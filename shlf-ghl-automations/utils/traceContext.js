@@ -9,6 +9,7 @@
 
 const { ConvexHttpClient } = require('convex/browser');
 const crypto = require('crypto');
+const { api } = require('../convex/_generated/api.cjs');
 
 // Initialize Convex client
 let convex = null;
@@ -236,9 +237,6 @@ async function startTrace(options) {
   }
 
   try {
-    // Dynamic import for Convex API
-    const { api } = await import('../convex/_generated/api.js');
-
     await client.mutation(api.ghl.traces.createTrace, {
       traceId,
       triggerType,
@@ -278,8 +276,6 @@ async function completeTrace(traceId, responseStatus, responseBody) {
   }
 
   try {
-    const { api } = await import('../convex/_generated/api.js');
-
     await client.mutation(api.ghl.traces.completeTrace, {
       traceId,
       responseStatus,
@@ -306,8 +302,6 @@ async function failTrace(traceId, error, responseStatus, responseBody) {
   }
 
   try {
-    const { api } = await import('../convex/_generated/api.js');
-
     await client.mutation(api.ghl.traces.failTrace, {
       traceId,
       error: formatError(error),
@@ -330,8 +324,6 @@ async function updateTraceContextIds(traceId, contextIds) {
   if (!client) return;
 
   try {
-    const { api } = await import('../convex/_generated/api.js');
-
     await client.mutation(api.ghl.traces.updateTraceContextIds, {
       traceId,
       ...contextIds,
@@ -366,8 +358,6 @@ async function startStep(traceId, serviceName, functionName, input, contextData)
   }
 
   try {
-    const { api } = await import('../convex/_generated/api.js');
-
     await client.mutation(api.ghl.steps.createStep, {
       stepId,
       traceId,
@@ -395,8 +385,6 @@ async function completeStep(stepId, output) {
   if (!client) return;
 
   try {
-    const { api } = await import('../convex/_generated/api.js');
-
     await client.mutation(api.ghl.steps.completeStep, {
       stepId,
       output: truncatePayload(output),
@@ -421,8 +409,6 @@ async function failStep(stepId, error, traceId) {
   if (!client) return;
 
   try {
-    const { api } = await import('../convex/_generated/api.js');
-
     await client.mutation(api.ghl.steps.failStep, {
       stepId,
       error: formatError(error),
@@ -442,8 +428,6 @@ async function skipStep(stepId, reason) {
   if (!client) return;
 
   try {
-    const { api } = await import('../convex/_generated/api.js');
-
     await client.mutation(api.ghl.steps.skipStep, {
       stepId,
       reason,
@@ -487,8 +471,6 @@ async function startDetail(traceId, stepId, options) {
   } = options;
 
   try {
-    const { api } = await import('../convex/_generated/api.js');
-
     await client.mutation(api.ghl.details.createDetail, {
       detailId,
       traceId,
@@ -529,8 +511,6 @@ async function completeDetail(detailId, options) {
   } = options;
 
   try {
-    const { api } = await import('../convex/_generated/api.js');
-
     await client.mutation(api.ghl.details.completeDetail, {
       detailId,
       responseStatus,
@@ -558,8 +538,6 @@ async function failDetail(detailId, error, traceId) {
   if (!client) return;
 
   try {
-    const { api } = await import('../convex/_generated/api.js');
-
     await client.mutation(api.ghl.details.failDetail, {
       detailId,
       error: formatError(error),
