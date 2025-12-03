@@ -1,6 +1,7 @@
 import { SupabaseService } from '../services/supabase.js';
 import { ERROR_CODES } from '../constants/error-codes.js';
 import { EventTracker } from '../services/event-tracker.js';
+import { config } from '../config/index.js';
 
 /**
  * AUTOMATION: Task Deletion
@@ -100,6 +101,20 @@ export class TaskDeletedAutomation {
 
         console.log(`[TASK-DELETE] ${taskId} COMPLETED (not found)\n`);
         return { success: true, action: 'task_not_found' };
+      }
+
+      // TEST MODE: Safety check - only process tasks from test matter
+      if (config.testing.testMode && existingTask.matter_id !== config.testing.testMatterId) {
+        console.log(`[TASK-DELETE] ${taskId} SKIPPED (test mode - matter ${existingTask.matter_id} !== ${config.testing.testMatterId})`);
+        await EventTracker.endStep(updateTaskStepId, { status: 'skipped', metadata: { reason: 'test_mode_filter' } });
+
+        await SupabaseService.updateWebhookProcessed(idempotencyKey, {
+          processing_duration_ms: Date.now() - startTime,
+          success: true,
+          action: 'skipped_test_mode',
+        });
+
+        return { success: true, action: 'skipped_test_mode' };
       }
 
       // Mark task as deleted in Supabase (soft delete)

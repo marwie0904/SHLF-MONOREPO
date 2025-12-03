@@ -9,18 +9,16 @@ import { DocumentCreatedAutomation } from '../automations/document-created.js';
 import { webhookQueue } from '../utils/webhook-queue.js';
 import { EventTracker } from '../services/event-tracker.js';
 import { ClioService } from '../services/clio.js';
+import { config } from '../config/index.js';
 
 const router = express.Router();
 
 /**
  * TEST MODE CONFIGURATION
- * When enabled, only webhooks for the specified matter ID will be processed.
- * Set TEST_MODE=false or remove it to process all matters.
+ * Uses environment variables: TEST_MODE=true and TEST_MATTER_ID=1675950832
+ * This provides an EARLY filter at the router level before any automation runs.
+ * Individual automations also check test mode as a safety net.
  */
-const TEST_MODE = {
-  enabled: true,
-  allowedMatterIds: [1675950832], // Add more matter IDs here if needed
-};
 
 /**
  * Extract matter ID from various webhook data structures (for test mode filtering)
@@ -43,35 +41,43 @@ const extractMatterIdForFilter = (webhookData) => {
 
 /**
  * Test mode middleware - filters webhooks to only process allowed matters
+ * Uses config.testing.testMode and config.testing.testMatterId from environment
  */
 const testModeFilter = (req, res, next) => {
   // Skip if test mode is disabled
-  if (!TEST_MODE.enabled) {
+  if (!config.testing.testMode) {
     return next();
   }
 
   const webhookData = req.body;
   const matterId = extractMatterIdForFilter(webhookData);
 
-  // If we can't determine matter ID, skip (let the handler deal with it)
+  // If we can't determine matter ID from webhook data, block it in test mode
+  // This is safer than allowing unknown matters through
   if (!matterId) {
-    console.log('⚠️  [TEST MODE] Could not extract matter ID from webhook, allowing through');
+    console.log('🚫 [TEST MODE] Could not extract matter ID from webhook - blocking for safety');
+    console.log('   Webhook data keys:', Object.keys(webhookData.data || {}));
+    return res.status(200).json({
+      success: true,
+      action: 'skipped',
+      reason: 'test_mode_no_matter_id',
+      message: 'Test mode active - could not determine matter ID from webhook',
+    });
+  }
+
+  // Check if matter matches allowed test matter
+  if (matterId === config.testing.testMatterId) {
+    console.log(`✅ [TEST MODE] Matter ${matterId} is the test matter, processing webhook`);
     return next();
   }
 
-  // Check if matter is in allowed list
-  if (TEST_MODE.allowedMatterIds.includes(matterId)) {
-    console.log(`✅ [TEST MODE] Matter ${matterId} is allowed, processing webhook`);
-    return next();
-  }
-
-  // Matter not in allowed list - skip silently
-  console.log(`🚫 [TEST MODE] Matter ${matterId} not in allowed list, skipping`);
+  // Matter not allowed - skip silently
+  console.log(`🚫 [TEST MODE] Matter ${matterId} !== ${config.testing.testMatterId}, skipping`);
   return res.status(200).json({
     success: true,
     action: 'skipped',
     reason: 'test_mode_filter',
-    message: `Test mode active - only processing matters: ${TEST_MODE.allowedMatterIds.join(', ')}`,
+    message: `Test mode active - only processing matter: ${config.testing.testMatterId}`,
   });
 };
 
@@ -308,8 +314,8 @@ router.get('/health', (req, res) => {
     status: 'healthy',
     timestamp: new Date().toISOString(),
     testMode: {
-      enabled: TEST_MODE.enabled,
-      allowedMatterIds: TEST_MODE.enabled ? TEST_MODE.allowedMatterIds : 'all',
+      enabled: config.testing.testMode,
+      testMatterId: config.testing.testMode ? config.testing.testMatterId : 'all matters allowed',
     },
     automations: [
       'matter-stage-change',
