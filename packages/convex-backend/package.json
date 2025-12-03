@@ -1,0 +1,30 @@
+{
+  "name": "@shlf/convex-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared Convex backend for SHLF automations",
+  "type": "module",
+  "main": "convex/_generated/api.js",
+  "types": "convex/_generated/api.d.ts",
+  "scripts": {
+    "dev": "convex dev",
+    "deploy": "convex deploy",
+    "push": "convex deploy --cmd 'echo Deployed'"
+  },
+  "exports": {
+    ".": {
+      "import": "./convex/_generated/api.js",
+      "types": "./convex/_generated/api.d.ts"
+    },
+    "./api": {
+      "import": "./convex/_generated/api.js",
+      "types": "./convex/_generated/api.d.ts"
+    }
+  },
+  "dependencies": {
+    "convex": "^1.30.0"
+  },
+  "peerDependencies": {
+    "convex": "^1.30.0"
+  }
+}

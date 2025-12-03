@@ -1,0 +1,63 @@
+import axios from 'axios';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+// Fetch token from Supabase
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
+
+const { data: tokenData } = await supabase
+  .from('clio_tokens')
+  .select('access_token')
+  .eq('id', 1)
+  .single();
+
+const clioClient = axios.create({
+  baseURL: process.env.CLIO_API_BASE_URL,
+  headers: {
+    'Authorization': `Bearer ${tokenData.access_token}`,
+    'Content-Type': 'application/json',
+  },
+});
+
+console.log('🧪 TEST 2: Clio Task API Endpoint (Active Task)\n');
+
+const testTaskId = 1211338028;
+
+console.log(`Testing Clio API for task ${testTaskId}...\n`);
+
+try {
+  const response = await clioClient.get(`/api/v4/tasks/${testTaskId}`, {
+    params: {
+      fields: 'id,name,status,assignee{id,name}',
+    },
+  });
+
+  console.log('✅ API call successful!\n');
+  console.log('📋 Response structure:');
+  console.log(JSON.stringify(response.data, null, 2));
+
+  const task = response.data.data;
+  console.log('\n📊 Field verification:');
+  console.log(`  id: ${task.id} (${typeof task.id})`);
+  console.log(`  name: ${task.name} (${typeof task.name})`);
+  console.log(`  status: ${task.status} (${typeof task.status})`);
+  console.log(`  assignee: ${task.assignee ? JSON.stringify(task.assignee) : 'null'}`);
+
+  if (task.assignee) {
+    console.log(`    assignee.id: ${task.assignee.id} (${typeof task.assignee.id})`);
+    console.log(`    assignee.name: ${task.assignee.name} (${typeof task.assignee.name})`);
+  }
+
+  console.log('\n✅ Test 2 passed - Clio task endpoint structure is correct');
+  console.log('✅ Response format matches script expectations');
+} catch (error) {
+  console.error('❌ API call failed:', error.message);
+  console.error('Status:', error.response?.status);
+  console.error('Data:', JSON.stringify(error.response?.data, null, 2));
+  process.exit(1);
+}

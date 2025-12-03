@@ -1,0 +1,410 @@
+Verifying 100 contacts via Clio API...
+
+[1/100] Verifying Contact ID: 2137888372 (Millie Lopez)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[2/100] Verifying Contact ID: 2249740477 (Mark Tate)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[3/100] Verifying Contact ID: 2137892332 (Sam Mazzola)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[4/100] Verifying Contact ID: 2249703772 (No Name)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[5/100] Verifying Contact ID: 2249720872 (No Name)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[6/100] Verifying Contact ID: 2249779537 (Bianca Negron)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[7/100] Verifying Contact ID: 2136012277 (Christina Cachon)
+  ✓ Has Matters: Yes (1)
+  ✓ Duplicates Found: 0
+
+[8/100] Verifying Contact ID: 2249856052 (Bill Pembleton)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[9/100] Verifying Contact ID: 2137887457 (Livette Augus)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[10/100] Verifying Contact ID: 2135962192 (Monica Gatt)
+  ✓ Has Matters: Yes (1)
+  ✓ Duplicates Found: 0
+
+[11/100] Verifying Contact ID: 2249754967 (Simi Sasson)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[12/100] Verifying Contact ID: 2249752537 (Jackie Danforth)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[13/100] Verifying Contact ID: 2249829187 (Linda O'neill)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[14/100] Verifying Contact ID: 2136037282 (Patricia Pulisciano)
+  ✓ Has Matters: Yes (1)
+  ✓ Duplicates Found: 0
+
+[15/100] Verifying Contact ID: 2249720227 (Kelly Hunter)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[16/100] Verifying Contact ID: 2137894672 (yarenis Abril)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[17/100] Verifying Contact ID: 2249779597 (Rosemarie Spesia)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[18/100] Verifying Contact ID: 2159934157 (Gabby Ang)
+  ✓ Has Matters: Yes (1)
+  ✓ Duplicates Found: 0
+
+[19/100] Verifying Contact ID: 2249828962 (Laura Cari)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[20/100] Verifying Contact ID: 2163219472 (Fred Raimann)
+  ✓ Has Matters: Yes (1)
+  ✓ Duplicates Found: 0
+
+[21/100] Verifying Contact ID: 2249756587 (Kathryn ruth Lundquist)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[22/100] Verifying Contact ID: 2135952922 (Michelle Taylor)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[23/100] Verifying Contact ID: 2148912367 (Julie Kennedy)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[24/100] Verifying Contact ID: 2249862502 (Caroline Cameron)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[25/100] Verifying Contact ID: 2249755717 (Jane Carroo)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[26/100] Verifying Contact ID: 2249756632 (Robert bruce Ledoux)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[27/100] Verifying Contact ID: 2137879312 (Cheryl Harris)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[28/100] Verifying Contact ID: 2249705617 (No Name)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[29/100] Verifying Contact ID: 2249864347 (Gilda Kompanek)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[30/100] Verifying Contact ID: 2249776957 (Diane Mato)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[31/100] Verifying Contact ID: 2249735917 (Mark Sastre)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[32/100] Verifying Contact ID: 2249753272 (Grace Neville)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[33/100] Verifying Contact ID: 2249754682 (Pauline Surillo)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[34/100] Verifying Contact ID: 2157938602 (Que Raphael)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[35/100] Verifying Contact ID: 2137876867 (Alexis Gaughan)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[36/100] Verifying Contact ID: 2249851447 (Cyndi Requejo)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[37/100] Verifying Contact ID: 2249724082 (Christine Sylvers)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[38/100] Verifying Contact ID: 2249700067 (No Name)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[39/100] Verifying Contact ID: 2249829322 (Susan Underwood)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[40/100] Verifying Contact ID: 2249823142 (Anita Wonsang)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[41/100] Verifying Contact ID: 2249732167 (Alice Dennis)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[42/100] Verifying Contact ID: 2249813452 (Angela Pryce)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[43/100] Verifying Contact ID: 2249813887 (Christine Sullivan)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[44/100] Verifying Contact ID: 2249824147 (Dianne Macgregor)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[45/100] Verifying Contact ID: 2249827312 (Tammie Kilpatrick)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[46/100] Verifying Contact ID: 2137877392 (Donna Carbone)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[47/100] Verifying Contact ID: 2249796292 (Patricia Miller)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[48/100] Verifying Contact ID: 2249755462 (Rebecca Rozhon)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[49/100] Verifying Contact ID: 2249694757 (No Name)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[50/100] Verifying Contact ID: 2249839432 (Betty Steiner)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[51/100] Verifying Contact ID: 2249854507 (Ellen Glowacki)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[52/100] Verifying Contact ID: 2249742742 (Jamie Flowers)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[53/100] Verifying Contact ID: 2157938587 (Kathy Jewell)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[54/100] Verifying Contact ID: 2136029737 (Patricia Hyland)
+  ✓ Has Matters: Yes (1)
+  ✓ Duplicates Found: 0
+
+[55/100] Verifying Contact ID: 2249852782 (Mark Gonzales)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[56/100] Verifying Contact ID: 2249784997 (Nancy & bob Soukup)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[57/100] Verifying Contact ID: 2137877932 (Barbara Treffery)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[58/100] Verifying Contact ID: 2249812522 (Cecily Hoogerhyde)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[59/100] Verifying Contact ID: 2249725492 (Anne Kelly)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[60/100] Verifying Contact ID: 2249695387 (No Name)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[61/100] Verifying Contact ID: 2137887502 (Lou Kirk)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[62/100] Verifying Contact ID: 2136049312 (Teresa Panetta)
+  ✓ Has Matters: Yes (1)
+  ✓ Duplicates Found: 0
+
+[63/100] Verifying Contact ID: 2147421322 (Steven Szepesi I)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[64/100] Verifying Contact ID: 2249767687 (Debra Cheek)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[65/100] Verifying Contact ID: 2146399027 (Susan Fakoukakis)
+  ✓ Has Matters: Yes (1)
+  ✓ Duplicates Found: 0
+
+[66/100] Verifying Contact ID: 2249853472 (Sandra Marschall)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[67/100] Verifying Contact ID: 2157938782 (Dianne Wardinski)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[68/100] Verifying Contact ID: 2163418282 (Christine Charette)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[69/100] Verifying Contact ID: 2249844157 (Betty Andrews)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[70/100] Verifying Contact ID: 2249852557 (Barbara Lee)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[71/100] Verifying Contact ID: 2137891417 (Ronald Britton)
+  ✓ Has Matters: Yes (1)
+  ✓ Duplicates Found: 0
+
+[72/100] Verifying Contact ID: 2169390547 (Christine Sylvers)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[73/100] Verifying Contact ID: 2222193008 (Lynda Saraceni)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[74/100] Verifying Contact ID: 2137876177 (Kimberly Holmes)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[75/100] Verifying Contact ID: 2249730607 (E. Fakoukakis)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[76/100] Verifying Contact ID: 2249754442 (Sandra Jackson)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[77/100] Verifying Contact ID: 2249853037 (Mike Phillips)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[78/100] Verifying Contact ID: 2136028762 (Deborah Davis)
+  ✓ Has Matters: Yes (1)
+  ✓ Duplicates Found: 0
+
+[79/100] Verifying Contact ID: 2151208162 (Bill Cunningham)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[80/100] Verifying Contact ID: 2169390247 (Lynda Saraceni)
+  ✓ Has Matters: Yes (1)
+  ✓ Duplicates Found: 0
+
+[81/100] Verifying Contact ID: 2163418417 (Di Severns)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[82/100] Verifying Contact ID: 2140804927 (Jayne Patton)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[83/100] Verifying Contact ID: 2136049387 (Pamela Hershberger)
+  ✓ Has Matters: Yes (1)
+  ✓ Duplicates Found: 0
+
+[84/100] Verifying Contact ID: 2146958662 (Lynne La)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[85/100] Verifying Contact ID: 2137659382 (Valerie Lawson)
+  ✓ Has Matters: Yes (1)
+  ✓ Duplicates Found: 0
+
+[86/100] Verifying Contact ID: 2249843557 (William Safford)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[87/100] Verifying Contact ID: 2137889002 (Sue-Ann Dunlop)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[88/100] Verifying Contact ID: 2137893367 (Tammy Daffron)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[89/100] Verifying Contact ID: 2249756167 (Bernd Ziegler)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[90/100] Verifying Contact ID: 2135985652 (Richard Johnson)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[91/100] Verifying Contact ID: 2137889137 (Maryrose Buttice)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[92/100] Verifying Contact ID: 2163219307 (Lynn Staley)
+  ✓ Has Matters: Yes (1)
+  ✓ Duplicates Found: 0
+
+[93/100] Verifying Contact ID: 2249818942 (Anne Walker)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[94/100] Verifying Contact ID: 2249697202 (No Name)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[95/100] Verifying Contact ID: 2249776492 (Chequita Robinson)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[96/100] Verifying Contact ID: 2249808622 (Angela Wilson)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[97/100] Verifying Contact ID: 2249843107 (Cris Lake)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[98/100] Verifying Contact ID: 2249723902 (Gwendolyn Simmons)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[99/100] Verifying Contact ID: 2249703472 (No Name)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+[100/100] Verifying Contact ID: 2249748292 (Stephen Stearns)
+  ✓ Has Matters: No (0)
+  ✓ Duplicates Found: 0
+
+✓ Verification complete! Results saved to: ./csv/verification-results.csv
+
+=== Verification Summary ===
+Total Verified: 100/100
+Contacts WITH matters: 14
+Contacts WITHOUT matters: 86
+Contacts WITH duplicates: 0
+Contacts WITHOUT duplicates: 100

@@ -1,0 +1,132 @@
+=== Investigating Matter 1730829713 - Signing Meeting Task Issue ===
+
+1. Checking tasks table for matter 1730829713
+
+Found 10 tasks for matter 1730829713
+
+All tasks:
+
+[1] Task: Open client portal
+  Task ID: 1169436323
+  Description: Open client portal
+  Assigned User: Jacqui Calma
+  Due Date: 2025-09-18
+  Calendar Entry ID: N/A
+  Stage: I/V Meeting  (ID: 828078)
+  Completed: true
+  Last Updated: 2025-09-17
+
+[2] Task: Start Answer File - No PIF yet
+  Task ID: 1169436353
+  Description: Start Answer File
+  Assigned User: User
+  Due Date: 2025-09-17
+  Calendar Entry ID: N/A
+  Stage: I/V Meeting  (ID: 828078)
+  Completed: true
+  Last Updated: 2025-09-19
+
+[3] Task: Pre-Meeting Preparation
+  Task ID: 1169436368
+  Description: Call Client to confirm I/V Meeting. Make sure all initial meeting docs for Attorney is ready including PIF and Scanned POA.
+  Assigned User: Chelsea Engler
+  Due Date: N/A
+  Calendar Entry ID: N/A
+  Stage: I/V Meeting  (ID: 828078)
+  Completed: true
+  Last Updated: 2025-09-17
+
+[4] Task: Make Sure ID is on file
+  Task ID: 1169436383
+  Description: Make sure ID is on file, if not, scan at meeting
+  Assigned User: Chelsea Engler
+  Due Date: 2025-09-18
+  Calendar Entry ID: N/A
+  Stage: I/V Meeting  (ID: 828078)
+  Completed: true
+  Last Updated: 2025-09-17
+
+[5] Task: Draft and assemble deed
+  Task ID: 1170433148
+  Description: *DO NOT DELETE* Draft and assemble (including deed if needed, everything) save to OD. Coordinate with out of state attorneys if needed
+  Assigned User: Kelly Finck
+  Due Date: 2025-09-22
+  Calendar Entry ID: N/A
+  Stage: Drafting (ID: 828768)
+  Completed: true
+  Last Updated: 2025-09-19
+
+[6] Task: Update Funding Table
+  Task ID: 1170433163
+  Description: Update Funding Table based on atty notes and financial docs
+  Assigned User: Breanna Canning
+  Due Date: 2025-09-22
+  Calendar Entry ID: N/A
+  Stage: Drafting (ID: 828768)
+  Completed: true
+  Last Updated: 2025-09-19
+
+[7] Task: Submit TYFCB Slip with BNI
+  Task ID: 1170433193
+  Description: Submit TYFCB Slip with BNI
+  Assigned User: Kelly Finck
+  Due Date: 2025-09-22
+  Calendar Entry ID: N/A
+  Stage: Drafting (ID: 828768)
+  Completed: false
+  Last Updated: 2025-09-19
+
+[8] Task: Update Clio Grow
+  Task ID: 1170433208
+  Description: If not yet done, Update Clio Grow
+  Assigned User: Jacqui Calma
+  Due Date: 2025-09-22
+  Calendar Entry ID: N/A
+  Stage: Drafting (ID: 828768)
+  Completed: true
+  Last Updated: 2025-09-19
+
+[9] Task: Review Draft
+  Task ID: 1170433223
+  Description: review draft and funding table
+  Assigned User: Helen Mena
+  Due Date: 2025-09-24
+  Calendar Entry ID: N/A
+  Stage: Drafting (ID: 828768)
+  Completed: true
+  Last Updated: 2025-09-19
+
+[10] Task: Send out Videos and Draft Docs
+  Task ID: 1170433238
+  Description: Ensure Attorney has reviewed drafts and send out videos and draft docs, and Signing Meeting Is Scheduled
+  Assigned User: Chelsea Engler
+  Due Date: 2025-09-25
+  Calendar Entry ID: N/A
+  Stage: Drafting (ID: 828768)
+  Completed: true
+  Last Updated: 2025-10-10
+
+
+Signing-related tasks found: 1
+
+  [1] Send out Videos and Draft Docs
+    Calendar Entry ID: NONE - THIS IS THE ISSUE!
+    Due Date: 2025-09-25
+
+
+2. Checking webhook_events for matter 1730829713
+
+Found 0 webhook events for matter 1730829713
+  ⚠️  NO WEBHOOK EVENTS FOUND for this matter
+
+
+=== Investigation Summary ===
+Matter ID: 1730829713
+Total Tasks: 10
+Signing Tasks: 0
+Webhook Events: 0
+
+Next Steps:
+1. Check if signing meeting calendar entry exists for this matter
+2. Check task mapping configuration for signing meeting events
+3. Review webhook processing logs for any errors

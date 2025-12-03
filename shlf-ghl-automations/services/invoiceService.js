@@ -1,0 +1,833 @@
+const { createClient } = require('@supabase/supabase-js');
+const { startDetail, completeDetail, failDetail } = require('../utils/traceContext');
+
+/**
+ * Invoice Service
+ * Handles all invoice-related database operations with Supabase
+ */
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
+
+/**
+ * Save or update invoice in Supabase
+ * @param {Object} invoiceData - Invoice data to save
+ * @param {string} traceId - Optional trace ID for tracking
+ * @param {string} stepId - Optional step ID for tracking
+ * @returns {Promise<Object>} Saved invoice record
+ */
+async function saveInvoiceToSupabase(invoiceData, traceId = null, stepId = null) {
+  console.log('=== Saving Invoice to Supabase ===');
+  console.log('Invoice Data:', JSON.stringify(invoiceData, null, 2));
+
+  const record = {
+    ghl_invoice_id: invoiceData.ghlInvoiceId,
+    ghl_opportunity_id: invoiceData.opportunityId,
+    ghl_contact_id: invoiceData.contactId,
+    opportunity_name: invoiceData.opportunityName,
+    primary_contact_name: invoiceData.primaryContactName,
+    confido_invoice_id: invoiceData.confidoInvoiceId || null,
+    confido_client_id: invoiceData.confidoClientId || null,
+    confido_matter_id: invoiceData.confidoMatterId || null,
+    payment_url: invoiceData.paymentUrl || null,
+    service_items: invoiceData.serviceItems || null,
+    invoice_number: invoiceData.invoiceNumber,
+    amount_due: invoiceData.amountDue,
+    amount_paid: invoiceData.amountPaid || 0,
+    status: invoiceData.status || 'pending',
+    invoice_date: invoiceData.invoiceDate,
+    due_date: invoiceData.dueDate,
+    paid_date: invoiceData.paidDate || null,
+  };
+
+  // Start detail tracking
+  let detailId = null;
+  if (traceId && stepId) {
+    try {
+      const detail = await startDetail(traceId, stepId, {
+        detailType: 'db_query',
+        apiProvider: 'supabase',
+        operationName: 'upsert_invoices',
+        operationInput: { ghlInvoiceId: invoiceData.ghlInvoiceId }
+      });
+      detailId = detail.detailId;
+    } catch (e) {
+      console.error('Error starting detail:', e.message);
+    }
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('invoices')
+      .upsert(record, {
+        onConflict: 'ghl_invoice_id',
+        ignoreDuplicates: false,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      if (detailId) {
+        try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+      }
+      console.error('❌ Error saving invoice to Supabase:', error);
+      throw error;
+    }
+
+    if (detailId) {
+      try { await completeDetail(detailId, { operationOutput: { id: data.id } }); } catch (e) { console.error('Error completing detail:', e.message); }
+    }
+
+    console.log('✅ Invoice saved to Supabase successfully');
+    console.log('Invoice ID:', data.id);
+
+    return {
+      success: true,
+      data,
+    };
+
+  } catch (error) {
+    if (detailId) {
+      try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+    }
+    console.error('❌ Error in saveInvoiceToSupabase:', error.message);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * Update invoice payment status
+ * @param {string} confidoInvoiceId - Confido invoice ID
+ * @param {Object} paymentData - Payment information
+ * @param {string} traceId - Optional trace ID for tracking
+ * @param {string} stepId - Optional step ID for tracking
+ * @returns {Promise<Object>} Updated invoice record
+ */
+async function updateInvoicePaymentStatus(confidoInvoiceId, paymentData, traceId = null, stepId = null) {
+  console.log('=== Updating Invoice Payment Status ===');
+  console.log('Confido Invoice ID:', confidoInvoiceId);
+  console.log('Payment Data:', JSON.stringify(paymentData, null, 2));
+
+  const updateData = {
+    amount_paid: paymentData.amount,
+    status: 'paid',
+    paid_date: paymentData.transactionDate || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  // Start detail tracking
+  let detailId = null;
+  if (traceId && stepId) {
+    try {
+      const detail = await startDetail(traceId, stepId, {
+        detailType: 'db_query',
+        apiProvider: 'supabase',
+        operationName: 'update_invoices_payment_status',
+        operationInput: { confidoInvoiceId, status: 'paid' }
+      });
+      detailId = detail.detailId;
+    } catch (e) {
+      console.error('Error starting detail:', e.message);
+    }
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('invoices')
+      .update(updateData)
+      .eq('confido_invoice_id', confidoInvoiceId)
+      .select()
+      .single();
+
+    if (error) {
+      if (detailId) {
+        try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+      }
+      console.error('❌ Error updating invoice payment status:', error);
+      throw error;
+    }
+
+    if (!data) {
+      if (detailId) {
+        try { await completeDetail(detailId, { operationOutput: { found: false } }); } catch (e) { console.error('Error completing detail:', e.message); }
+      }
+      console.warn('⚠️ No invoice found with Confido Invoice ID:', confidoInvoiceId);
+      return {
+        success: false,
+        error: 'Invoice not found',
+      };
+    }
+
+    if (detailId) {
+      try { await completeDetail(detailId, { operationOutput: { id: data.id } }); } catch (e) { console.error('Error completing detail:', e.message); }
+    }
+
+    console.log('✅ Invoice payment status updated successfully');
+    console.log('Invoice ID:', data.id);
+
+    return {
+      success: true,
+      data,
+    };
+
+  } catch (error) {
+    if (detailId) {
+      try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+    }
+    console.error('❌ Error in updateInvoicePaymentStatus:', error.message);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * Get invoice by GHL invoice ID
+ * @param {string} ghlInvoiceId - GHL invoice ID
+ * @param {string} traceId - Optional trace ID for tracking
+ * @param {string} stepId - Optional step ID for tracking
+ * @returns {Promise<Object>} Invoice record
+ */
+async function getInvoiceByGHLId(ghlInvoiceId, traceId = null, stepId = null) {
+  console.log('=== Fetching Invoice by GHL ID ===');
+  console.log('GHL Invoice ID:', ghlInvoiceId);
+
+  // Start detail tracking
+  let detailId = null;
+  if (traceId && stepId) {
+    try {
+      const detail = await startDetail(traceId, stepId, {
+        detailType: 'db_query',
+        apiProvider: 'supabase',
+        operationName: 'select_invoices_by_ghl_id',
+        operationInput: { ghlInvoiceId }
+      });
+      detailId = detail.detailId;
+    } catch (e) {
+      console.error('Error starting detail:', e.message);
+    }
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('ghl_invoice_id', ghlInvoiceId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No rows returned
+        if (detailId) {
+          try { await completeDetail(detailId, { operationOutput: { found: false } }); } catch (e) { console.error('Error completing detail:', e.message); }
+        }
+        console.log('ℹ️ No invoice found with GHL Invoice ID:', ghlInvoiceId);
+        return {
+          success: true,
+          data: null,
+        };
+      }
+      if (detailId) {
+        try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+      }
+      console.error('❌ Error fetching invoice:', error);
+      throw error;
+    }
+
+    if (detailId) {
+      try { await completeDetail(detailId, { operationOutput: { found: true, id: data.id } }); } catch (e) { console.error('Error completing detail:', e.message); }
+    }
+
+    console.log('✅ Invoice found');
+
+    return {
+      success: true,
+      data,
+    };
+
+  } catch (error) {
+    if (detailId) {
+      try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+    }
+    console.error('❌ Error in getInvoiceByGHLId:', error.message);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * Get invoice by invoice number
+ * @param {string} invoiceNumber - Invoice number (e.g., INV-20251128-A84C)
+ * @param {string} traceId - Optional trace ID for tracking
+ * @param {string} stepId - Optional step ID for tracking
+ * @returns {Promise<Object>} Invoice record
+ */
+async function getInvoiceByInvoiceNumber(invoiceNumber, traceId = null, stepId = null) {
+  console.log('=== Fetching Invoice by Invoice Number ===');
+  console.log('Invoice Number:', invoiceNumber);
+
+  // Start detail tracking
+  let detailId = null;
+  if (traceId && stepId) {
+    try {
+      const detail = await startDetail(traceId, stepId, {
+        detailType: 'db_query',
+        apiProvider: 'supabase',
+        operationName: 'select_invoices_by_number',
+        operationInput: { invoiceNumber }
+      });
+      detailId = detail.detailId;
+    } catch (e) {
+      console.error('Error starting detail:', e.message);
+    }
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('invoice_number', invoiceNumber)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        if (detailId) {
+          try { await completeDetail(detailId, { operationOutput: { found: false } }); } catch (e) { console.error('Error completing detail:', e.message); }
+        }
+        console.log('ℹ️ No invoice found with Invoice Number:', invoiceNumber);
+        return {
+          success: true,
+          data: null,
+        };
+      }
+      if (detailId) {
+        try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+      }
+      console.error('❌ Error fetching invoice:', error);
+      throw error;
+    }
+
+    if (detailId) {
+      try { await completeDetail(detailId, { operationOutput: { found: true, id: data.id } }); } catch (e) { console.error('Error completing detail:', e.message); }
+    }
+
+    console.log('✅ Invoice found');
+
+    return {
+      success: true,
+      data,
+    };
+
+  } catch (error) {
+    if (detailId) {
+      try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+    }
+    console.error('❌ Error in getInvoiceByInvoiceNumber:', error.message);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * Get invoice by Confido invoice ID
+ * @param {string} confidoInvoiceId - Confido invoice ID
+ * @param {string} traceId - Optional trace ID for tracking
+ * @param {string} stepId - Optional step ID for tracking
+ * @returns {Promise<Object>} Invoice record
+ */
+async function getInvoiceByconfidoId(confidoInvoiceId, traceId = null, stepId = null) {
+  console.log('=== Fetching Invoice by Confido ID ===');
+  console.log('Confido Invoice ID:', confidoInvoiceId);
+
+  // Start detail tracking
+  let detailId = null;
+  if (traceId && stepId) {
+    try {
+      const detail = await startDetail(traceId, stepId, {
+        detailType: 'db_query',
+        apiProvider: 'supabase',
+        operationName: 'select_invoices_by_confido_id',
+        operationInput: { confidoInvoiceId }
+      });
+      detailId = detail.detailId;
+    } catch (e) {
+      console.error('Error starting detail:', e.message);
+    }
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('confido_invoice_id', confidoInvoiceId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No rows returned
+        if (detailId) {
+          try { await completeDetail(detailId, { operationOutput: { found: false } }); } catch (e) { console.error('Error completing detail:', e.message); }
+        }
+        console.log('ℹ️ No invoice found with Confido Invoice ID:', confidoInvoiceId);
+        return {
+          success: true,
+          data: null,
+        };
+      }
+      if (detailId) {
+        try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+      }
+      console.error('❌ Error fetching invoice:', error);
+      throw error;
+    }
+
+    if (detailId) {
+      try { await completeDetail(detailId, { operationOutput: { found: true, id: data.id } }); } catch (e) { console.error('Error completing detail:', e.message); }
+    }
+
+    console.log('✅ Invoice found');
+
+    return {
+      success: true,
+      data,
+    };
+
+  } catch (error) {
+    if (detailId) {
+      try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+    }
+    console.error('❌ Error in getInvoiceByconfidoId:', error.message);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * Save payment transaction to Supabase
+ * @param {Object} paymentData - Payment transaction data
+ * @param {string} traceId - Optional trace ID for tracking
+ * @param {string} stepId - Optional step ID for tracking
+ * @returns {Promise<Object>} Saved payment record
+ */
+async function savePaymentToSupabase(paymentData, traceId = null, stepId = null) {
+  console.log('=== Saving Payment to Supabase ===');
+  console.log('Payment Data:', JSON.stringify(paymentData, null, 2));
+
+  const record = {
+    confido_payment_id: paymentData.confidoPaymentId,
+    confido_invoice_id: paymentData.confidoInvoiceId,
+    ghl_invoice_id: paymentData.ghlInvoiceId,
+    ghl_contact_id: paymentData.ghlContactId,
+    ghl_opportunity_id: paymentData.ghlOpportunityId,
+    amount: paymentData.amount,
+    payment_method: paymentData.paymentMethod,
+    status: paymentData.status || 'completed',
+    transaction_date: paymentData.transactionDate,
+    raw_webhook_data: paymentData.rawWebhookData || null,
+  };
+
+  // Start detail tracking
+  let detailId = null;
+  if (traceId && stepId) {
+    try {
+      const detail = await startDetail(traceId, stepId, {
+        detailType: 'db_query',
+        apiProvider: 'supabase',
+        operationName: 'upsert_confido_payments',
+        operationInput: { confidoPaymentId: paymentData.confidoPaymentId }
+      });
+      detailId = detail.detailId;
+    } catch (e) {
+      console.error('Error starting detail:', e.message);
+    }
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('confido_payments')
+      .upsert(record, {
+        onConflict: 'confido_payment_id',
+        ignoreDuplicates: false,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      if (detailId) {
+        try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+      }
+      console.error('❌ Error saving payment to Supabase:', error);
+      throw error;
+    }
+
+    if (detailId) {
+      try { await completeDetail(detailId, { operationOutput: { id: data.id } }); } catch (e) { console.error('Error completing detail:', e.message); }
+    }
+
+    console.log('✅ Payment saved to Supabase successfully');
+    console.log('Payment ID:', data.id);
+
+    return {
+      success: true,
+      data,
+    };
+
+  } catch (error) {
+    if (detailId) {
+      try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+    }
+    console.error('❌ Error in savePaymentToSupabase:', error.message);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * Get all invoices for a specific opportunity
+ * @param {string} opportunityId - GHL opportunity ID
+ * @param {string} traceId - Optional trace ID for tracking
+ * @param {string} stepId - Optional step ID for tracking
+ * @returns {Promise<Object>} Array of invoice records
+ */
+async function getInvoicesByOpportunity(opportunityId, traceId = null, stepId = null) {
+  console.log('=== Fetching Invoices by Opportunity ===');
+  console.log('Opportunity ID:', opportunityId);
+
+  // Start detail tracking
+  let detailId = null;
+  if (traceId && stepId) {
+    try {
+      const detail = await startDetail(traceId, stepId, {
+        detailType: 'db_query',
+        apiProvider: 'supabase',
+        operationName: 'select_invoices_by_opportunity',
+        operationInput: { opportunityId }
+      });
+      detailId = detail.detailId;
+    } catch (e) {
+      console.error('Error starting detail:', e.message);
+    }
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('ghl_opportunity_id', opportunityId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      if (detailId) {
+        try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+      }
+      console.error('❌ Error fetching invoices:', error);
+      throw error;
+    }
+
+    if (detailId) {
+      try { await completeDetail(detailId, { operationOutput: { count: data.length } }); } catch (e) { console.error('Error completing detail:', e.message); }
+    }
+
+    console.log(`✅ Found ${data.length} invoices for opportunity`);
+
+    return {
+      success: true,
+      data,
+    };
+
+  } catch (error) {
+    if (detailId) {
+      try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+    }
+    console.error('❌ Error in getInvoicesByOpportunity:', error.message);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * Calculate invoice total from service items
+ * @param {Array<string>} serviceItemNames - Array of service item names
+ * @param {string} traceId - Optional trace ID for tracking
+ * @param {string} stepId - Optional step ID for tracking
+ * @returns {Promise<Object>} Total amount and line items
+ */
+async function calculateInvoiceTotal(serviceItemNames, traceId = null, stepId = null) {
+  console.log('=== Calculating Invoice Total ===');
+  console.log('Service Items:', serviceItemNames);
+
+  if (!serviceItemNames || serviceItemNames.length === 0) {
+    return {
+      success: true,
+      total: 0,
+      lineItems: [],
+      missingItems: []
+    };
+  }
+
+  // Start detail tracking
+  let detailId = null;
+  if (traceId && stepId) {
+    try {
+      const detail = await startDetail(traceId, stepId, {
+        detailType: 'db_query',
+        apiProvider: 'supabase',
+        operationName: 'select_invoice_service_items',
+        operationInput: { serviceItemNames }
+      });
+      detailId = detail.detailId;
+    } catch (e) {
+      console.error('Error starting detail:', e.message);
+    }
+  }
+
+  try {
+    // Fetch service items from catalog
+    const { data, error } = await supabase
+      .from('invoice_service_items')
+      .select('service_name, price, description')
+      .in('service_name', serviceItemNames)
+      .eq('is_active', true);
+
+    if (error) {
+      if (detailId) {
+        try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+      }
+      console.error('❌ Error fetching service items:', error);
+      throw error;
+    }
+
+    let total = 0;
+    const lineItems = [];
+    const missingItems = [];
+
+    // Calculate total and build line items
+    for (const serviceName of serviceItemNames) {
+      const item = data.find(d => d.service_name === serviceName);
+
+      if (item) {
+        const price = parseFloat(item.price);
+        total += price;
+        lineItems.push({
+          name: serviceName,
+          description: item.description || serviceName,
+          price: price,
+          quantity: 1
+        });
+        console.log(`✅ Found: ${serviceName} - $${price}`);
+      } else {
+        console.warn(`⚠️ Service item not found in catalog: ${serviceName}`);
+        missingItems.push(serviceName);
+      }
+    }
+
+    if (detailId) {
+      try { await completeDetail(detailId, { operationOutput: { total, lineItemCount: lineItems.length, missingCount: missingItems.length } }); } catch (e) { console.error('Error completing detail:', e.message); }
+    }
+
+    console.log(`Total: $${total.toFixed(2)}`);
+    console.log(`Line Items: ${lineItems.length}`);
+    if (missingItems.length > 0) {
+      console.warn(`Missing Items: ${missingItems.join(', ')}`);
+    }
+
+    return {
+      success: true,
+      total,
+      lineItems,
+      missingItems
+    };
+
+  } catch (error) {
+    if (detailId) {
+      try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+    }
+    console.error('❌ Error in calculateInvoiceTotal:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      total: 0,
+      lineItems: [],
+      missingItems: []
+    };
+  }
+}
+
+/**
+ * Get service items from catalog
+ * @param {Array<string>} serviceNames - Array of service names to fetch
+ * @param {string} traceId - Optional trace ID for tracking
+ * @param {string} stepId - Optional step ID for tracking
+ * @returns {Promise<Object>} Service items data
+ */
+async function getServiceItems(serviceNames, traceId = null, stepId = null) {
+  console.log('=== Fetching Service Items ===');
+  console.log('Service Names:', serviceNames);
+
+  // Start detail tracking
+  let detailId = null;
+  if (traceId && stepId) {
+    try {
+      const detail = await startDetail(traceId, stepId, {
+        detailType: 'db_query',
+        apiProvider: 'supabase',
+        operationName: 'select_service_items',
+        operationInput: { serviceNames }
+      });
+      detailId = detail.detailId;
+    } catch (e) {
+      console.error('Error starting detail:', e.message);
+    }
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('invoice_service_items')
+      .select('*')
+      .in('service_name', serviceNames)
+      .eq('is_active', true);
+
+    if (error) {
+      if (detailId) {
+        try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+      }
+      console.error('❌ Error fetching service items:', error);
+      throw error;
+    }
+
+    if (detailId) {
+      try { await completeDetail(detailId, { operationOutput: { count: data.length } }); } catch (e) { console.error('Error completing detail:', e.message); }
+    }
+
+    console.log(`✅ Found ${data.length} service items`);
+
+    return {
+      success: true,
+      data
+    };
+
+  } catch (error) {
+    if (detailId) {
+      try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+    }
+    console.error('❌ Error in getServiceItems:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      data: []
+    };
+  }
+}
+
+/**
+ * Update invoice in Supabase by GHL invoice ID
+ * @param {string} ghlInvoiceId - GHL invoice ID
+ * @param {Object} updates - Fields to update
+ * @param {string} traceId - Optional trace ID for tracking
+ * @param {string} stepId - Optional step ID for tracking
+ * @returns {Promise<Object>} Updated invoice record
+ */
+async function updateInvoiceInSupabase(ghlInvoiceId, updates, traceId = null, stepId = null) {
+  console.log('=== Updating Invoice in Supabase ===');
+  console.log('GHL Invoice ID:', ghlInvoiceId);
+  console.log('Updates:', JSON.stringify(updates, null, 2));
+
+  const updateData = {
+    ...updates,
+    updated_at: new Date().toISOString()
+  };
+
+  // Start detail tracking
+  let detailId = null;
+  if (traceId && stepId) {
+    try {
+      const detail = await startDetail(traceId, stepId, {
+        detailType: 'db_query',
+        apiProvider: 'supabase',
+        operationName: 'update_invoices',
+        operationInput: { ghlInvoiceId, updateFields: Object.keys(updates) }
+      });
+      detailId = detail.detailId;
+    } catch (e) {
+      console.error('Error starting detail:', e.message);
+    }
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('invoices')
+      .update(updateData)
+      .eq('ghl_invoice_id', ghlInvoiceId)
+      .select()
+      .single();
+
+    if (error) {
+      if (detailId) {
+        try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+      }
+      console.error('❌ Error updating invoice:', error);
+      throw error;
+    }
+
+    if (!data) {
+      if (detailId) {
+        try { await completeDetail(detailId, { operationOutput: { found: false } }); } catch (e) { console.error('Error completing detail:', e.message); }
+      }
+      console.warn('⚠️ No invoice found with GHL Invoice ID:', ghlInvoiceId);
+      return {
+        success: false,
+        error: 'Invoice not found'
+      };
+    }
+
+    if (detailId) {
+      try { await completeDetail(detailId, { operationOutput: { id: data.id } }); } catch (e) { console.error('Error completing detail:', e.message); }
+    }
+
+    console.log('✅ Invoice updated successfully');
+
+    return {
+      success: true,
+      data
+    };
+
+  } catch (error) {
+    if (detailId) {
+      try { await failDetail(detailId, error, traceId); } catch (e) { console.error('Error failing detail:', e.message); }
+    }
+    console.error('❌ Error in updateInvoiceInSupabase:', error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+module.exports = {
+  saveInvoiceToSupabase,
+  updateInvoicePaymentStatus,
+  getInvoiceByGHLId,
+  getInvoiceByInvoiceNumber,
+  getInvoiceByconfidoId,
+  savePaymentToSupabase,
+  getInvoicesByOpportunity,
+  calculateInvoiceTotal,
+  getServiceItems,
+  updateInvoiceInSupabase,
+};

@@ -1,0 +1,40 @@
+=== Checking Calendar Entries for Matter 1730829713 ===
+
+Found 2 calendar entries for matter 1730829713
+
+[1] Helen - Initial Meeting - Naples - Jacqueline Campbell
+  ID: 4603489373
+  Start: 2025-09-19T09:30:00-04:00
+  End: 2025-09-19T10:30:00-04:00
+  Created: 2025-09-16T10:58:09-04:00
+  Description: N/A
+
+[2] Brea - Signing Conference - Naples - Campbell, Jacqueline
+  ID: 4637476193
+  Start: 2025-10-29T09:30:00-04:00
+  End: 2025-10-29T10:30:00-04:00
+  Created: 2025-10-13T15:57:26-04:00
+  Description: N/A
+  ⚠️  THIS IS A SIGNING MEETING!
+
+
+=== Summary ===
+Total Calendar Entries: 2
+Signing Meetings: 1
+
+⚠️  SIGNING MEETING(S) FOUND:
+
+[1] Brea - Signing Conference - Naples - Campbell, Jacqueline (ID: 4637476193)
+  Start: 2025-10-29T09:30:00-04:00
+  Created: 2025-10-13T15:57:26-04:00
+
+❌ PROBLEM IDENTIFIED:
+   - Signing meeting calendar entries exist in Clio
+   - NO tasks were created for these signing meetings
+   - NO webhook events found in Supabase for this matter
+
+Possible Causes:
+   1. Webhook not triggered when signing meeting was created/updated
+   2. Webhook triggered but failed to process
+   3. Task mapping configuration missing for signing meetings
+   4. Calendar entry created before automation was enabled

@@ -1,0 +1,50 @@
+{
+  "name": "shlf-automations",
+  "version": "1.0.0",
+  "description": "SHLF Legal Practice Automation System - Clio Task Automation",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "test": "node tests/test-runner.js",
+    "test:stage": "node scripts/test-one-stage.mjs",
+    "test:validate": "node scripts/validate-task-generation.mjs",
+    "test:completion": "node scripts/test-task-completion.mjs",
+    "test:calendar:event-first": "node scripts/test-calendar-event-first.mjs",
+    "test:calendar:stage-first": "node scripts/test-calendar-stage-first.mjs",
+    "report:generate": "node scripts/generate-readable-report.mjs",
+    "cleanup": "node scripts/delete-test-matter-tasks.mjs",
+    "cleanup:test-matter": "node cleanup-test-matter.js",
+    "webhook:check": "node scripts/check-webhook-status.mjs",
+    "webhook:create": "bash scripts/create-clio-webhook.sh",
+    "webhook:renew": "node src/jobs/renew-webhooks.js",
+    "job:stale-matters": "node src/jobs/check-stale-matters.js",
+    "token:refresh": "node src/jobs/refresh-token.js"
+  },
+  "keywords": [
+    "clio",
+    "automation",
+    "legal",
+    "task-management"
+  ],
+  "author": "SHLF",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@shlf/convex-backend": "workspace:*",
+    "@supabase/supabase-js": "^2.39.0",
+    "axios": "^1.6.2",
+    "convex": "^1.30.0",
+    "csv-parse": "^6.1.0",
+    "csv-stringify": "^6.6.0",
+    "date-fns": "^2.30.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "node-cron": "^4.2.1",
+    "pg": "^8.16.3",
+    "playwright": "^1.56.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

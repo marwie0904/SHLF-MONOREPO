@@ -1,0 +1,2526 @@
+{
+  "testSuite": "Estate Planning Automation Tests",
+  "timestamp": "2025-11-03T11:43:00.068Z",
+  "duration": "22m 36s",
+  "configuration": {
+    "matterId": 1675950832,
+    "variations": 3,
+    "stagesPerVariation": 12,
+    "totalTests": 36
+  },
+  "results": {
+    "total": 36,
+    "passed": 30,
+    "failed": 6,
+    "totalTasksGenerated": 74,
+    "totalDependenciesResolved": 15
+  },
+  "details": [
+    {
+      "variation": "Naples - Attorney 1",
+      "location": "Naples",
+      "attorneyId": 357380836,
+      "stageId": 805098,
+      "stageName": "Stage 805098",
+      "timestamp": "2025-11-03T11:20:24.329Z",
+      "success": false,
+      "tasksGenerated": 0,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [],
+      "errors": [
+        "Request failed with status code 422"
+      ]
+    },
+    {
+      "variation": "Naples - Attorney 1",
+      "location": "Naples",
+      "attorneyId": 357380836,
+      "stageId": 828078,
+      "stageName": "I/V MEETING",
+      "timestamp": "2025-11-03T11:20:29.698Z",
+      "success": true,
+      "tasksGenerated": 0,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:20:59.199Z",
+          "tasks": []
+        }
+      ]
+    },
+    {
+      "variation": "Naples - Attorney 1",
+      "location": "Naples",
+      "attorneyId": 357380836,
+      "stageId": 828768,
+      "stageName": "Drafting",
+      "timestamp": "2025-11-03T11:20:59.443Z",
+      "success": true,
+      "tasksGenerated": 6,
+      "completionDependencies": {
+        "found": 1,
+        "parentsCompleted": 1,
+        "dependenciesResolved": 2
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Update Clio Grow",
+          "assignedUser": "Jacqui Calma",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 2,
+          "taskName": "Update Funding Table",
+          "assignedUser": "Breanna Canning",
+          "dueDate": "2025-11-05",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 3,
+          "taskName": "Draft and assemble deed",
+          "assignedUser": "Kelly Finck",
+          "dueDate": "2025-11-05",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 4,
+          "taskName": "Review Draft",
+          "assignedUser": "Brittany Cocchieri",
+          "dueDate": null,
+          "hasDueDate": false
+        },
+        {
+          "taskNumber": 5,
+          "taskName": "Send out Videos and Draft Docs",
+          "assignedUser": "Chelsea Engler",
+          "dueDate": null,
+          "hasDueDate": false
+        },
+        {
+          "taskNumber": 6,
+          "taskName": "Submit TYFCB Slip with BNI",
+          "assignedUser": "Kelly Finck",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:21:32.603Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Update Clio Grow",
+              "assignedUser": "Jacqui Calma",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Update Funding Table",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Draft and assemble deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 4,
+              "taskName": "Review Draft",
+              "assignedUser": "Brittany Cocchieri",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 5,
+              "taskName": "Send out Videos and Draft Docs",
+              "assignedUser": "Chelsea Engler",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 6,
+              "taskName": "Submit TYFCB Slip with BNI",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        },
+        {
+          "step": "After completing Task 3: \"Draft and assemble deed\"",
+          "timestamp": "2025-11-03T11:21:57.918Z",
+          "completedTaskNumber": 3,
+          "completedTaskName": "Draft and assemble deed",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Update Clio Grow",
+              "assignedUser": "Jacqui Calma",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Update Funding Table",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Draft and assemble deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 4,
+              "taskName": "Review Draft",
+              "assignedUser": "Brittany Cocchieri",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 5,
+              "taskName": "Send out Videos and Draft Docs",
+              "assignedUser": "Chelsea Engler",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 6,
+              "taskName": "Submit TYFCB Slip with BNI",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Naples - Attorney 1",
+      "location": "Naples",
+      "attorneyId": 357380836,
+      "stageId": 828783,
+      "stageName": "Pending Engagement",
+      "timestamp": "2025-11-03T11:21:58.155Z",
+      "success": true,
+      "tasksGenerated": 2,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Email Lead",
+          "assignedUser": "Brittany Cocchieri",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 2,
+          "taskName": "Attempt 1",
+          "assignedUser": "Chelsea Engler",
+          "dueDate": "2025-11-06",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:22:32.232Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Email Lead",
+              "assignedUser": "Brittany Cocchieri",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Attempt 1",
+              "assignedUser": "Chelsea Engler",
+              "dueDate": "2025-11-06",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Naples - Attorney 1",
+      "location": "Naples",
+      "attorneyId": 357380836,
+      "stageId": 833223,
+      "stageName": "Cancelled/No Show IV Meeting",
+      "timestamp": "2025-11-03T11:22:32.935Z",
+      "success": true,
+      "tasksGenerated": 2,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Attempt 1 Follow Up",
+          "assignedUser": "Chelsea Engler",
+          "dueDate": "2025-11-05",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 5,
+          "taskName": "Update Clio Grow",
+          "assignedUser": "Jacqui Calma",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:23:05.403Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Attempt 1 Follow Up",
+              "assignedUser": "Chelsea Engler",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 5,
+              "taskName": "Update Clio Grow",
+              "assignedUser": "Jacqui Calma",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Naples - Attorney 1",
+      "location": "Naples",
+      "attorneyId": 357380836,
+      "stageId": 848343,
+      "stageName": "Cancelled/No Show Signing",
+      "timestamp": "2025-11-03T11:23:06.129Z",
+      "success": true,
+      "tasksGenerated": 2,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Attempt 1",
+          "assignedUser": "Brittany Cocchieri",
+          "dueDate": "2025-11-10",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 5,
+          "taskName": "Void Invoice",
+          "assignedUser": "Chelsea Engler",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:23:38.581Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Attempt 1",
+              "assignedUser": "Brittany Cocchieri",
+              "dueDate": "2025-11-10",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 5,
+              "taskName": "Void Invoice",
+              "assignedUser": "Chelsea Engler",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Naples - Attorney 1",
+      "location": "Naples",
+      "attorneyId": 357380836,
+      "stageId": 848358,
+      "stageName": "For Recording and Submission",
+      "timestamp": "2025-11-03T11:23:39.478Z",
+      "success": true,
+      "tasksGenerated": 4,
+      "completionDependencies": {
+        "found": 1,
+        "parentsCompleted": 2,
+        "dependenciesResolved": 2
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Initiate Funding Process",
+          "assignedUser": "Breanna Canning",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 2,
+          "taskName": "Record Deed",
+          "assignedUser": "Kelly Finck",
+          "dueDate": "2025-11-05",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 3,
+          "taskName": "Mail Recorded Deed",
+          "assignedUser": "Kelly Finck",
+          "dueDate": null,
+          "hasDueDate": false
+        },
+        {
+          "taskNumber": 4,
+          "taskName": "Send Thank You Letter and Confirm Deed",
+          "assignedUser": "Chelsea Engler",
+          "dueDate": null,
+          "hasDueDate": false
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:24:11.984Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Initiate Funding Process",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Record Deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Mail Recorded Deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 4,
+              "taskName": "Send Thank You Letter and Confirm Deed",
+              "assignedUser": "Chelsea Engler",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            }
+          ]
+        },
+        {
+          "step": "After completing Task 2: \"Record Deed\"",
+          "timestamp": "2025-11-03T11:24:35.835Z",
+          "completedTaskNumber": 2,
+          "completedTaskName": "Record Deed",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Initiate Funding Process",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Record Deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Mail Recorded Deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-06",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 4,
+              "taskName": "Send Thank You Letter and Confirm Deed",
+              "assignedUser": "Chelsea Engler",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "unknown"
+            }
+          ]
+        },
+        {
+          "step": "After completing Task 3: \"Mail Recorded Deed\"",
+          "timestamp": "2025-11-03T11:24:58.521Z",
+          "completedTaskNumber": 3,
+          "completedTaskName": "Mail Recorded Deed",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Initiate Funding Process",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Record Deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Mail Recorded Deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-06",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 4,
+              "taskName": "Send Thank You Letter and Confirm Deed",
+              "assignedUser": "Chelsea Engler",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Naples - Attorney 1",
+      "location": "Naples",
+      "attorneyId": 357380836,
+      "stageId": 896506,
+      "stageName": "Did Not Engage",
+      "timestamp": "2025-11-03T11:24:58.762Z",
+      "success": true,
+      "tasksGenerated": 1,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Update Clio Grow",
+          "assignedUser": "Jacqui Calma",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:25:31.700Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Update Clio Grow",
+              "assignedUser": "Jacqui Calma",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Naples - Attorney 1",
+      "location": "Naples",
+      "attorneyId": 357380836,
+      "stageId": 986242,
+      "stageName": "Cancelled/No Show Design",
+      "timestamp": "2025-11-03T11:25:32.173Z",
+      "success": true,
+      "tasksGenerated": 1,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Attempt 1",
+          "assignedUser": "Brittany Cocchieri",
+          "dueDate": "2025-11-10",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:26:03.729Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Attempt 1",
+              "assignedUser": "Brittany Cocchieri",
+              "dueDate": "2025-11-10",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Naples - Attorney 1",
+      "location": "Naples",
+      "attorneyId": 357380836,
+      "stageId": 1038727,
+      "stageName": "New D/S Meeting Booked / Drafting Parked",
+      "timestamp": "2025-11-03T11:26:04.211Z",
+      "success": false,
+      "tasksGenerated": 0,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [],
+      "errors": [
+        "Request failed with status code 422"
+      ]
+    },
+    {
+      "variation": "Naples - Attorney 1",
+      "location": "Naples",
+      "attorneyId": 357380836,
+      "stageId": 1053877,
+      "stageName": "New D/S Meeting Booked / Drafting Parked",
+      "timestamp": "2025-11-03T11:26:09.204Z",
+      "success": true,
+      "tasksGenerated": 1,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Attempt 1",
+          "assignedUser": "Chelsea Engler",
+          "dueDate": "2025-11-10",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:26:39.662Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Attempt 1",
+              "assignedUser": "Chelsea Engler",
+              "dueDate": "2025-11-10",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Naples - Attorney 1",
+      "location": "Naples",
+      "attorneyId": 357380836,
+      "stageId": 1110277,
+      "stageName": "Funding in Progress",
+      "timestamp": "2025-11-03T11:26:40.129Z",
+      "success": true,
+      "tasksGenerated": 3,
+      "completionDependencies": {
+        "found": 1,
+        "parentsCompleted": 1,
+        "dependenciesResolved": 1
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Confirm Funding Documents Have Been Signed",
+          "assignedUser": "Breanna Canning",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 2,
+          "taskName": "Send Out Funding",
+          "assignedUser": "Breanna Canning",
+          "dueDate": null,
+          "hasDueDate": false
+        },
+        {
+          "taskNumber": 3,
+          "taskName": "Check Funding Status",
+          "assignedUser": "Breanna Canning",
+          "dueDate": "2025-11-18",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:27:12.262Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Confirm Funding Documents Have Been Signed",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Send Out Funding",
+              "assignedUser": "Breanna Canning",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Check Funding Status",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-18",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        },
+        {
+          "step": "After completing Task 1: \"Confirm Funding Documents Have Been Signed\"",
+          "timestamp": "2025-11-03T11:27:36.286Z",
+          "completedTaskNumber": 1,
+          "completedTaskName": "Confirm Funding Documents Have Been Signed",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Confirm Funding Documents Have Been Signed",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Send Out Funding",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-10",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Check Funding Status",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-18",
+              "hasDueDate": true,
+              "status": "unknown"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Bonita Springs - Attorney 2",
+      "location": "Bonita Springs",
+      "attorneyId": 357292201,
+      "stageId": 805098,
+      "stageName": "Stage 805098",
+      "timestamp": "2025-11-03T11:27:56.710Z",
+      "success": false,
+      "tasksGenerated": 0,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [],
+      "errors": [
+        "Request failed with status code 422"
+      ]
+    },
+    {
+      "variation": "Bonita Springs - Attorney 2",
+      "location": "Bonita Springs",
+      "attorneyId": 357292201,
+      "stageId": 828078,
+      "stageName": "I/V MEETING",
+      "timestamp": "2025-11-03T11:28:03.398Z",
+      "success": true,
+      "tasksGenerated": 4,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Open client portal",
+          "assignedUser": "Jacqui Calma",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 2,
+          "taskName": "Make Sure ID is on file",
+          "assignedUser": "Brooklyn Klepfer",
+          "dueDate": null,
+          "hasDueDate": false
+        },
+        {
+          "taskNumber": 3,
+          "taskName": "Pre-Meeting Preparation",
+          "assignedUser": "Brooklyn Klepfer",
+          "dueDate": null,
+          "hasDueDate": false
+        },
+        {
+          "taskNumber": 4,
+          "taskName": "Start Answer File",
+          "assignedUser": "Jacqui Calma",
+          "dueDate": null,
+          "hasDueDate": false
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:28:34.990Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Open client portal",
+              "assignedUser": "Jacqui Calma",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Make Sure ID is on file",
+              "assignedUser": "Brooklyn Klepfer",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Pre-Meeting Preparation",
+              "assignedUser": "Brooklyn Klepfer",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 4,
+              "taskName": "Start Answer File",
+              "assignedUser": "Jacqui Calma",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Bonita Springs - Attorney 2",
+      "location": "Bonita Springs",
+      "attorneyId": 357292201,
+      "stageId": 828768,
+      "stageName": "Drafting",
+      "timestamp": "2025-11-03T11:28:36.271Z",
+      "success": true,
+      "tasksGenerated": 6,
+      "completionDependencies": {
+        "found": 1,
+        "parentsCompleted": 1,
+        "dependenciesResolved": 2
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Update Clio Grow",
+          "assignedUser": "Jacqui Calma",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 2,
+          "taskName": "Update Funding Table",
+          "assignedUser": "Breanna Canning",
+          "dueDate": "2025-11-05",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 3,
+          "taskName": "Draft and assemble deed",
+          "assignedUser": "Kelly Finck",
+          "dueDate": "2025-11-05",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 4,
+          "taskName": "Review Draft",
+          "assignedUser": "Pam Baker",
+          "dueDate": null,
+          "hasDueDate": false
+        },
+        {
+          "taskNumber": 5,
+          "taskName": "Send out Videos and Draft Docs",
+          "assignedUser": "Brooklyn Klepfer",
+          "dueDate": null,
+          "hasDueDate": false
+        },
+        {
+          "taskNumber": 6,
+          "taskName": "Submit TYFCB Slip with BNI",
+          "assignedUser": "Kelly Finck",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:29:10.655Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Update Clio Grow",
+              "assignedUser": "Jacqui Calma",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Update Funding Table",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Draft and assemble deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 4,
+              "taskName": "Review Draft",
+              "assignedUser": "Pam Baker",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 5,
+              "taskName": "Send out Videos and Draft Docs",
+              "assignedUser": "Brooklyn Klepfer",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 6,
+              "taskName": "Submit TYFCB Slip with BNI",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        },
+        {
+          "step": "After completing Task 3: \"Draft and assemble deed\"",
+          "timestamp": "2025-11-03T11:29:35.373Z",
+          "completedTaskNumber": 3,
+          "completedTaskName": "Draft and assemble deed",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Update Clio Grow",
+              "assignedUser": "Jacqui Calma",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Update Funding Table",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Draft and assemble deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 4,
+              "taskName": "Review Draft",
+              "assignedUser": "Pam Baker",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 5,
+              "taskName": "Send out Videos and Draft Docs",
+              "assignedUser": "Brooklyn Klepfer",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 6,
+              "taskName": "Submit TYFCB Slip with BNI",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Bonita Springs - Attorney 2",
+      "location": "Bonita Springs",
+      "attorneyId": 357292201,
+      "stageId": 828783,
+      "stageName": "Pending Engagement",
+      "timestamp": "2025-11-03T11:29:35.606Z",
+      "success": true,
+      "tasksGenerated": 2,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Email Lead",
+          "assignedUser": "Pam Baker",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 2,
+          "taskName": "Attempt 1",
+          "assignedUser": "Brooklyn Klepfer",
+          "dueDate": "2025-11-06",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:30:09.595Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Email Lead",
+              "assignedUser": "Pam Baker",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Attempt 1",
+              "assignedUser": "Brooklyn Klepfer",
+              "dueDate": "2025-11-06",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Bonita Springs - Attorney 2",
+      "location": "Bonita Springs",
+      "attorneyId": 357292201,
+      "stageId": 833223,
+      "stageName": "Cancelled/No Show IV Meeting",
+      "timestamp": "2025-11-03T11:30:10.564Z",
+      "success": true,
+      "tasksGenerated": 2,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Attempt 1 Follow Up",
+          "assignedUser": "Brooklyn Klepfer",
+          "dueDate": "2025-11-05",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 5,
+          "taskName": "Update Clio Grow",
+          "assignedUser": "Jacqui Calma",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:30:42.642Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Attempt 1 Follow Up",
+              "assignedUser": "Brooklyn Klepfer",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 5,
+              "taskName": "Update Clio Grow",
+              "assignedUser": "Jacqui Calma",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Bonita Springs - Attorney 2",
+      "location": "Bonita Springs",
+      "attorneyId": 357292201,
+      "stageId": 848343,
+      "stageName": "Cancelled/No Show Signing",
+      "timestamp": "2025-11-03T11:30:43.443Z",
+      "success": true,
+      "tasksGenerated": 2,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Attempt 1",
+          "assignedUser": "Pam Baker",
+          "dueDate": "2025-11-10",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 5,
+          "taskName": "Void Invoice",
+          "assignedUser": "Brooklyn Klepfer",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:31:15.956Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Attempt 1",
+              "assignedUser": "Pam Baker",
+              "dueDate": "2025-11-10",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 5,
+              "taskName": "Void Invoice",
+              "assignedUser": "Brooklyn Klepfer",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Bonita Springs - Attorney 2",
+      "location": "Bonita Springs",
+      "attorneyId": 357292201,
+      "stageId": 848358,
+      "stageName": "For Recording and Submission",
+      "timestamp": "2025-11-03T11:31:16.740Z",
+      "success": true,
+      "tasksGenerated": 4,
+      "completionDependencies": {
+        "found": 1,
+        "parentsCompleted": 2,
+        "dependenciesResolved": 2
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Initiate Funding Process",
+          "assignedUser": "Breanna Canning",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 2,
+          "taskName": "Record Deed",
+          "assignedUser": "Kelly Finck",
+          "dueDate": "2025-11-05",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 3,
+          "taskName": "Mail Recorded Deed",
+          "assignedUser": "Kelly Finck",
+          "dueDate": null,
+          "hasDueDate": false
+        },
+        {
+          "taskNumber": 4,
+          "taskName": "Send Thank You Letter and Confirm Deed",
+          "assignedUser": "Brooklyn Klepfer",
+          "dueDate": null,
+          "hasDueDate": false
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:31:51.050Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Initiate Funding Process",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Record Deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Mail Recorded Deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 4,
+              "taskName": "Send Thank You Letter and Confirm Deed",
+              "assignedUser": "Brooklyn Klepfer",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            }
+          ]
+        },
+        {
+          "step": "After completing Task 2: \"Record Deed\"",
+          "timestamp": "2025-11-03T11:32:14.966Z",
+          "completedTaskNumber": 2,
+          "completedTaskName": "Record Deed",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Initiate Funding Process",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Record Deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Mail Recorded Deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-06",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 4,
+              "taskName": "Send Thank You Letter and Confirm Deed",
+              "assignedUser": "Brooklyn Klepfer",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "unknown"
+            }
+          ]
+        },
+        {
+          "step": "After completing Task 3: \"Mail Recorded Deed\"",
+          "timestamp": "2025-11-03T11:32:38.079Z",
+          "completedTaskNumber": 3,
+          "completedTaskName": "Mail Recorded Deed",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Initiate Funding Process",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Record Deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Mail Recorded Deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-06",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 4,
+              "taskName": "Send Thank You Letter and Confirm Deed",
+              "assignedUser": "Brooklyn Klepfer",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Bonita Springs - Attorney 2",
+      "location": "Bonita Springs",
+      "attorneyId": 357292201,
+      "stageId": 896506,
+      "stageName": "Did Not Engage",
+      "timestamp": "2025-11-03T11:32:38.326Z",
+      "success": true,
+      "tasksGenerated": 1,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Update Clio Grow",
+          "assignedUser": "Jacqui Calma",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:33:11.405Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Update Clio Grow",
+              "assignedUser": "Jacqui Calma",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Bonita Springs - Attorney 2",
+      "location": "Bonita Springs",
+      "attorneyId": 357292201,
+      "stageId": 986242,
+      "stageName": "Cancelled/No Show Design",
+      "timestamp": "2025-11-03T11:33:11.892Z",
+      "success": true,
+      "tasksGenerated": 1,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Attempt 1",
+          "assignedUser": "Pam Baker",
+          "dueDate": "2025-11-10",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:33:43.523Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Attempt 1",
+              "assignedUser": "Pam Baker",
+              "dueDate": "2025-11-10",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Bonita Springs - Attorney 2",
+      "location": "Bonita Springs",
+      "attorneyId": 357292201,
+      "stageId": 1038727,
+      "stageName": "New D/S Meeting Booked / Drafting Parked",
+      "timestamp": "2025-11-03T11:33:44.026Z",
+      "success": false,
+      "tasksGenerated": 0,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [],
+      "errors": [
+        "Request failed with status code 422"
+      ]
+    },
+    {
+      "variation": "Bonita Springs - Attorney 2",
+      "location": "Bonita Springs",
+      "attorneyId": 357292201,
+      "stageId": 1053877,
+      "stageName": "New D/S Meeting Booked / Drafting Parked",
+      "timestamp": "2025-11-03T11:33:49.037Z",
+      "success": true,
+      "tasksGenerated": 1,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Attempt 1",
+          "assignedUser": "Brooklyn Klepfer",
+          "dueDate": "2025-11-10",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:34:19.539Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Attempt 1",
+              "assignedUser": "Brooklyn Klepfer",
+              "dueDate": "2025-11-10",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Bonita Springs - Attorney 2",
+      "location": "Bonita Springs",
+      "attorneyId": 357292201,
+      "stageId": 1110277,
+      "stageName": "Funding in Progress",
+      "timestamp": "2025-11-03T11:34:20.037Z",
+      "success": true,
+      "tasksGenerated": 3,
+      "completionDependencies": {
+        "found": 1,
+        "parentsCompleted": 1,
+        "dependenciesResolved": 1
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Confirm Funding Documents Have Been Signed",
+          "assignedUser": "Breanna Canning",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 2,
+          "taskName": "Send Out Funding",
+          "assignedUser": "Breanna Canning",
+          "dueDate": null,
+          "hasDueDate": false
+        },
+        {
+          "taskNumber": 3,
+          "taskName": "Check Funding Status",
+          "assignedUser": "Breanna Canning",
+          "dueDate": "2025-11-18",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:34:52.673Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Confirm Funding Documents Have Been Signed",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Send Out Funding",
+              "assignedUser": "Breanna Canning",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Check Funding Status",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-18",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        },
+        {
+          "step": "After completing Task 1: \"Confirm Funding Documents Have Been Signed\"",
+          "timestamp": "2025-11-03T11:35:17.318Z",
+          "completedTaskNumber": 1,
+          "completedTaskName": "Confirm Funding Documents Have Been Signed",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Confirm Funding Documents Have Been Signed",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Send Out Funding",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-10",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Check Funding Status",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-18",
+              "hasDueDate": true,
+              "status": "unknown"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Fort Myers - Attorney 3",
+      "location": "Fort Myers",
+      "attorneyId": 357520756,
+      "stageId": 805098,
+      "stageName": "Stage 805098",
+      "timestamp": "2025-11-03T11:35:37.827Z",
+      "success": false,
+      "tasksGenerated": 0,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [],
+      "errors": [
+        "Request failed with status code 422"
+      ]
+    },
+    {
+      "variation": "Fort Myers - Attorney 3",
+      "location": "Fort Myers",
+      "attorneyId": 357520756,
+      "stageId": 828078,
+      "stageName": "I/V MEETING",
+      "timestamp": "2025-11-03T11:35:44.278Z",
+      "success": true,
+      "tasksGenerated": 4,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Open client portal",
+          "assignedUser": "Jacqui Calma",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 2,
+          "taskName": "Make Sure ID is on file",
+          "assignedUser": "Jessica Maristany",
+          "dueDate": null,
+          "hasDueDate": false
+        },
+        {
+          "taskNumber": 3,
+          "taskName": "Pre-Meeting Preparation",
+          "assignedUser": "Jessica Maristany",
+          "dueDate": null,
+          "hasDueDate": false
+        },
+        {
+          "taskNumber": 4,
+          "taskName": "Start Answer File",
+          "assignedUser": "Jacqui Calma",
+          "dueDate": null,
+          "hasDueDate": false
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:36:16.696Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Open client portal",
+              "assignedUser": "Jacqui Calma",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Make Sure ID is on file",
+              "assignedUser": "Jessica Maristany",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Pre-Meeting Preparation",
+              "assignedUser": "Jessica Maristany",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 4,
+              "taskName": "Start Answer File",
+              "assignedUser": "Jacqui Calma",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Fort Myers - Attorney 3",
+      "location": "Fort Myers",
+      "attorneyId": 357520756,
+      "stageId": 828768,
+      "stageName": "Drafting",
+      "timestamp": "2025-11-03T11:36:17.951Z",
+      "success": true,
+      "tasksGenerated": 6,
+      "completionDependencies": {
+        "found": 1,
+        "parentsCompleted": 1,
+        "dependenciesResolved": 2
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Update Clio Grow",
+          "assignedUser": "Jacqui Calma",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 2,
+          "taskName": "Update Funding Table",
+          "assignedUser": "Breanna Canning",
+          "dueDate": "2025-11-05",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 3,
+          "taskName": "Draft and assemble deed",
+          "assignedUser": "Kelly Finck",
+          "dueDate": "2025-11-05",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 4,
+          "taskName": "Review Draft",
+          "assignedUser": "Helen Mena",
+          "dueDate": null,
+          "hasDueDate": false
+        },
+        {
+          "taskNumber": 5,
+          "taskName": "Send out Videos and Draft Docs",
+          "assignedUser": "Jessica Maristany",
+          "dueDate": null,
+          "hasDueDate": false
+        },
+        {
+          "taskNumber": 6,
+          "taskName": "Submit TYFCB Slip with BNI",
+          "assignedUser": "Kelly Finck",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:36:53.141Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Update Clio Grow",
+              "assignedUser": "Jacqui Calma",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Update Funding Table",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Draft and assemble deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 4,
+              "taskName": "Review Draft",
+              "assignedUser": "Helen Mena",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 5,
+              "taskName": "Send out Videos and Draft Docs",
+              "assignedUser": "Jessica Maristany",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 6,
+              "taskName": "Submit TYFCB Slip with BNI",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        },
+        {
+          "step": "After completing Task 3: \"Draft and assemble deed\"",
+          "timestamp": "2025-11-03T11:37:19.202Z",
+          "completedTaskNumber": 3,
+          "completedTaskName": "Draft and assemble deed",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Update Clio Grow",
+              "assignedUser": "Jacqui Calma",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Update Funding Table",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Draft and assemble deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 4,
+              "taskName": "Review Draft",
+              "assignedUser": "Helen Mena",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 5,
+              "taskName": "Send out Videos and Draft Docs",
+              "assignedUser": "Jessica Maristany",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 6,
+              "taskName": "Submit TYFCB Slip with BNI",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Fort Myers - Attorney 3",
+      "location": "Fort Myers",
+      "attorneyId": 357520756,
+      "stageId": 828783,
+      "stageName": "Pending Engagement",
+      "timestamp": "2025-11-03T11:37:19.440Z",
+      "success": true,
+      "tasksGenerated": 2,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Email Lead",
+          "assignedUser": "Helen Mena",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 2,
+          "taskName": "Attempt 1",
+          "assignedUser": "Jessica Maristany",
+          "dueDate": "2025-11-06",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:37:53.694Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Email Lead",
+              "assignedUser": "Helen Mena",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Attempt 1",
+              "assignedUser": "Jessica Maristany",
+              "dueDate": "2025-11-06",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Fort Myers - Attorney 3",
+      "location": "Fort Myers",
+      "attorneyId": 357520756,
+      "stageId": 833223,
+      "stageName": "Cancelled/No Show IV Meeting",
+      "timestamp": "2025-11-03T11:37:54.428Z",
+      "success": true,
+      "tasksGenerated": 2,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Attempt 1 Follow Up",
+          "assignedUser": "Jessica Maristany",
+          "dueDate": "2025-11-05",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 5,
+          "taskName": "Update Clio Grow",
+          "assignedUser": "Jacqui Calma",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:38:26.577Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Attempt 1 Follow Up",
+              "assignedUser": "Jessica Maristany",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 5,
+              "taskName": "Update Clio Grow",
+              "assignedUser": "Jacqui Calma",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Fort Myers - Attorney 3",
+      "location": "Fort Myers",
+      "attorneyId": 357520756,
+      "stageId": 848343,
+      "stageName": "Cancelled/No Show Signing",
+      "timestamp": "2025-11-03T11:38:27.343Z",
+      "success": true,
+      "tasksGenerated": 2,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Attempt 1",
+          "assignedUser": "Helen Mena",
+          "dueDate": "2025-11-10",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 5,
+          "taskName": "Void Invoice",
+          "assignedUser": "Jessica Maristany",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:38:59.953Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Attempt 1",
+              "assignedUser": "Helen Mena",
+              "dueDate": "2025-11-10",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 5,
+              "taskName": "Void Invoice",
+              "assignedUser": "Jessica Maristany",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Fort Myers - Attorney 3",
+      "location": "Fort Myers",
+      "attorneyId": 357520756,
+      "stageId": 848358,
+      "stageName": "For Recording and Submission",
+      "timestamp": "2025-11-03T11:39:00.693Z",
+      "success": true,
+      "tasksGenerated": 4,
+      "completionDependencies": {
+        "found": 1,
+        "parentsCompleted": 2,
+        "dependenciesResolved": 2
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Initiate Funding Process",
+          "assignedUser": "Breanna Canning",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 2,
+          "taskName": "Record Deed",
+          "assignedUser": "Kelly Finck",
+          "dueDate": "2025-11-05",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 3,
+          "taskName": "Mail Recorded Deed",
+          "assignedUser": "Kelly Finck",
+          "dueDate": null,
+          "hasDueDate": false
+        },
+        {
+          "taskNumber": 4,
+          "taskName": "Send Thank You Letter and Confirm Deed",
+          "assignedUser": "Jessica Maristany",
+          "dueDate": null,
+          "hasDueDate": false
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:39:33.553Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Initiate Funding Process",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Record Deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Mail Recorded Deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 4,
+              "taskName": "Send Thank You Letter and Confirm Deed",
+              "assignedUser": "Jessica Maristany",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            }
+          ]
+        },
+        {
+          "step": "After completing Task 2: \"Record Deed\"",
+          "timestamp": "2025-11-03T11:39:57.549Z",
+          "completedTaskNumber": 2,
+          "completedTaskName": "Record Deed",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Initiate Funding Process",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Record Deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Mail Recorded Deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-06",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 4,
+              "taskName": "Send Thank You Letter and Confirm Deed",
+              "assignedUser": "Jessica Maristany",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "unknown"
+            }
+          ]
+        },
+        {
+          "step": "After completing Task 3: \"Mail Recorded Deed\"",
+          "timestamp": "2025-11-03T11:40:20.263Z",
+          "completedTaskNumber": 3,
+          "completedTaskName": "Mail Recorded Deed",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Initiate Funding Process",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Record Deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-05",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Mail Recorded Deed",
+              "assignedUser": "Kelly Finck",
+              "dueDate": "2025-11-06",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 4,
+              "taskName": "Send Thank You Letter and Confirm Deed",
+              "assignedUser": "Jessica Maristany",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Fort Myers - Attorney 3",
+      "location": "Fort Myers",
+      "attorneyId": 357520756,
+      "stageId": 896506,
+      "stageName": "Did Not Engage",
+      "timestamp": "2025-11-03T11:40:20.518Z",
+      "success": true,
+      "tasksGenerated": 1,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Update Clio Grow",
+          "assignedUser": "Jacqui Calma",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:40:54.736Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Update Clio Grow",
+              "assignedUser": "Jacqui Calma",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Fort Myers - Attorney 3",
+      "location": "Fort Myers",
+      "attorneyId": 357520756,
+      "stageId": 986242,
+      "stageName": "Cancelled/No Show Design",
+      "timestamp": "2025-11-03T11:40:55.206Z",
+      "success": true,
+      "tasksGenerated": 1,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Attempt 1",
+          "assignedUser": "Helen Mena",
+          "dueDate": "2025-11-10",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:41:27.773Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Attempt 1",
+              "assignedUser": "Helen Mena",
+              "dueDate": "2025-11-10",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Fort Myers - Attorney 3",
+      "location": "Fort Myers",
+      "attorneyId": 357520756,
+      "stageId": 1038727,
+      "stageName": "New D/S Meeting Booked / Drafting Parked",
+      "timestamp": "2025-11-03T11:41:28.264Z",
+      "success": false,
+      "tasksGenerated": 0,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [],
+      "errors": [
+        "Request failed with status code 422"
+      ]
+    },
+    {
+      "variation": "Fort Myers - Attorney 3",
+      "location": "Fort Myers",
+      "attorneyId": 357520756,
+      "stageId": 1053877,
+      "stageName": "New D/S Meeting Booked / Drafting Parked",
+      "timestamp": "2025-11-03T11:41:33.321Z",
+      "success": true,
+      "tasksGenerated": 1,
+      "completionDependencies": {
+        "found": 0,
+        "parentsCompleted": 0,
+        "dependenciesResolved": 0
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Attempt 1",
+          "assignedUser": "Jessica Maristany",
+          "dueDate": "2025-11-10",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:42:03.954Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Attempt 1",
+              "assignedUser": "Jessica Maristany",
+              "dueDate": "2025-11-10",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "variation": "Fort Myers - Attorney 3",
+      "location": "Fort Myers",
+      "attorneyId": 357520756,
+      "stageId": 1110277,
+      "stageName": "Funding in Progress",
+      "timestamp": "2025-11-03T11:42:04.469Z",
+      "success": true,
+      "tasksGenerated": 3,
+      "completionDependencies": {
+        "found": 1,
+        "parentsCompleted": 1,
+        "dependenciesResolved": 1
+      },
+      "tasks": [
+        {
+          "taskNumber": 1,
+          "taskName": "Confirm Funding Documents Have Been Signed",
+          "assignedUser": "Breanna Canning",
+          "dueDate": "2025-11-04",
+          "hasDueDate": true
+        },
+        {
+          "taskNumber": 2,
+          "taskName": "Send Out Funding",
+          "assignedUser": "Breanna Canning",
+          "dueDate": null,
+          "hasDueDate": false
+        },
+        {
+          "taskNumber": 3,
+          "taskName": "Check Funding Status",
+          "assignedUser": "Breanna Canning",
+          "dueDate": "2025-11-18",
+          "hasDueDate": true
+        }
+      ],
+      "errors": [],
+      "taskSnapshots": [
+        {
+          "step": "Initial - After stage change",
+          "timestamp": "2025-11-03T11:42:36.451Z",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Confirm Funding Documents Have Been Signed",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Send Out Funding",
+              "assignedUser": "Breanna Canning",
+              "dueDate": null,
+              "hasDueDate": false,
+              "status": "pending"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Check Funding Status",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-18",
+              "hasDueDate": true,
+              "status": "pending"
+            }
+          ]
+        },
+        {
+          "step": "After completing Task 1: \"Confirm Funding Documents Have Been Signed\"",
+          "timestamp": "2025-11-03T11:43:00.068Z",
+          "completedTaskNumber": 1,
+          "completedTaskName": "Confirm Funding Documents Have Been Signed",
+          "tasks": [
+            {
+              "taskNumber": 1,
+              "taskName": "Confirm Funding Documents Have Been Signed",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-04",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 2,
+              "taskName": "Send Out Funding",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-10",
+              "hasDueDate": true,
+              "status": "unknown"
+            },
+            {
+              "taskNumber": 3,
+              "taskName": "Check Funding Status",
+              "assignedUser": "Breanna Canning",
+              "dueDate": "2025-11-18",
+              "hasDueDate": true,
+              "status": "unknown"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

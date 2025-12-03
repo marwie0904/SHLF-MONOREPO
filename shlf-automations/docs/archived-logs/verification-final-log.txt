@@ -1,0 +1,214 @@
+Total duplicates without matters: 8137
+Selected 100 random contacts for verification
+
+[1/100] Verifying Contact ID: 2249741332 (Jo Anna lombardt)
+  ✓ Confirmed: NO matters
+[2/100] Verifying Contact ID: 2249703952 (No Name)
+  ✓ Confirmed: NO matters
+[3/100] Verifying Contact ID: 2136006892 (Virginia Davis)
+  ✓ Confirmed: NO matters
+[4/100] Verifying Contact ID: 2136032902 (Bruce Thomas)
+  ❌ ERROR: Contact HAS 1 matter(s)!
+[5/100] Verifying Contact ID: 2249697757 (No Name)
+  ✓ Confirmed: NO matters
+[6/100] Verifying Contact ID: 2249747242 (Hank Graham)
+  ✓ Confirmed: NO matters
+[7/100] Verifying Contact ID: 2249729782 (Roger Bilas)
+  ✓ Confirmed: NO matters
+[8/100] Verifying Contact ID: 2140804702 (Debra Stephano)
+  ✓ Confirmed: NO matters
+[9/100] Verifying Contact ID: 2137873882 (Basmati Somwaru)
+  ✓ Confirmed: NO matters
+[10/100] Verifying Contact ID: 2137879762 (Kathleen Lafrance)
+  ✓ Confirmed: NO matters
+[11/100] Verifying Contact ID: 2249678962 (John Nimmo)
+  ✓ Confirmed: NO matters
+[12/100] Verifying Contact ID: 2135955292 (Susan Polastri)
+  ❌ ERROR: Contact HAS 1 matter(s)!
+[13/100] Verifying Contact ID: 2203429328 (Mark Gery)
+  ✓ Confirmed: NO matters
+[14/100] Verifying Contact ID: 2137855417 (Sumeray Pinarli)
+  ✓ Confirmed: NO matters
+[15/100] Verifying Contact ID: 2249695357 (No Name)
+  ✓ Confirmed: NO matters
+[16/100] Verifying Contact ID: 2249691397 (No Name)
+  ✓ Confirmed: NO matters
+[17/100] Verifying Contact ID: 2249728012 (No Name)
+  ✓ Confirmed: NO matters
+[18/100] Verifying Contact ID: 2136026827 (Robert San)
+  ❌ ERROR: Contact HAS 1 matter(s)!
+[19/100] Verifying Contact ID: 2249691502 (No Name)
+  ✓ Confirmed: NO matters
+[20/100] Verifying Contact ID: 2249779672 (Suzanne Meredith)
+  ✓ Confirmed: NO matters
+[21/100] Verifying Contact ID: 2249692102 (No Name)
+  ✓ Confirmed: NO matters
+[22/100] Verifying Contact ID: 2136026707 (Edward Arasimowicz)
+  ❌ ERROR: Contact HAS 1 matter(s)!
+[23/100] Verifying Contact ID: 2249705362 (No Name)
+  ✓ Confirmed: NO matters
+[24/100] Verifying Contact ID: 2249704402 (No Name)
+  ✓ Confirmed: NO matters
+[25/100] Verifying Contact ID: 2136037132 (Simone Manarite)
+  ✓ Confirmed: NO matters
+[26/100] Verifying Contact ID: 2249817877 (Stanley Rupinski)
+  ✓ Confirmed: NO matters
+[27/100] Verifying Contact ID: 2137891237 (Yvette Wrona)
+  ✓ Confirmed: NO matters
+[28/100] Verifying Contact ID: 2249692462 (No Name)
+  ✓ Confirmed: NO matters
+[29/100] Verifying Contact ID: 2137890217 (Walt Delevich)
+  ✓ Confirmed: NO matters
+[30/100] Verifying Contact ID: 2249686072 (Sharon Jacques)
+  ✓ Confirmed: NO matters
+[31/100] Verifying Contact ID: 2137893727 (Tighe Rubinstein)
+  ❌ ERROR: Contact HAS 1 matter(s)!
+[32/100] Verifying Contact ID: 2147251822 (Lisa Fahrner)
+  ✓ Confirmed: NO matters
+[33/100] Verifying Contact ID: 2249706142 (No Name)
+  ✓ Confirmed: NO matters
+[34/100] Verifying Contact ID: 2137885642 (Thomas Lansden)
+  ✓ Confirmed: NO matters
+[35/100] Verifying Contact ID: 2136045097 (Silvia Flores)
+  ✓ Confirmed: NO matters
+[36/100] Verifying Contact ID: 2249706697 (No Name)
+  ✓ Confirmed: NO matters
+[37/100] Verifying Contact ID: 2249812477 (Clarissa Valdivia)
+  ✓ Confirmed: NO matters
+[38/100] Verifying Contact ID: 2136046672 (Mike Smith)
+  ❌ ERROR: Contact HAS 1 matter(s)!
+[39/100] Verifying Contact ID: 2249705677 (No Name)
+  ✓ Confirmed: NO matters
+[40/100] Verifying Contact ID: 2249704672 (No Name)
+  ✓ Confirmed: NO matters
+[41/100] Verifying Contact ID: 2249746552 (Barbara Hoffman)
+  ✓ Confirmed: NO matters
+[42/100] Verifying Contact ID: 2249691817 (No Name)
+  ✓ Confirmed: NO matters
+[43/100] Verifying Contact ID: 2249715067 (No Name)
+  ✓ Confirmed: NO matters
+[44/100] Verifying Contact ID: 2249721937 (No Name)
+  ✓ Confirmed: NO matters
+[45/100] Verifying Contact ID: 2140804942 (Jayne Kiel)
+  ✓ Confirmed: NO matters
+[46/100] Verifying Contact ID: 2249713897 (No Name)
+  ✓ Confirmed: NO matters
+[47/100] Verifying Contact ID: 2249728867 (Karen Pignato)
+  ✓ Confirmed: NO matters
+[48/100] Verifying Contact ID: 2249760862 (Jayne Patton)
+  ✓ Confirmed: NO matters
+[49/100] Verifying Contact ID: 2136034042 (Nanci Barfoot)
+  ❌ ERROR: Contact HAS 1 matter(s)!
+[50/100] Verifying Contact ID: 2249705647 (No Name)
+  ✓ Confirmed: NO matters
+[51/100] Verifying Contact ID: 2135962627 (Paul Gallant)
+  ❌ ERROR: Contact HAS 1 matter(s)!
+[52/100] Verifying Contact ID: 2249692342 (No Name)
+  ✓ Confirmed: NO matters
+[53/100] Verifying Contact ID: 2249746177 (Patrick Blair)
+  ✓ Confirmed: NO matters
+[54/100] Verifying Contact ID: 2249811352 (Cathy Buyarski)
+  ✓ Confirmed: NO matters
+[55/100] Verifying Contact ID: 2249720677 (No Name)
+  ✓ Confirmed: NO matters
+[56/100] Verifying Contact ID: 2249691562 (No Name)
+  ✓ Confirmed: NO matters
+[57/100] Verifying Contact ID: 2135987107 (Charles Massimi)
+  ✓ Confirmed: NO matters
+[58/100] Verifying Contact ID: 2154752782 (Linda Rodgers)
+  ✓ Confirmed: NO matters
+[59/100] Verifying Contact ID: 2137891852 (Jennifer Cail)
+  ✓ Confirmed: NO matters
+[60/100] Verifying Contact ID: 2221681868 (Richard Fraser Escoffery)
+  ❌ ERROR: Contact HAS 1 matter(s)!
+[61/100] Verifying Contact ID: 2249798812 (Sandra Cantor)
+  ✓ Confirmed: NO matters
+[62/100] Verifying Contact ID: 2153470657 (Robert L. Kampmann)
+  ❌ ERROR: Contact HAS 1 matter(s)!
+[63/100] Verifying Contact ID: 2249722552 (No Name)
+  ✓ Confirmed: NO matters
+[64/100] Verifying Contact ID: 2249692012 (No Name)
+  ✓ Confirmed: NO matters
+[65/100] Verifying Contact ID: 2249734867 (No Name)
+  ✓ Confirmed: NO matters
+[66/100] Verifying Contact ID: 2249722072 (No Name)
+  ✓ Confirmed: NO matters
+[67/100] Verifying Contact ID: 2249693092 (No Name)
+  ✓ Confirmed: NO matters
+[68/100] Verifying Contact ID: 2249755057 (Melissa Vanderloo)
+  ✓ Confirmed: NO matters
+[69/100] Verifying Contact ID: 2235197618 (Janet Hill Barnhart)
+  ❌ ERROR: Contact HAS 1 matter(s)!
+[70/100] Verifying Contact ID: 2136027592 (Vincent Smiley)
+  ❌ ERROR: Contact HAS 1 matter(s)!
+[71/100] Verifying Contact ID: 2219001683 (Louise Pratt)
+  ✓ Confirmed: NO matters
+[72/100] Verifying Contact ID: 2137895692 (Nadynne Brady)
+  ✓ Confirmed: NO matters
+[73/100] Verifying Contact ID: 2137893637 (Theresa Bottomly)
+  ✓ Confirmed: NO matters
+[74/100] Verifying Contact ID: 2249751172 (Robin Secouler)
+  ✓ Confirmed: NO matters
+[75/100] Verifying Contact ID: 2249864077 (Edward Arasimowicz)
+  ✓ Confirmed: NO matters
+[76/100] Verifying Contact ID: 2249692882 (No Name)
+  ✓ Confirmed: NO matters
+[77/100] Verifying Contact ID: 2249783287 (Sandra Cantor)
+  ✓ Confirmed: NO matters
+[78/100] Verifying Contact ID: 2136026452 (Elvia Arana)
+  ❌ ERROR: Contact HAS 1 matter(s)!
+[79/100] Verifying Contact ID: 2135974567 (Lynn Theberge)
+  ✓ Confirmed: NO matters
+[80/100] Verifying Contact ID: 2136034552 (Marie Forcella)
+  ❌ ERROR: Contact HAS 2 matter(s)!
+[81/100] Verifying Contact ID: 2249720767 (No Name)
+  ✓ Confirmed: NO matters
+[82/100] Verifying Contact ID: 2249716432 (No Name)
+  ✓ Confirmed: NO matters
+[83/100] Verifying Contact ID: 2249722327 (No Name)
+  ✓ Confirmed: NO matters
+[84/100] Verifying Contact ID: 2249692792 (No Name)
+  ✓ Confirmed: NO matters
+[85/100] Verifying Contact ID: 2135966632 (Sheila Whitehead)
+  ❌ ERROR: Contact HAS 1 matter(s)!
+[86/100] Verifying Contact ID: 2249691592 (No Name)
+  ✓ Confirmed: NO matters
+[87/100] Verifying Contact ID: 2249709697 (No Name)
+  ✓ Confirmed: NO matters
+[88/100] Verifying Contact ID: 2249745502 (Anthony Tumbarello)
+  ✓ Confirmed: NO matters
+[89/100] Verifying Contact ID: 2249689237 (No Name)
+  ✓ Confirmed: NO matters
+[90/100] Verifying Contact ID: 2249802442 (Admin Pro)
+  ✓ Confirmed: NO matters
+[91/100] Verifying Contact ID: 2249714212 (No Name)
+  ✓ Confirmed: NO matters
+[92/100] Verifying Contact ID: 2249728207 (No Name)
+  ✓ Confirmed: NO matters
+[93/100] Verifying Contact ID: 2249721277 (No Name)
+  ✓ Confirmed: NO matters
+[94/100] Verifying Contact ID: 2249714047 (No Name)
+  ✓ Confirmed: NO matters
+[95/100] Verifying Contact ID: 2249671897 (Bruce a Midler)
+  ✓ Confirmed: NO matters
+[96/100] Verifying Contact ID: 2136038272 (John Brelus)
+  ❌ ERROR: Contact HAS 2 matter(s)!
+[97/100] Verifying Contact ID: 2249720872 (No Name)
+  ✓ Confirmed: NO matters
+[98/100] Verifying Contact ID: 2249676082 (Lanny Polansky)
+  ✓ Confirmed: NO matters
+[99/100] Verifying Contact ID: 2249784622 (David B. george)
+  ✓ Confirmed: NO matters
+[100/100] Verifying Contact ID: 2249690122 (No Name)
+  ✓ Confirmed: NO matters
+
+✓ Verification complete! Results saved to: ./csv/verification-final-results.csv
+
+=== Verification Summary ===
+Total Verified: 100/100
+Contacts WITH matters: 16 ❌
+Contacts WITHOUT matters: 84 ✓
+API Errors: 0
+
+⚠️  WARNING: Some contacts marked as "no matters" actually HAVE matters!
+Check verification-final-results.csv for details.

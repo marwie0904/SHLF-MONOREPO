@@ -1,0 +1,342 @@
+Total duplicates to verify: 8137
+Starting verification process...
+
+[1/8137] Verifying Contact ID: 2159934157 (Gabby Ang)
+  ❌ HAS 1 matter(s)
+[50/8137] Verifying Contact ID: 2135967532 (Joe Sibilia)
+  ✓ Confirmed NO matters
+[100/8137] Verifying Contact ID: 2135960497 (June Herr)
+  ❌ HAS 1 matter(s)
+[150/8137] Verifying Contact ID: 2135976187 (Jim Cox)
+  ✓ Confirmed NO matters
+[200/8137] Verifying Contact ID: 2137889947 (Lynn Theberge)
+  ✓ Confirmed NO matters
+[250/8137] Verifying Contact ID: 2137879192 (Edward Cardinal)
+  ✓ Confirmed NO matters
+[300/8137] Verifying Contact ID: 2136050692 (James Brooks Mann)
+  ❌ HAS 1 matter(s)
+[350/8137] Verifying Contact ID: 2135997172 (John Brady)
+  ✓ Confirmed NO matters
+[400/8137] Verifying Contact ID: 2136007702 (Anne Holmes)
+  ❌ HAS 1 matter(s)
+[450/8137] Verifying Contact ID: 2136013117 (Carol Sobota)
+  ❌ HAS 1 matter(s)
+[500/8137] Verifying Contact ID: 2249744182 (Lary Patrick)
+  ✓ Confirmed NO matters
+[550/8137] Verifying Contact ID: 2249863597 (Robert Ogrosky)
+  ✓ Confirmed NO matters
+[600/8137] Verifying Contact ID: 2249863012 (Robert San)
+  ✓ Confirmed NO matters
+[650/8137] Verifying Contact ID: 2136028897 (Jean Auger)
+  ✓ Confirmed NO matters
+[700/8137] Verifying Contact ID: 2136031132 (Vito Fortuna)
+  ✓ Confirmed NO matters
+[750/8137] Verifying Contact ID: 2249843287 (David Summers)
+  ✓ Confirmed NO matters
+[800/8137] Verifying Contact ID: 2249860582 (Kathleen Panebianco)
+  ✓ Confirmed NO matters
+[850/8137] Verifying Contact ID: 2249849707 (Donna Carbone)
+  ✓ Confirmed NO matters
+[900/8137] Verifying Contact ID: 2136039142 (Jeannine Ann Miller)
+  ❌ HAS 1 matter(s)
+[950/8137] Verifying Contact ID: 2136040192 (Kimberly Nelson)
+  ❌ HAS 1 matter(s)
+[1000/8137] Verifying Contact ID: 2249854792 (Joaquin Hernandez)
+  ✓ Confirmed NO matters
+[1050/8137] Verifying Contact ID: 2136043462 (Claudia Sharlin)
+  ❌ HAS 1 matter(s)
+[1100/8137] Verifying Contact ID: 2249822527 (Pamela Davidson)
+  ✓ Confirmed NO matters
+[1150/8137] Verifying Contact ID: 2136047242 (Judith Belmont)
+  ❌ HAS 2 matter(s)
+[1200/8137] Verifying Contact ID: 2136049102 (Connie Carter)
+  ❌ HAS 1 matter(s)
+[1250/8137] Verifying Contact ID: 2249803342 (Steven Cohen)
+  ✓ Confirmed NO matters
+[1300/8137] Verifying Contact ID: 2137659967 (John Harris)
+  ❌ HAS 1 matter(s)
+[1350/8137] Verifying Contact ID: 2249692357 (Cyndi Requejo)
+  ✓ Confirmed NO matters
+[1400/8137] Verifying Contact ID: 2249767552 (Jane Portaluppi)
+  ✓ Confirmed NO matters
+[1450/8137] Verifying Contact ID: 2249852542 (Lois Kassel)
+  ✓ Confirmed NO matters
+[1500/8137] Verifying Contact ID: 2137890427 (Rachele Marsh)
+  ✓ Confirmed NO matters
+[1550/8137] Verifying Contact ID: 2137893727 (Tighe Rubinstein)
+  ❌ HAS 1 matter(s)
+[1600/8137] Verifying Contact ID: 2249760172 (Catherine Dreher)
+  ✓ Confirmed NO matters
+[1650/8137] Verifying Contact ID: 2147035237 (Nels Arcese)
+  ✓ Confirmed NO matters
+[1700/8137] Verifying Contact ID: 2152419712 (Patricia Ann Kulka)
+  ❌ HAS 1 matter(s)
+[1750/8137] Verifying Contact ID: 2158389262 (Judy Stead)
+  ✓ Confirmed NO matters
+[1800/8137] Verifying Contact ID: 2249727202 (Sallie Norenberg)
+  ✓ Confirmed NO matters
+[1850/8137] Verifying Contact ID: 2177406247 (Cheryl Personick)
+  ❌ HAS 1 matter(s)
+[1900/8137] Verifying Contact ID: 2249717452 (Maureen Slavin)
+  ✓ Confirmed NO matters
+[1950/8137] Verifying Contact ID: 2249710327 (Linda Streett)
+  ✓ Confirmed NO matters
+[2000/8137] Verifying Contact ID: 2193939877 (Jerry Stawski)
+  ❌ HAS 1 matter(s)
+[2050/8137] Verifying Contact ID: 2219087828 (Ben H. Daud)
+  ✓ Confirmed NO matters
+[2100/8137] Verifying Contact ID: 2249689612 (Sallie Denner)
+  ✓ Confirmed NO matters
+[2150/8137] Verifying Contact ID: 2249689522 (Barbara Gurney)
+  ✓ Confirmed NO matters
+[2200/8137] Verifying Contact ID: 2249683147 (Jean Jarovsky)
+  ✓ Confirmed NO matters
+[2250/8137] Verifying Contact ID: 2223305843 (Lynne Bruno)
+  ✓ Confirmed NO matters
+[2300/8137] Verifying Contact ID: 2227008998 (Mark Terry)
+  ❌ HAS 1 matter(s)
+[2350/8137] Verifying Contact ID: 2249658112 (Patricia Gregory)
+  ✓ Confirmed NO matters
+[2400/8137] Verifying Contact ID: 2235441173 (Fred Black)
+  ✓ Confirmed NO matters
+[2450/8137] Verifying Contact ID: 2243681618 (Sue Hunter)
+  ✓ Confirmed NO matters
+[2500/8137] Verifying Contact ID: 2258354048 (NA NA)
+  ✓ Confirmed NO matters
+[2550/8137] Verifying Contact ID: 2249686672 (No Name)
+  ✓ Confirmed NO matters
+[2600/8137] Verifying Contact ID: 2249688577 (No Name)
+  ✓ Confirmed NO matters
+[2650/8137] Verifying Contact ID: 2249690272 (No Name)
+  ✓ Confirmed NO matters
+[2700/8137] Verifying Contact ID: 2249691667 (No Name)
+  ✓ Confirmed NO matters
+[2750/8137] Verifying Contact ID: 2249693932 (No Name)
+  ✓ Confirmed NO matters
+[2800/8137] Verifying Contact ID: 2249695402 (No Name)
+  ✓ Confirmed NO matters
+[2850/8137] Verifying Contact ID: 2249697592 (No Name)
+  ✓ Confirmed NO matters
+[2900/8137] Verifying Contact ID: 2249698687 (No Name)
+  ✓ Confirmed NO matters
+[2950/8137] Verifying Contact ID: 2249700082 (No Name)
+  ✓ Confirmed NO matters
+[3000/8137] Verifying Contact ID: 2249701462 (No Name)
+  ✓ Confirmed NO matters
+[3050/8137] Verifying Contact ID: 2249703052 (No Name)
+  ✓ Confirmed NO matters
+[3100/8137] Verifying Contact ID: 2249704297 (No Name)
+  ✓ Confirmed NO matters
+[3150/8137] Verifying Contact ID: 2249705902 (No Name)
+  ✓ Confirmed NO matters
+[3200/8137] Verifying Contact ID: 2249707162 (No Name)
+  ✓ Confirmed NO matters
+[3250/8137] Verifying Contact ID: 2249708662 (No Name)
+  ✓ Confirmed NO matters
+[3300/8137] Verifying Contact ID: 2249710762 (No Name)
+  ✓ Confirmed NO matters
+[3350/8137] Verifying Contact ID: 2249711887 (No Name)
+  ✓ Confirmed NO matters
+[3400/8137] Verifying Contact ID: 2249713207 (No Name)
+  ✓ Confirmed NO matters
+[3450/8137] Verifying Contact ID: 2249714287 (No Name)
+  ✓ Confirmed NO matters
+[3500/8137] Verifying Contact ID: 2249715397 (No Name)
+  ✓ Confirmed NO matters
+[3550/8137] Verifying Contact ID: 2249716717 (No Name)
+  ✓ Confirmed NO matters
+[3600/8137] Verifying Contact ID: 2249718817 (No Name)
+  ✓ Confirmed NO matters
+[3650/8137] Verifying Contact ID: 2249720677 (No Name)
+  ✓ Confirmed NO matters
+[3700/8137] Verifying Contact ID: 2249722072 (No Name)
+  ✓ Confirmed NO matters
+[3750/8137] Verifying Contact ID: 2249724307 (No Name)
+  ✓ Confirmed NO matters
+[3800/8137] Verifying Contact ID: 2249726362 (No Name)
+  ✓ Confirmed NO matters
+[3850/8137] Verifying Contact ID: 2249728252 (No Name)
+  ✓ Confirmed NO matters
+[3900/8137] Verifying Contact ID: 2249729767 (No Name)
+  ✓ Confirmed NO matters
+[3950/8137] Verifying Contact ID: 2249732827 (No Name)
+  ✓ Confirmed NO matters
+[4000/8137] Verifying Contact ID: 2249734252 (No Name)
+  ✓ Confirmed NO matters
+[4050/8137] Verifying Contact ID: 2249737357 (No Name)
+  ✓ Confirmed NO matters
+[4100/8137] Verifying Contact ID: 2249739802 (No Name)
+  ✓ Confirmed NO matters
+[4150/8137] Verifying Contact ID: 2249741782 (No Name)
+  ✓ Confirmed NO matters
+[4200/8137] Verifying Contact ID: 2249744962 (No Name)
+  ✓ Confirmed NO matters
+[4250/8137] Verifying Contact ID: 2249748847 (No Name)
+  ✓ Confirmed NO matters
+[4300/8137] Verifying Contact ID: 2249751442 (No Name)
+  ✓ Confirmed NO matters
+[4350/8137] Verifying Contact ID: 2249756422 (No Name)
+  ✓ Confirmed NO matters
+[4400/8137] Verifying Contact ID: 2249758867 (No Name)
+  ✓ Confirmed NO matters
+[4450/8137] Verifying Contact ID: 2249761717 (No Name)
+  ✓ Confirmed NO matters
+[4500/8137] Verifying Contact ID: 2249763187 (No Name)
+  ✓ Confirmed NO matters
+[4550/8137] Verifying Contact ID: 2249764762 (No Name)
+  ✓ Confirmed NO matters
+[4600/8137] Verifying Contact ID: 2249766937 (No Name)
+  ✓ Confirmed NO matters
+[4650/8137] Verifying Contact ID: 2249769742 (No Name)
+  ✓ Confirmed NO matters
+[4700/8137] Verifying Contact ID: 2249771497 (No Name)
+  ✓ Confirmed NO matters
+[4750/8137] Verifying Contact ID: 2249774437 (No Name)
+  ✓ Confirmed NO matters
+[4800/8137] Verifying Contact ID: 2249776237 (No Name)
+  ✓ Confirmed NO matters
+[4850/8137] Verifying Contact ID: 2249781877 (No Name)
+  ✓ Confirmed NO matters
+[4900/8137] Verifying Contact ID: 2249785147 (No Name)
+  ✓ Confirmed NO matters
+[4950/8137] Verifying Contact ID: 2249788477 (No Name)
+  ✓ Confirmed NO matters
+[5000/8137] Verifying Contact ID: 2249790472 (No Name)
+  ✓ Confirmed NO matters
+[5050/8137] Verifying Contact ID: 2249794822 (No Name)
+  ✓ Confirmed NO matters
+[5100/8137] Verifying Contact ID: 2249797912 (No Name)
+  ✓ Confirmed NO matters
+[5150/8137] Verifying Contact ID: 2249801482 (No Name)
+  ✓ Confirmed NO matters
+[5200/8137] Verifying Contact ID: 2249803642 (No Name)
+  ✓ Confirmed NO matters
+[5250/8137] Verifying Contact ID: 2249805547 (No Name)
+  ✓ Confirmed NO matters
+[5300/8137] Verifying Contact ID: 2249807197 (No Name)
+  ✓ Confirmed NO matters
+[5350/8137] Verifying Contact ID: 2249810542 (No Name)
+  ✓ Confirmed NO matters
+[5400/8137] Verifying Contact ID: 2249813107 (No Name)
+  ✓ Confirmed NO matters
+[5450/8137] Verifying Contact ID: 2249815447 (No Name)
+  ✓ Confirmed NO matters
+[5500/8137] Verifying Contact ID: 2249818252 (No Name)
+  ✓ Confirmed NO matters
+[5550/8137] Verifying Contact ID: 2249821327 (No Name)
+  ✓ Confirmed NO matters
+[5600/8137] Verifying Contact ID: 2249822692 (No Name)
+  ✓ Confirmed NO matters
+[5650/8137] Verifying Contact ID: 2249826772 (No Name)
+  ✓ Confirmed NO matters
+[5700/8137] Verifying Contact ID: 2249831182 (No Name)
+  ✓ Confirmed NO matters
+[5750/8137] Verifying Contact ID: 2249832607 (No Name)
+  ✓ Confirmed NO matters
+[5800/8137] Verifying Contact ID: 2249833912 (No Name)
+  ✓ Confirmed NO matters
+[5850/8137] Verifying Contact ID: 2249837947 (No Name)
+  ✓ Confirmed NO matters
+[5900/8137] Verifying Contact ID: 2249841937 (No Name)
+  ✓ Confirmed NO matters
+[5950/8137] Verifying Contact ID: 2249848117 (No Name)
+  ✓ Confirmed NO matters
+[6000/8137] Verifying Contact ID: 2249849422 (No Name)
+  ✓ Confirmed NO matters
+[6050/8137] Verifying Contact ID: 2249850547 (No Name)
+  ✓ Confirmed NO matters
+[6100/8137] Verifying Contact ID: 2249856502 (No Name)
+  ✓ Confirmed NO matters
+[6150/8137] Verifying Contact ID: 2249858062 (No Name)
+  ✓ Confirmed NO matters
+[6200/8137] Verifying Contact ID: 2249860972 (No Name)
+  ✓ Confirmed NO matters
+[6250/8137] Verifying Contact ID: 2249866222 (No Name)
+  ✓ Confirmed NO matters
+[6300/8137] Verifying Contact ID: 2249753077 (Supports Page)
+  ✓ Confirmed NO matters
+[6350/8137] Verifying Contact ID: 2249664877 (Briana Shipe karaszi)
+  ✓ Confirmed NO matters
+[6400/8137] Verifying Contact ID: 2249668792 (Nick Massuridis)
+  ✓ Confirmed NO matters
+[6450/8137] Verifying Contact ID: 2249684932 (Marisa Mcdougall)
+  ✓ Confirmed NO matters
+[6500/8137] Verifying Contact ID: 2249688712 (Tim Wilson wilson)
+  ✓ Confirmed NO matters
+[6550/8137] Verifying Contact ID: 2249698627 (Advertising Support)
+  ✓ Confirmed NO matters
+[6600/8137] Verifying Contact ID: 2249701852 (Joseph Lanfranchi)
+  ✓ Confirmed NO matters
+[6650/8137] Verifying Contact ID: 2249708167 (Richard & nancy russell)
+  ✓ Confirmed NO matters
+[6700/8137] Verifying Contact ID: 2249717302 (Kim joyner)
+  ✓ Confirmed NO matters
+[6750/8137] Verifying Contact ID: 2249725762 (Meli)
+  ✓ Confirmed NO matters
+[6800/8137] Verifying Contact ID: 2249735002 (Kadiatou Diallo)
+  ✓ Confirmed NO matters
+[6850/8137] Verifying Contact ID: 2249749852 (Sadik)
+  ✓ Confirmed NO matters
+[6900/8137] Verifying Contact ID: 2249754337 (Paul d Rhines)
+  ✓ Confirmed NO matters
+[6950/8137] Verifying Contact ID: 2249759167 (Aalsow)
+  ✓ Confirmed NO matters
+[7000/8137] Verifying Contact ID: 2249770702 (Support Manager)
+  ✓ Confirmed NO matters
+[7050/8137] Verifying Contact ID: 2249773432 (Genevs Willis)
+  ✓ Confirmed NO matters
+[7100/8137] Verifying Contact ID: 2249779222 (Bob Seida)
+  ✓ Confirmed NO matters
+[7150/8137] Verifying Contact ID: 2249784712 (Martha Markley)
+  ✓ Confirmed NO matters
+[7200/8137] Verifying Contact ID: 2249789722 (Jacqueline Mc kinney)
+  ✓ Confirmed NO matters
+[7250/8137] Verifying Contact ID: 2249793547 (Yolanda Paul)
+  ✓ Confirmed NO matters
+[7300/8137] Verifying Contact ID: 2249796592 (Eileen)
+  ✓ Confirmed NO matters
+[7350/8137] Verifying Contact ID: 2249800747 (Mark Himelick & sharon eldred h/w)
+  ✓ Confirmed NO matters
+[7400/8137] Verifying Contact ID: 2249804467 (Gigi Ivieta)
+  ✓ Confirmed NO matters
+[7450/8137] Verifying Contact ID: 2249808322 (Stephen Dillen)
+  ✓ Confirmed NO matters
+[7500/8137] Verifying Contact ID: 2249796052 (John Bailey)
+  ✓ Confirmed NO matters
+[7550/8137] Verifying Contact ID: 2249815237 (Lori Parr)
+  ✓ Confirmed NO matters
+[7600/8137] Verifying Contact ID: 2249803387 (Hazel Kula)
+  ✓ Confirmed NO matters
+[7650/8137] Verifying Contact ID: 2249808367 (Barbara ann Lattimer)
+  ✓ Confirmed NO matters
+[7700/8137] Verifying Contact ID: 2249812657 (Yllen Matt)
+  ✓ Confirmed NO matters
+[7750/8137] Verifying Contact ID: 2249816632 (Vicson)
+  ✓ Confirmed NO matters
+[7800/8137] Verifying Contact ID: 2249820982 (Stephanie Vallecio)
+  ✓ Confirmed NO matters
+[7850/8137] Verifying Contact ID: 2249825947 (Joseph louis Vitulli)
+  ✓ Confirmed NO matters
+[7900/8137] Verifying Contact ID: 2249836267 (Carl Brown jr)
+  ✓ Confirmed NO matters
+[7950/8137] Verifying Contact ID: 2249856892 (Douglas)
+  ✓ Confirmed NO matters
+[8000/8137] Verifying Contact ID: 2249863552 (Amy (zumbrun) hance)
+  ✓ Confirmed NO matters
+[8050/8137] Verifying Contact ID: 2249867647 (Louann M penders)
+  ✓ Confirmed NO matters
+[8100/8137] Verifying Contact ID: 2271850673 (Andreana Higgins)
+  ✓ Confirmed NO matters
+[8137/8137] Verifying Contact ID: 2285498348 (Natalie Guess)
+  ✓ Confirmed NO matters
+
+✓ Saved 7564 contacts with NO matters to: ./csv/duplicates-verified-no-matters.csv
+✓ Saved 573 contacts WITH matters to: ./csv/duplicates-verified-with-matters.csv
+
+=== Verification Summary ===
+Total Processed: 8137
+Contacts WITHOUT matters: 7564 ✓
+Contacts WITH matters: 573 ❌
+API Errors: 0
+
+Estimated time: 542 minutes

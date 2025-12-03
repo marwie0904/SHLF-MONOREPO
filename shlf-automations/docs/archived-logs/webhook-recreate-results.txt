@@ -1,0 +1,5 @@
+=== Recreating Calendar Webhook ===
+
+1. Deleting old calendar webhook...
+Failed to delete webhook: 404 Not Found
+Error details: {"error":{"type":"NotFoundError","message":"Not Found"}}

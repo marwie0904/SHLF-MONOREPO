@@ -1,0 +1,244 @@
+Total matched contacts to verify: 5736
+Starting API verification (2 second delay)...
+
+[1/5736] Verifying Contact ID: 2284590653 (John Westlund)
+  ✓ No matters - SAFE
+[50/5736] Verifying Contact ID: 2249817217 (No Name)
+  ✓ No matters - SAFE
+[100/5736] Verifying Contact ID: 2249827447 (No Name)
+  ✓ No matters - SAFE
+[150/5736] Verifying Contact ID: 2249826682 (No Name)
+  ✓ No matters - SAFE
+[200/5736] Verifying Contact ID: 2249804647 (No Name)
+  ✓ No matters - SAFE
+[250/5736] Verifying Contact ID: 2249802547 (No Name)
+  ✓ No matters - SAFE
+[300/5736] Verifying Contact ID: 2249816572 (No Name)
+  ✓ No matters - SAFE
+[350/5736] Verifying Contact ID: 2249814487 (No Name)
+  ✓ No matters - SAFE
+[400/5736] Verifying Contact ID: 2249795872 (No Name)
+  ✓ No matters - SAFE
+[450/5736] Verifying Contact ID: 2249790112 (No Name)
+  ✓ No matters - SAFE
+[500/5736] Verifying Contact ID: 2249788042 (No Name)
+  ✓ No matters - SAFE
+[550/5736] Verifying Contact ID: 2249789842 (No Name)
+  ✓ No matters - SAFE
+[600/5736] Verifying Contact ID: 2249803492 (No Name)
+  ✓ No matters - SAFE
+[650/5736] Verifying Contact ID: 2249796322 (No Name)
+  ✓ No matters - SAFE
+[700/5736] Verifying Contact ID: 2249793532 (No Name)
+  ✓ No matters - SAFE
+[750/5736] Verifying Contact ID: 2249791342 (No Name)
+  ✓ No matters - SAFE
+[800/5736] Verifying Contact ID: 2249789332 (No Name)
+  ✓ No matters - SAFE
+[850/5736] Verifying Contact ID: 2249772427 (No Name)
+  ✓ No matters - SAFE
+[900/5736] Verifying Contact ID: 2249765452 (No Name)
+  ✓ No matters - SAFE
+[950/5736] Verifying Contact ID: 2249763172 (No Name)
+  ✓ No matters - SAFE
+[1000/5736] Verifying Contact ID: 2249774242 (No Name)
+  ✓ No matters - SAFE
+[1050/5736] Verifying Contact ID: 2249759677 (No Name)
+  ✓ No matters - SAFE
+[1100/5736] Verifying Contact ID: 2249756482 (No Name)
+  ✓ No matters - SAFE
+[1150/5736] Verifying Contact ID: 2249752642 (No Name)
+  ✓ No matters - SAFE
+[1200/5736] Verifying Contact ID: 2249765557 (No Name)
+  ✓ No matters - SAFE
+[1250/5736] Verifying Contact ID: 2249762782 (No Name)
+  ✓ No matters - SAFE
+[1300/5736] Verifying Contact ID: 2249759677 (No Name)
+  ✓ No matters - SAFE
+[1350/5736] Verifying Contact ID: 2249758042 (No Name)
+  ✓ No matters - SAFE
+[1400/5736] Verifying Contact ID: 2249743522 (No Name)
+  ✓ No matters - SAFE
+[1450/5736] Verifying Contact ID: 2249748997 (No Name)
+  ✓ No matters - SAFE
+[1500/5736] Verifying Contact ID: 2249742232 (No Name)
+  ✓ No matters - SAFE
+[1550/5736] Verifying Contact ID: 2249742457 (No Name)
+  ✓ No matters - SAFE
+[1600/5736] Verifying Contact ID: 2249732602 (No Name)
+  ✓ No matters - SAFE
+[1650/5736] Verifying Contact ID: 2249738107 (No Name)
+  ✓ No matters - SAFE
+[1700/5736] Verifying Contact ID: 2249727967 (No Name)
+  ✓ No matters - SAFE
+[1750/5736] Verifying Contact ID: 2249733697 (No Name)
+  ✓ No matters - SAFE
+[1800/5736] Verifying Contact ID: 2249731717 (No Name)
+  ✓ No matters - SAFE
+[1850/5736] Verifying Contact ID: 2249722552 (No Name)
+  ✓ No matters - SAFE
+[1900/5736] Verifying Contact ID: 2249720587 (No Name)
+  ✓ No matters - SAFE
+[1950/5736] Verifying Contact ID: 2249716132 (No Name)
+  ✓ No matters - SAFE
+[2000/5736] Verifying Contact ID: 2249722402 (No Name)
+  ✓ No matters - SAFE
+[2050/5736] Verifying Contact ID: 2249712052 (No Name)
+  ✓ No matters - SAFE
+[2100/5736] Verifying Contact ID: 2249721877 (No Name)
+  ✓ No matters - SAFE
+[2150/5736] Verifying Contact ID: 2249719432 (No Name)
+  ✓ No matters - SAFE
+[2200/5736] Verifying Contact ID: 2249709472 (No Name)
+  ✓ No matters - SAFE
+[2250/5736] Verifying Contact ID: 2249714572 (No Name)
+  ✓ No matters - SAFE
+[2300/5736] Verifying Contact ID: 2249715697 (No Name)
+  ✓ No matters - SAFE
+[2350/5736] Verifying Contact ID: 2249713417 (No Name)
+  ✓ No matters - SAFE
+[2400/5736] Verifying Contact ID: 2249711137 (No Name)
+  ✓ No matters - SAFE
+[2450/5736] Verifying Contact ID: 2249708107 (No Name)
+  ✓ No matters - SAFE
+[2500/5736] Verifying Contact ID: 2249705902 (No Name)
+  ✓ No matters - SAFE
+[2550/5736] Verifying Contact ID: 2249707162 (No Name)
+  ✓ No matters - SAFE
+[2600/5736] Verifying Contact ID: 2249698372 (No Name)
+  ✓ No matters - SAFE
+[2650/5736] Verifying Contact ID: 2249702182 (No Name)
+  ✓ No matters - SAFE
+[2700/5736] Verifying Contact ID: 2249697562 (No Name)
+  ✓ No matters - SAFE
+[2750/5736] Verifying Contact ID: 2249700682 (No Name)
+  ✓ No matters - SAFE
+[2800/5736] Verifying Contact ID: 2249698642 (No Name)
+  ✓ No matters - SAFE
+[2850/5736] Verifying Contact ID: 2249696017 (No Name)
+  ✓ No matters - SAFE
+[2900/5736] Verifying Contact ID: 2249697952 (No Name)
+  ✓ No matters - SAFE
+[2950/5736] Verifying Contact ID: 2249695072 (No Name)
+  ✓ No matters - SAFE
+[3000/5736] Verifying Contact ID: 2249692927 (No Name)
+  ✓ No matters - SAFE
+[3050/5736] Verifying Contact ID: 2249690407 (No Name)
+  ✓ No matters - SAFE
+[3100/5736] Verifying Contact ID: 2249687962 (No Name)
+  ✓ No matters - SAFE
+[3150/5736] Verifying Contact ID: 2249689717 (No Name)
+  ✓ No matters - SAFE
+[3200/5736] Verifying Contact ID: 2249687092 (No Name)
+  ✓ No matters - SAFE
+[3250/5736] Verifying Contact ID: 2249684587 (No Name)
+  ✓ No matters - SAFE
+[3300/5736] Verifying Contact ID: 2249682802 (No Name)
+  ✓ No matters - SAFE
+[3350/5736] Verifying Contact ID: 2249849392 (No Name)
+  ✓ No matters - SAFE
+[3400/5736] Verifying Contact ID: 2249848582 (No Name)
+  ✓ No matters - SAFE
+[3450/5736] Verifying Contact ID: 2249841637 (No Name)
+  ✓ No matters - SAFE
+[3500/5736] Verifying Contact ID: 2249854567 (Deb Russell)
+  ✓ No matters - SAFE
+[3550/5736] Verifying Contact ID: 2249851942 (Molly Beers)
+  ✓ No matters - SAFE
+[3600/5736] Verifying Contact ID: 2249854222 (Denise Konecny)
+  ✓ No matters - SAFE
+[3650/5736] Verifying Contact ID: 2249846812 (Kc Jordan)
+  ✓ No matters - SAFE
+[3700/5736] Verifying Contact ID: 2136026692 (Julia Lombardi)
+  ❌ HAS 1 matter(s) - NOT SAFE
+[3750/5736] Verifying Contact ID: 2136026032 (Steven Eatough)
+  ❌ HAS 1 matter(s) - NOT SAFE
+[3800/5736] Verifying Contact ID: 2249841067 (Julie a. Leffert)
+  ✓ No matters - SAFE
+[3850/5736] Verifying Contact ID: 2136040627 (Bill Pembleton)
+  ❌ HAS 1 matter(s) - NOT SAFE
+[3900/5736] Verifying Contact ID: 2249836852 (Barbara B)
+  ✓ No matters - SAFE
+[3950/5736] Verifying Contact ID: 2136040597 (Jacque Cobb)
+  ❌ HAS 1 matter(s) - NOT SAFE
+[4000/5736] Verifying Contact ID: 2249823697 (Diana Mcgowen)
+  ✓ No matters - SAFE
+[4050/5736] Verifying Contact ID: 2249822122 (Alex Niakani)
+  ✓ No matters - SAFE
+[4100/5736] Verifying Contact ID: 2249816512 (Maria Gonzales)
+  ✓ No matters - SAFE
+[4150/5736] Verifying Contact ID: 2249814817 (Test Ang)
+  ✓ No matters - SAFE
+[4200/5736] Verifying Contact ID: 2249813137 (Kim Kilduff)
+  ✓ No matters - SAFE
+[4250/5736] Verifying Contact ID: 2249807407 (Lisa And harold weaver)
+  ✓ No matters - SAFE
+[4300/5736] Verifying Contact ID: 2249802322 (Bob Champ)
+  ✓ No matters - SAFE
+[4350/5736] Verifying Contact ID: 2249796652 (Susan Thompson)
+  ✓ No matters - SAFE
+[4400/5736] Verifying Contact ID: 2249795947 (Terrence M kane)
+  ✓ No matters - SAFE
+[4450/5736] Verifying Contact ID: 2249790697 (Moskito Caribe)
+  ✓ No matters - SAFE
+[4500/5736] Verifying Contact ID: 2249786242 (Darrell Worstine)
+  ✓ No matters - SAFE
+[4550/5736] Verifying Contact ID: 2136022192 (Donna Estep)
+  ❌ HAS 1 matter(s) - NOT SAFE
+[4600/5736] Verifying Contact ID: 2249777677 (Alicia Villegas)
+  ✓ No matters - SAFE
+[4650/5736] Verifying Contact ID: 2249776027 (Margaret Williams ( maggie))
+  ✓ No matters - SAFE
+[4700/5736] Verifying Contact ID: 2249774587 (Dixie Mccollaum)
+  ✓ No matters - SAFE
+[4750/5736] Verifying Contact ID: 2249770597 (Anne L√©ger)
+  ✓ No matters - SAFE
+[4800/5736] Verifying Contact ID: 2135997292 (Lisa Peruski)
+  ❌ HAS 3 matter(s) - NOT SAFE
+[4850/5736] Verifying Contact ID: 2249759857 (Teresa Gago)
+  ✓ No matters - SAFE
+[4900/5736] Verifying Contact ID: 2249750317 (Barbara Martinez)
+  ✓ No matters - SAFE
+[4950/5736] Verifying Contact ID: 2136025672 (John Warnik)
+  ❌ HAS 2 matter(s) - NOT SAFE
+[5000/5736] Verifying Contact ID: 2136011362 (Paul Brager)
+  ❌ HAS 1 matter(s) - NOT SAFE
+[5050/5736] Verifying Contact ID: 2136042397 (Karen Masciarelli)
+  ❌ HAS 1 matter(s) - NOT SAFE
+[5100/5736] Verifying Contact ID: 2249726032 (Vern Lazaroff)
+  ✓ No matters - SAFE
+[5150/5736] Verifying Contact ID: 2189395432 (Dan Sullivan)
+  ✓ No matters - SAFE
+[5200/5736] Verifying Contact ID: 2249698762 (Diana Hoffman)
+  ✓ No matters - SAFE
+[5250/5736] Verifying Contact ID: 2249680357 (Nicole Webb tomlinson)
+  ✓ No matters - SAFE
+[5300/5736] Verifying Contact ID: 2249669152 (Anita Capizzi)
+  ✓ No matters - SAFE
+[5350/5736] Verifying Contact ID: 2249658637 (Audrey Berry)
+  ✓ No matters - SAFE
+[5400/5736] Verifying Contact ID: 2135962627 (Paul Gallant)
+  ❌ HAS 1 matter(s) - NOT SAFE
+[5450/5736] Verifying Contact ID: 2135960947 (Robert Geach)
+  ✓ No matters - SAFE
+[5500/5736] Verifying Contact ID: 2136035632 (Pamela Jones-Morton)
+  ✓ No matters - SAFE
+[5550/5736] Verifying Contact ID: 2136025987 (Elouise Hennigan)
+  ✓ No matters - SAFE
+[5600/5736] Verifying Contact ID: 2135997172 (John Brady)
+  ✓ No matters - SAFE
+[5650/5736] Verifying Contact ID: 2135990032 (Linda Miller)
+  ❌ HAS 1 matter(s) - NOT SAFE
+[5700/5736] Verifying Contact ID: 2135954227 (Richard Johnson)
+  ❌ HAS 2 matter(s) - NOT SAFE
+
+✓ Saved 5051 SAFE contacts to: ./csv/safe-to-delete-contacts.csv
+✓ Saved 685 UNSAFE contacts to: ./csv/unsafe-has-matters.csv
+
+=== Verification Summary ===
+Total Verified: 5736
+SAFE to delete (no matters): 5051 ✓
+UNSAFE (has matters): 685 ❌
+API Errors: 0
+
+Estimated time: 191 minutes

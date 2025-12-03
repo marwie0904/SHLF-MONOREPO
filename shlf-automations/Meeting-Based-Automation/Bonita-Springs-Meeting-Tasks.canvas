@@ -1,0 +1,20 @@
+{
+	"nodes":[
+		{"id":"header","type":"text","text":"# Bonita Springs - Meeting-Based Task Automation\n\n**Test Matter:** 1675950832\n**Attorney ID:** 357292201\n**Test Date:** November 2025","x":-400,"y":-300,"width":600,"height":140,"color":"5"},
+		{"id":"vision-meeting","type":"text","text":"## Vision Meeting\n\n**Event Type ID:** 334831\n**Calendar Entry ID:** 4667258843\n**Meeting Date:** 11/11/2025, 6:00 PM\n**Status:** ✅ PASSED\n**Tasks Generated:** 6","x":-400,"y":-100,"width":350,"height":200,"color":"4"},
+		{"id":"vision-task-1","type":"text","text":"**Task 1:** Open client portal\n👤 **Assigned:** Jacqui Calma\n📅 **Due:** 2025-11-07\n🆔 **Clio ID:** 1209261833","x":-400,"y":150,"width":300,"height":120,"color":"2"},
+		{"id":"vision-task-2","type":"text","text":"**Task 2:** Make Sure ID is on file\n👤 **Assigned:** Jessica Maristany\n📅 **Due:** 2025-11-11\n🆔 **Clio ID:** 1209261848","x":-70,"y":150,"width":300,"height":120,"color":"2"},
+		{"id":"vision-task-3","type":"text","text":"**Task 3:** Pre-Meeting Preparation\n👤 **Assigned:** Jessica Maristany\n📅 **Due:** 2025-11-10\n🆔 **Clio ID:** 1209261863","x":260,"y":150,"width":300,"height":120,"color":"2"},
+		{"id":"vision-task-4","type":"text","text":"**Task 4:** Review Draft\n👤 **Assigned:** Brittany Cocchieri\n📅 **Due:** No due date\n🆔 **Clio ID:** 1209261443\n⚠️ Could not fetch from Clio","x":-400,"y":300,"width":300,"height":140,"color":"2"},
+		{"id":"vision-task-5","type":"text","text":"**Task 4:** Start Answer File\n👤 **Assigned:** Jacqui Calma\n📅 **Due:** 2025-11-10\n🆔 **Clio ID:** 1209261878","x":-70,"y":300,"width":300,"height":120,"color":"2"},
+		{"id":"vision-task-6","type":"text","text":"**Task 5:** Send out Videos and Draft Docs\n👤 **Assigned:** Jessica Maristany\n📅 **Due:** No due date\n🆔 **Clio ID:** 1209261383\n⚠️ Could not fetch from Clio","x":260,"y":300,"width":300,"height":140,"color":"2"}
+	],
+	"edges":[
+		{"id":"e1","fromNode":"vision-meeting","fromSide":"bottom","toNode":"vision-task-1","toSide":"top"},
+		{"id":"e2","fromNode":"vision-meeting","fromSide":"bottom","toNode":"vision-task-2","toSide":"top"},
+		{"id":"e3","fromNode":"vision-meeting","fromSide":"bottom","toNode":"vision-task-3","toSide":"top"},
+		{"id":"e4","fromNode":"vision-task-1","fromSide":"bottom","toNode":"vision-task-4","toSide":"top"},
+		{"id":"e5","fromNode":"vision-task-2","fromSide":"bottom","toNode":"vision-task-5","toSide":"top"},
+		{"id":"e6","fromNode":"vision-task-3","fromSide":"bottom","toNode":"vision-task-6","toSide":"top"}
+	]
+}

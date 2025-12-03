@@ -1,0 +1,19 @@
+{
+  "name": "shlf-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SHLF Monorepo - Shared Convex backend for automations",
+  "scripts": {
+    "convex:dev": "pnpm --filter @shlf/convex-backend dev",
+    "convex:deploy": "pnpm --filter @shlf/convex-backend deploy",
+    "convex:push": "pnpm --filter @shlf/convex-backend push",
+    "automations:dev": "pnpm --filter shlf-automations dev",
+    "automations:start": "pnpm --filter shlf-automations start",
+    "ghl:dev": "pnpm --filter jotform-ghl-automation dev",
+    "ghl:start": "pnpm --filter jotform-ghl-automation start",
+    "install:all": "pnpm install"
+  },
+  "keywords": ["monorepo", "convex", "automation"],
+  "author": "SHLF",
+  "license": "UNLICENSED"
+}

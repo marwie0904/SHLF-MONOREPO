@@ -1,0 +1,33 @@
+=== Creating Calendar Webhook ===
+
+
+Trying model: "CalendarEntry"...
+  ❌ Failed: 422 - {"error":{"type":"ArgumentError","message":"An invalid argument was supplied: 'CalendarEntry' is not a valid model"}}
+
+Trying model: "Calendar"...
+  ❌ Failed: 422 - {"error":{"type":"ArgumentError","message":"An invalid argument was supplied: 'Calendar' is not a valid model"}}
+
+Trying model: "calendar_entry"...
+
+✓ SUCCESS! Webhook created with model "calendar_entry"
+New webhook: {
+  "data": {
+    "id": 3205148,
+    "etag": "\"30e81c68efbe946a68f6d0d2c3633492\""
+  }
+}
+
+=== Summary ===
+Webhook ID: 3205148
+URL: undefined
+Model: calendar_entry
+Status: undefined
+Events: undefined
+
+✓ Calendar webhook is now properly configured!
+
+This webhook will trigger when:
+  - A calendar entry is created
+  - A calendar entry is updated
+
+Signing meeting tasks should now be created automatically.

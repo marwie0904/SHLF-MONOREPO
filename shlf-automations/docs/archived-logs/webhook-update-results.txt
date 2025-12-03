@@ -1,0 +1,24 @@
+=== Updating Calendar Webhook ===
+
+1. Fetching current webhook configuration...
+Current webhook: {
+  "data": {
+    "id": 3183473,
+    "etag": "\"30937168e5f6ad6a68f6d0d2c3633492\""
+  }
+}
+
+2. Updating webhook to subscribe to CalendarEntry.created and CalendarEntry.updated...
+Update payload: {
+  "data": {
+    "url": "https://shlf-main-automation-ywgsu.ondigitalocean.app/webhooks/calendar",
+    "model": "Calendar",
+    "events": [
+      "created",
+      "updated"
+    ],
+    "fields": "id,summary,description,start_at,end_at,matter,created_at,updated_at"
+  }
+}
+Failed to update webhook: 422 Unprocessable Entity
+Error details: {"error":{"type":"ArgumentError","message":"An invalid argument was supplied: 'Calendar' is not a valid model"}}
