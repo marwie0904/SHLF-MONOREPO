@@ -17,15 +17,15 @@ export const listTraces = query({
     const limit = args.limit ?? 50;
 
     if (args.system === "clio") {
-      let query = ctx.db.query("clio_traces").order("desc");
+      let dbQuery = ctx.db.query("clio_traces").order("desc");
 
       if (args.status) {
-        query = ctx.db.query("clio_traces")
+        dbQuery = ctx.db.query("clio_traces")
           .withIndex("by_status", (q) => q.eq("status", args.status as any))
           .order("desc");
       }
 
-      const traces = await query.take(limit + 1);
+      const traces = await dbQuery.take(limit + 1);
 
       const hasMore = traces.length > limit;
       const items = hasMore ? traces.slice(0, limit) : traces;
@@ -48,15 +48,15 @@ export const listTraces = query({
         hasMore,
       };
     } else {
-      let query = ctx.db.query("ghl_traces").order("desc");
+      let dbQuery = ctx.db.query("ghl_traces").order("desc");
 
       if (args.status) {
-        query = ctx.db.query("ghl_traces")
+        dbQuery = ctx.db.query("ghl_traces")
           .withIndex("by_status", (q) => q.eq("status", args.status as any))
           .order("desc");
       }
 
-      const traces = await query.take(limit + 1);
+      const traces = await dbQuery.take(limit + 1);
 
       const hasMore = traces.length > limit;
       const items = hasMore ? traces.slice(0, limit) : traces;
