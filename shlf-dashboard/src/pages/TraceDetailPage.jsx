@@ -16,25 +16,276 @@ function formatTime(timestamp) {
   return format(new Date(timestamp), 'MMM dd, yyyy HH:mm:ss.SSS')
 }
 
-function JsonViewer({ data, label }) {
-  const [expanded, setExpanded] = useState(false)
+function getStepIcon(layerName) {
+  const icons = {
+    webhook: '⚡',
+    processing: '⚙️',
+    automation: '🤖',
+    service: '📦',
+    external: '🌐',
+    validation: '✓',
+    default: '○'
+  }
+  return icons[layerName?.toLowerCase()] || icons.default
+}
 
-  if (!data) return null
+function getStatusColor(status) {
+  const colors = {
+    success: 'var(--accent-green)',
+    completed: 'var(--accent-green)',
+    error: 'var(--accent-red)',
+    failed: 'var(--accent-red)',
+    in_progress: 'var(--accent-blue)',
+    started: 'var(--accent-blue)',
+    skipped: 'var(--text-muted)',
+    partial: 'var(--accent-yellow)',
+  }
+  return colors[status] || 'var(--text-muted)'
+}
+
+// Flow Node Component (Left side)
+function FlowNode({ item, type, isSelected, onClick, isFirst, isLast, system }) {
+  const isTrace = type === 'trace'
+  const isStep = type === 'step'
+
+  let title, subtitle, status, duration
+
+  if (isTrace) {
+    title = system === 'clio' ? item.triggerName : item.endpoint
+    subtitle = system === 'clio' ? item.endpoint : item.httpMethod
+    status = item.status
+    duration = item.durationMs
+  } else if (isStep) {
+    title = system === 'clio' ? item.stepName : item.functionName
+    subtitle = system === 'clio' ? item.layerName : item.serviceName
+    status = item.status
+    duration = item.durationMs
+  }
+
+  const icon = isTrace ? '⚡' : getStepIcon(subtitle)
+  const statusColor = getStatusColor(status)
 
   return (
-    <div className="payload-section">
-      <button className="payload-toggle" onClick={() => setExpanded(!expanded)}>
-        {expanded ? '▼' : '▶'} {label}
-      </button>
-      {expanded && (
-        <div className="detail-content">
-          <pre>{JSON.stringify(data, null, 2)}</pre>
+    <div className="flow-node-wrapper">
+      {/* Connector line */}
+      {!isFirst && <div className="flow-connector" />}
+
+      {/* Node */}
+      <div
+        className={`flow-node ${isSelected ? 'selected' : ''} ${isTrace ? 'trigger' : ''}`}
+        onClick={onClick}
+        style={{ '--status-color': statusColor }}
+      >
+        <div className="flow-node-icon">{icon}</div>
+        <div className="flow-node-content">
+          <div className="flow-node-title">{title}</div>
+          <div className="flow-node-subtitle">{subtitle}</div>
         </div>
-      )}
+        <div className="flow-node-meta">
+          <span className={`status-dot ${status}`} />
+          <span className="flow-node-duration">{formatDuration(duration)}</span>
+        </div>
+      </div>
+
+      {/* Bottom connector */}
+      {!isLast && <div className="flow-connector" />}
     </div>
   )
 }
 
+// Detail Panel Component (Right side)
+function DetailPanel({ item, type, system, onClose }) {
+  const [expandedSections, setExpandedSections] = useState({})
+
+  if (!item) {
+    return (
+      <div className="detail-panel empty">
+        <div className="detail-panel-placeholder">
+          <div className="placeholder-icon">👈</div>
+          <p>Select a step to view details</p>
+        </div>
+      </div>
+    )
+  }
+
+  const toggleSection = (key) => {
+    setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const isTrace = type === 'trace'
+  const isStep = type === 'step'
+
+  let title, subtitle, status, duration, startTime, endTime
+
+  if (isTrace) {
+    title = system === 'clio' ? item.triggerName : item.endpoint
+    subtitle = system === 'clio' ? (item.source || 'webhook') : item.triggerType
+    status = item.status
+    duration = item.durationMs
+    startTime = system === 'clio' ? item.dateStarted : item.startTime
+    endTime = system === 'clio' ? item.dateFinished : item.endTime
+  } else if (isStep) {
+    title = system === 'clio' ? item.stepName : item.functionName
+    subtitle = system === 'clio' ? item.layerName : item.serviceName
+    status = item.status
+    duration = item.durationMs
+    startTime = system === 'clio' ? item.dateStarted : item.startTime
+    endTime = system === 'clio' ? item.dateFinished : item.endTime
+  }
+
+  const renderJsonSection = (data, label, key) => {
+    if (!data) return null
+    const isExpanded = expandedSections[key]
+
+    return (
+      <div className="panel-section">
+        <div className="panel-section-header" onClick={() => toggleSection(key)}>
+          <span>{isExpanded ? '▼' : '▶'} {label}</span>
+        </div>
+        {isExpanded && (
+          <div className="panel-json">
+            <pre>{JSON.stringify(data, null, 2)}</pre>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="detail-panel">
+      <div className="detail-panel-header">
+        <div>
+          <h2>{title}</h2>
+          <span className="panel-subtitle">{subtitle}</span>
+        </div>
+        <button className="panel-close" onClick={onClose}>×</button>
+      </div>
+
+      <div className="detail-panel-body">
+        {/* Status & Timing */}
+        <div className="panel-section">
+          <div className="panel-grid">
+            <div className="panel-stat">
+              <span className="panel-stat-label">Status</span>
+              <span className={`status-badge ${status}`}>{status}</span>
+            </div>
+            <div className="panel-stat">
+              <span className="panel-stat-label">Duration</span>
+              <span className="panel-stat-value">{formatDuration(duration)}</span>
+            </div>
+            <div className="panel-stat">
+              <span className="panel-stat-label">Started</span>
+              <span className="panel-stat-value">{formatTime(startTime)}</span>
+            </div>
+            <div className="panel-stat">
+              <span className="panel-stat-label">Ended</span>
+              <span className="panel-stat-value">{formatTime(endTime)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Trace-specific fields */}
+        {isTrace && (
+          <>
+            {system === 'clio' && item.matterId && (
+              <div className="panel-section">
+                <div className="panel-stat">
+                  <span className="panel-stat-label">Matter ID</span>
+                  <span className="panel-stat-value highlight">{item.matterId}</span>
+                </div>
+              </div>
+            )}
+            {system === 'ghl' && (item.contactId || item.opportunityId) && (
+              <div className="panel-section">
+                <div className="panel-grid">
+                  {item.contactId && (
+                    <div className="panel-stat">
+                      <span className="panel-stat-label">Contact ID</span>
+                      <span className="panel-stat-value">{item.contactId}</span>
+                    </div>
+                  )}
+                  {item.opportunityId && (
+                    <div className="panel-stat">
+                      <span className="panel-stat-label">Opportunity ID</span>
+                      <span className="panel-stat-value">{item.opportunityId}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {item.resultAction && (
+              <div className="panel-section">
+                <div className="panel-stat">
+                  <span className="panel-stat-label">Result Action</span>
+                  <span className="panel-stat-value">{item.resultAction}</span>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Error Message */}
+        {(item.errorMessage || item.error) && (
+          <div className="panel-section error">
+            <div className="panel-error">
+              <strong>Error:</strong> {item.errorMessage || item.error?.message}
+            </div>
+            {item.error?.stack && (
+              <div className="panel-json error-stack">
+                <pre>{item.error.stack}</pre>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Data Payloads */}
+        {isTrace && system === 'ghl' && (
+          <>
+            {renderJsonSection(item.requestBody, 'Request Body', 'requestBody')}
+            {renderJsonSection(item.responseBody, 'Response Body', 'responseBody')}
+            {renderJsonSection(item.requestHeaders, 'Request Headers', 'requestHeaders')}
+          </>
+        )}
+
+        {isTrace && system === 'clio' && (
+          <>
+            {renderJsonSection(item.metadata, 'Metadata', 'metadata')}
+          </>
+        )}
+
+        {isStep && (
+          <>
+            {system === 'clio' ? (
+              <>
+                {renderJsonSection(item.metadata, 'Context Data', 'metadata')}
+              </>
+            ) : (
+              <>
+                {renderJsonSection(item.input, 'Input', 'input')}
+                {renderJsonSection(item.output, 'Output', 'output')}
+                {renderJsonSection(item.contextData, 'Context Data', 'contextData')}
+              </>
+            )}
+          </>
+        )}
+
+        {/* Nested Details for Steps */}
+        {isStep && item.details && item.details.length > 0 && (
+          <div className="panel-section">
+            <h3 className="panel-section-title">Operations ({item.details.length})</h3>
+            <div className="panel-details-list">
+              {item.details.map((detail, idx) => (
+                <DetailItem key={detail.detailId || idx} detail={detail} system={system} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Detail Item for nested operations
 function DetailItem({ detail, system }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -43,42 +294,53 @@ function DetailItem({ detail, system }) {
   const status = detail.status
 
   return (
-    <div className="detail-item">
-      <div className="detail-header" onClick={() => setExpanded(!expanded)} style={{ cursor: 'pointer' }}>
-        <div>
-          <span className="detail-operation">{operation}</span>
-          <span className={`status-badge ${status}`} style={{ marginLeft: '8px' }}>
-            {status}
-          </span>
+    <div className={`panel-detail-item ${expanded ? 'expanded' : ''}`}>
+      <div className="panel-detail-header" onClick={() => setExpanded(!expanded)}>
+        <div className="panel-detail-info">
+          <span className={`status-dot ${status}`} />
+          <span className="panel-detail-operation">{operation}</span>
+          <span className="panel-detail-type">{detailType}</span>
         </div>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <span className="detail-type">{detailType}</span>
-          <span className="step-duration">{formatDuration(detail.durationMs)}</span>
-        </div>
+        <span className="panel-detail-duration">{formatDuration(detail.durationMs)}</span>
       </div>
 
       {expanded && (
-        <div style={{ marginTop: '12px' }}>
+        <div className="panel-detail-body">
           {system === 'clio' ? (
             <>
-              <JsonViewer data={detail.input} label="Input" />
-              <JsonViewer data={detail.output} label="Output" />
+              {detail.input && (
+                <div className="panel-detail-data">
+                  <div className="panel-detail-data-label">Input</div>
+                  <pre>{JSON.stringify(detail.input, null, 2)}</pre>
+                </div>
+              )}
+              {detail.output && (
+                <div className="panel-detail-data">
+                  <div className="panel-detail-data-label">Output</div>
+                  <pre>{JSON.stringify(detail.output, null, 2)}</pre>
+                </div>
+              )}
             </>
           ) : (
             <>
-              <JsonViewer data={detail.requestBody} label="Request Body" />
-              <JsonViewer data={detail.responseBody} label="Response Body" />
-              <JsonViewer data={detail.operationInput} label="Operation Input" />
-              <JsonViewer data={detail.operationOutput} label="Operation Output" />
+              {detail.requestBody && (
+                <div className="panel-detail-data">
+                  <div className="panel-detail-data-label">Request</div>
+                  <pre>{JSON.stringify(detail.requestBody, null, 2)}</pre>
+                </div>
+              )}
+              {detail.responseBody && (
+                <div className="panel-detail-data">
+                  <div className="panel-detail-data-label">Response</div>
+                  <pre>{JSON.stringify(detail.responseBody, null, 2)}</pre>
+                </div>
+              )}
             </>
           )}
           {detail.errorMessage && (
-            <div style={{ marginTop: '8px', color: 'var(--accent-red)', fontSize: '13px' }}>
+            <div className="panel-detail-error">
               Error: {detail.errorMessage}
             </div>
-          )}
-          {detail.error && (
-            <JsonViewer data={detail.error} label="Error Details" />
           )}
         </div>
       )}
@@ -86,72 +348,24 @@ function DetailItem({ detail, system }) {
   )
 }
 
-function StepCard({ step, system }) {
-  const [expanded, setExpanded] = useState(false)
-
-  const stepName = system === 'clio' ? step.stepName : step.functionName
-  const layerName = system === 'clio' ? step.layerName : step.serviceName
-  const status = step.status
-  const details = step.details || []
-
-  return (
-    <div className={`flow-item ${status}`}>
-      <div
-        className={`step-card ${expanded ? 'expanded' : ''}`}
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="step-header">
-          <div>
-            <div className="step-title">{stepName}</div>
-            <div className="step-layer">{layerName}</div>
-          </div>
-          <div className="step-stats">
-            <span className={`status-badge ${status}`}>{status}</span>
-            <span className="step-duration">{formatDuration(step.durationMs)}</span>
-            {details.length > 0 && (
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                {details.length} detail{details.length !== 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {expanded && details.length > 0 && (
-          <div className="details-container">
-            {details.map((detail, idx) => (
-              <DetailItem key={detail.detailId || idx} detail={detail} system={system} />
-            ))}
-          </div>
-        )}
-
-        {expanded && step.errorMessage && (
-          <div style={{ marginTop: '12px', color: 'var(--accent-red)', fontSize: '13px' }}>
-            Error: {step.errorMessage}
-          </div>
-        )}
-
-        {expanded && (
-          <div style={{ marginTop: '12px' }}>
-            <JsonViewer data={step.metadata || step.contextData} label="Context Data" />
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 export default function TraceDetailPage() {
   const { system, traceId } = useParams()
   const navigate = useNavigate()
+  const [selectedItem, setSelectedItem] = useState({ type: 'trace', item: null })
 
   const data = useQuery(api.dashboard.traces.getTraceDetails, {
     system: system,
     traceId: traceId,
   })
 
+  // Auto-select trace when data loads
+  if (data && !selectedItem.item && data.trace) {
+    setSelectedItem({ type: 'trace', item: data.trace })
+  }
+
   if (data === undefined) {
     return (
-      <div className="trace-detail">
+      <div className="trace-detail-page">
         <div className="loading">
           <div className="loading-spinner" />
           Loading trace details...
@@ -162,7 +376,7 @@ export default function TraceDetailPage() {
 
   if (!data) {
     return (
-      <div className="trace-detail">
+      <div className="trace-detail-page">
         <button className="back-btn" onClick={() => navigate('/')}>
           ← Back to Traces
         </button>
@@ -175,110 +389,59 @@ export default function TraceDetailPage() {
   }
 
   const { trace, steps } = data
-  const triggerName = system === 'clio' ? trace.triggerName : trace.endpoint
-  const startTime = system === 'clio' ? trace.dateStarted : trace.startTime
-  const endTime = system === 'clio' ? trace.dateFinished : trace.endTime
 
   return (
-    <div className="trace-detail">
-      <button className="back-btn" onClick={() => navigate('/')}>
-        ← Back to Traces
-      </button>
-
-      {/* Trace Header */}
-      <div className="trace-header">
-        <h1>
-          {triggerName}
+    <div className="trace-detail-page">
+      <div className="trace-detail-header">
+        <button className="back-btn" onClick={() => navigate('/')}>
+          ← Back to Traces
+        </button>
+        <div className="trace-detail-title">
+          <h1>{system === 'clio' ? trace.triggerName : trace.endpoint}</h1>
           <span className={`status-badge ${trace.status}`}>{trace.status}</span>
-        </h1>
-
-        <div className="trace-meta">
-          <div className="meta-item">
-            <span className="meta-label">Trace ID</span>
-            <span className="meta-value">{trace.traceId}</span>
-          </div>
-          <div className="meta-item">
-            <span className="meta-label">Started</span>
-            <span className="meta-value">{formatTime(startTime)}</span>
-          </div>
-          <div className="meta-item">
-            <span className="meta-label">Ended</span>
-            <span className="meta-value">{formatTime(endTime)}</span>
-          </div>
-          <div className="meta-item">
-            <span className="meta-label">Duration</span>
-            <span className="meta-value">{formatDuration(trace.durationMs)}</span>
-          </div>
-          {system === 'clio' && trace.matterId && (
-            <div className="meta-item">
-              <span className="meta-label">Matter ID</span>
-              <span className="meta-value">{trace.matterId}</span>
-            </div>
-          )}
-          {system === 'ghl' && trace.contactId && (
-            <div className="meta-item">
-              <span className="meta-label">Contact ID</span>
-              <span className="meta-value">{trace.contactId}</span>
-            </div>
-          )}
-          {system === 'ghl' && trace.opportunityId && (
-            <div className="meta-item">
-              <span className="meta-label">Opportunity ID</span>
-              <span className="meta-value">{trace.opportunityId}</span>
-            </div>
-          )}
-          {trace.resultAction && (
-            <div className="meta-item">
-              <span className="meta-label">Result Action</span>
-              <span className="meta-value">{trace.resultAction}</span>
-            </div>
-          )}
+          <span className="trace-id">ID: {trace.traceId}</span>
         </div>
-
-        {trace.errorMessage && (
-          <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(244, 33, 46, 0.1)', borderRadius: '8px', color: 'var(--accent-red)' }}>
-            <strong>Error:</strong> {trace.errorMessage}
-          </div>
-        )}
-
-        {trace.error && (
-          <div style={{ marginTop: '16px' }}>
-            <JsonViewer data={trace.error} label="Error Details" />
-          </div>
-        )}
-
-        {/* Request/Response for GHL */}
-        {system === 'ghl' && (
-          <div style={{ marginTop: '16px' }}>
-            <JsonViewer data={trace.requestBody} label="Request Body" />
-            <JsonViewer data={trace.responseBody} label="Response Body" />
-          </div>
-        )}
-
-        {/* Metadata for Clio */}
-        {system === 'clio' && trace.metadata && (
-          <div style={{ marginTop: '16px' }}>
-            <JsonViewer data={trace.metadata} label="Metadata" />
-          </div>
-        )}
       </div>
 
-      {/* Steps Flow */}
-      <h2 style={{ marginBottom: '16px', fontSize: '16px', color: 'var(--text-secondary)' }}>
-        Execution Flow ({steps.length} step{steps.length !== 1 ? 's' : ''})
-      </h2>
+      <div className="trace-detail-layout">
+        {/* Left: Flow Graph */}
+        <div className="flow-graph">
+          <div className="flow-graph-container">
+            {/* Trigger Node */}
+            <FlowNode
+              item={trace}
+              type="trace"
+              isSelected={selectedItem.type === 'trace'}
+              onClick={() => setSelectedItem({ type: 'trace', item: trace })}
+              isFirst={true}
+              isLast={steps.length === 0}
+              system={system}
+            />
 
-      <div className="trace-flow">
-        {steps.map((step, idx) => (
-          <StepCard key={step.stepId || idx} step={step} system={system} />
-        ))}
-      </div>
-
-      {steps.length === 0 && (
-        <div className="empty-state">
-          <p>No steps recorded for this trace</p>
+            {/* Step Nodes */}
+            {steps.map((step, idx) => (
+              <FlowNode
+                key={step.stepId || idx}
+                item={step}
+                type="step"
+                isSelected={selectedItem.type === 'step' && selectedItem.item?.stepId === step.stepId}
+                onClick={() => setSelectedItem({ type: 'step', item: step })}
+                isFirst={false}
+                isLast={idx === steps.length - 1}
+                system={system}
+              />
+            ))}
+          </div>
         </div>
-      )}
+
+        {/* Right: Detail Panel */}
+        <DetailPanel
+          item={selectedItem.item}
+          type={selectedItem.type}
+          system={system}
+          onClose={() => setSelectedItem({ type: null, item: null })}
+        />
+      </div>
     </div>
   )
 }
