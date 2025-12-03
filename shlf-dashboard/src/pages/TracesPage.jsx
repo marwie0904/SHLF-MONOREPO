@@ -23,6 +23,24 @@ function formatTimeRange(start, end) {
   return `${startTime} - ${endTime}`
 }
 
+// Determine effective status based on status field and resultAction
+function getEffectiveStatus(trace) {
+  const status = trace.status
+  const resultAction = trace.resultAction?.toLowerCase() || ''
+
+  // If resultAction contains error indicators, override to error
+  if (resultAction === 'error' || resultAction.includes('error') || resultAction.includes('failed')) {
+    return 'error'
+  }
+
+  // If status is success but errorMessage exists, it's an error
+  if (trace.errorMessage) {
+    return 'error'
+  }
+
+  return status
+}
+
 export default function TracesPage() {
   const navigate = useNavigate()
   const [system, setSystem] = useState('clio')
@@ -170,14 +188,21 @@ export default function TracesPage() {
                 </td>
                 <td className="endpoint-cell">{trace.endpoint || '-'}</td>
                 <td>
-                  <span className={`status-badge ${trace.status}`}>
-                    {trace.status}
-                  </span>
-                  {trace.resultAction && (
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                      {trace.resultAction}
-                    </div>
-                  )}
+                  {(() => {
+                    const effectiveStatus = getEffectiveStatus(trace)
+                    return (
+                      <>
+                        <span className={`status-badge ${effectiveStatus}`}>
+                          {effectiveStatus}
+                        </span>
+                        {trace.resultAction && trace.resultAction !== effectiveStatus && (
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                            {trace.resultAction}
+                          </div>
+                        )}
+                      </>
+                    )
+                  })()}
                 </td>
                 <td className="id-cell">
                   {system === 'clio'
