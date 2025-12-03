@@ -13,7 +13,6 @@
     "postinstall": "echo 'Skipping Chromium download - using system chromium'"
   },
   "dependencies": {
-    "@shlf/convex-backend": "workspace:*",
     "@supabase/supabase-js": "^2.39.0",
     "axios": "^1.6.0",
     "convex": "^1.30.0",

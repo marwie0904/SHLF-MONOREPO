@@ -40,7 +40,7 @@ export async function initializeEventTracker() {
     if (config.convex?.url) {
       // Try to import the Convex API - it may not exist in all environments
       try {
-        const apiModule = await import("@shlf/convex-backend");
+        const apiModule = await import("../../convex/_generated/api.js");
         convexApi = apiModule.api;
         convex = new ConvexHttpClient(config.convex.url);
         trackingEnabled = config.tracking?.enabled !== false;

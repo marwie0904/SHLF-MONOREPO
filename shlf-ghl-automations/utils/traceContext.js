@@ -237,7 +237,7 @@ async function startTrace(options) {
 
   try {
     // Dynamic import for Convex API
-    const { api } = await import('@shlf/convex-backend');
+    const { api } = await import('../convex/_generated/api.js');
 
     await client.mutation(api.ghl.traces.createTrace, {
       traceId,
@@ -278,7 +278,7 @@ async function completeTrace(traceId, responseStatus, responseBody) {
   }
 
   try {
-    const { api } = await import('@shlf/convex-backend');
+    const { api } = await import('../convex/_generated/api.js');
 
     await client.mutation(api.ghl.traces.completeTrace, {
       traceId,
@@ -306,7 +306,7 @@ async function failTrace(traceId, error, responseStatus, responseBody) {
   }
 
   try {
-    const { api } = await import('@shlf/convex-backend');
+    const { api } = await import('../convex/_generated/api.js');
 
     await client.mutation(api.ghl.traces.failTrace, {
       traceId,
@@ -330,7 +330,7 @@ async function updateTraceContextIds(traceId, contextIds) {
   if (!client) return;
 
   try {
-    const { api } = await import('@shlf/convex-backend');
+    const { api } = await import('../convex/_generated/api.js');
 
     await client.mutation(api.ghl.traces.updateTraceContextIds, {
       traceId,
@@ -366,7 +366,7 @@ async function startStep(traceId, serviceName, functionName, input, contextData)
   }
 
   try {
-    const { api } = await import('@shlf/convex-backend');
+    const { api } = await import('../convex/_generated/api.js');
 
     await client.mutation(api.ghl.steps.createStep, {
       stepId,
@@ -395,7 +395,7 @@ async function completeStep(stepId, output) {
   if (!client) return;
 
   try {
-    const { api } = await import('@shlf/convex-backend');
+    const { api } = await import('../convex/_generated/api.js');
 
     await client.mutation(api.ghl.steps.completeStep, {
       stepId,
@@ -421,7 +421,7 @@ async function failStep(stepId, error, traceId) {
   if (!client) return;
 
   try {
-    const { api } = await import('@shlf/convex-backend');
+    const { api } = await import('../convex/_generated/api.js');
 
     await client.mutation(api.ghl.steps.failStep, {
       stepId,
@@ -442,7 +442,7 @@ async function skipStep(stepId, reason) {
   if (!client) return;
 
   try {
-    const { api } = await import('@shlf/convex-backend');
+    const { api } = await import('../convex/_generated/api.js');
 
     await client.mutation(api.ghl.steps.skipStep, {
       stepId,
@@ -487,7 +487,7 @@ async function startDetail(traceId, stepId, options) {
   } = options;
 
   try {
-    const { api } = await import('@shlf/convex-backend');
+    const { api } = await import('../convex/_generated/api.js');
 
     await client.mutation(api.ghl.details.createDetail, {
       detailId,
@@ -529,7 +529,7 @@ async function completeDetail(detailId, options) {
   } = options;
 
   try {
-    const { api } = await import('@shlf/convex-backend');
+    const { api } = await import('../convex/_generated/api.js');
 
     await client.mutation(api.ghl.details.completeDetail, {
       detailId,
@@ -558,7 +558,7 @@ async function failDetail(detailId, error, traceId) {
   if (!client) return;
 
   try {
-    const { api } = await import('@shlf/convex-backend');
+    const { api } = await import('../convex/_generated/api.js');
 
     await client.mutation(api.ghl.details.failDetail, {
       detailId,

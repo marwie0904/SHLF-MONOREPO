@@ -49,7 +49,7 @@ export async function run(traceId = null) {
 
   try {
     // Import the API dynamically
-    const { api } = await import("@shlf/convex-backend");
+    const { api } = await import("../../convex/_generated/api.js");
 
     // First, preview what will be deleted
     const preview = await client.query(api.clio.cleanup.previewCleanup, {
@@ -149,7 +149,7 @@ export async function getStats() {
   }
 
   try {
-    const { api } = await import("@shlf/convex-backend");
+    const { api } = await import("../../convex/_generated/api.js");
     return await client.query(api.clio.cleanup.getCleanupStats, {});
   } catch (error) {
     return { error: error.message };

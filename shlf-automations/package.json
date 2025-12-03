@@ -4,6 +4,9 @@
   "description": "SHLF Legal Practice Automation System - Clio Task Automation",
   "main": "src/index.js",
   "type": "module",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
@@ -31,7 +34,6 @@
   "author": "SHLF",
   "license": "UNLICENSED",
   "dependencies": {
-    "@shlf/convex-backend": "workspace:*",
     "@supabase/supabase-js": "^2.39.0",
     "axios": "^1.6.2",
     "convex": "^1.30.0",
