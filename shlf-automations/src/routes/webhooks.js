@@ -169,6 +169,26 @@ const withRetry = (handler, endpoint, maxAttempts = 3) => {
       },
     });
 
+    // Log webhook received as first step with full payload
+    const webhookStepId = await EventTracker.startStep(traceId, {
+      layerName: 'webhook',
+      stepName: 'webhook_received',
+      stepOrder: 0,
+      metadata: { endpoint, matterId },
+    });
+
+    const webhookCtx = EventTracker.createContext(traceId, webhookStepId);
+    webhookCtx.logWebhook('webhook_received', {
+      eventType: webhookData.type,
+      resourceId: webhookData.data?.id,
+      resourceType: triggerName.split('-')[0], // e.g., 'matter', 'task', 'calendar'
+      webhookId: webhookData.id,
+      endpoint: `/webhooks${endpoint}`,
+      rawPayload: webhookData,
+    });
+
+    await EventTracker.endStep(webhookStepId, { status: 'success' });
+
     // Enqueue the webhook processing for this matter
     // This ensures sequential processing per matter to avoid race conditions
     try {
@@ -203,10 +223,15 @@ const withRetry = (handler, endpoint, maxAttempts = 3) => {
         data: result,
       });
     } catch (error) {
-      // End trace with error
+      // End trace with error - include structured error info
       await EventTracker.endTrace(traceId, {
         status: 'error',
         errorMessage: error.message,
+        metadata: {
+          errorCode: error.code || error.response?.data?.error,
+          httpStatus: error.response?.status,
+          errorStack: error.stack?.split('\n').slice(0, 5).join('\n'),
+        },
       });
 
       return res.status(500).json({

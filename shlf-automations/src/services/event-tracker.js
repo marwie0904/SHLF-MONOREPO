@@ -70,6 +70,57 @@ function generateId() {
 }
 
 /**
+ * Format an error into a structured object
+ * - Extracts message, stack, code, httpStatus, and response
+ * - Cleans stack trace (filters node_modules, limits lines)
+ * - Captures API response data when available
+ *
+ * @param {Error|Object} error - The error to format
+ * @returns {Object} Structured error object
+ */
+function formatError(error) {
+  if (!error) return null;
+
+  // Get the error message
+  const message = error.message || String(error);
+
+  // Clean and truncate stack trace
+  let stack = error.stack || null;
+  if (stack) {
+    // Filter out node_modules lines for cleaner traces
+    const lines = stack.split("\n");
+    const filteredLines = lines.filter(
+      (line) => !line.includes("node_modules") || line.includes("shlf-")
+    );
+    // Limit to 15 lines and 2000 chars
+    stack = filteredLines.slice(0, 15).join("\n");
+    if (stack.length > 2000) {
+      stack = stack.substring(0, 2000) + "\n...[truncated]";
+    }
+  }
+
+  // Extract error code
+  const code = error.code || error.response?.data?.error || null;
+
+  // Extract HTTP status from axios-style errors
+  const httpStatus = error.response?.status || error.status || null;
+
+  // Extract response body (sanitized)
+  let response = null;
+  if (error.response?.data) {
+    response = sanitize(error.response.data, 2);
+  }
+
+  return {
+    message,
+    stack,
+    code: code ? String(code) : null,
+    httpStatus: httpStatus ? Number(httpStatus) : null,
+    response,
+  };
+}
+
+/**
  * Sanitize data for logging
  * - Redacts sensitive fields (tokens, passwords, etc.)
  * - Truncates large strings
@@ -292,10 +343,14 @@ export const EventTracker = {
    * @param {Object} [params.output]
    * @param {number} [params.durationMs]
    * @param {string} params.status - "success", "error", or "skipped"
-   * @param {string} [params.errorMessage]
+   * @param {string} [params.errorMessage] - Legacy: simple error message
+   * @param {Error|Object} [params.error] - New: error object for structured logging
    */
   logDetail(stepId, traceId, params) {
     if (!trackingEnabled || !stepId || !traceId) return;
+
+    // Format error if provided as an Error object
+    const formattedError = params.error ? formatError(params.error) : null;
 
     detailBuffer.push({
       detailId: generateId(),
@@ -307,7 +362,10 @@ export const EventTracker = {
       output: sanitize(params.output),
       durationMs: params.durationMs,
       status: params.status,
-      errorMessage: params.errorMessage,
+      // Keep legacy errorMessage for backward compatibility
+      errorMessage: params.errorMessage || (formattedError?.message),
+      // Add structured error object
+      error: formattedError,
       timestamp: Date.now(),
     });
 
@@ -421,7 +479,7 @@ export const EventTracker = {
       /**
        * Log an external call (non-Clio external services)
        */
-      logExternalCall: (operation, input, output, durationMs, status, errorMessage) => {
+      logExternalCall: (operation, input, output, durationMs, status, error) => {
         EventTracker.logDetail(stepId, traceId, {
           operation,
           operationType: "external_call",
@@ -429,7 +487,61 @@ export const EventTracker = {
           output,
           durationMs,
           status,
-          errorMessage,
+          error: status === "error" ? error : undefined,
+        });
+      },
+
+      /**
+       * Log webhook received data
+       */
+      logWebhook: (operation, webhookData, status = "success") => {
+        EventTracker.logDetail(stepId, traceId, {
+          operation,
+          operationType: "webhook",
+          input: webhookData,
+          status,
+        });
+      },
+
+      /**
+       * Log a stage change decision
+       */
+      logStageChange: (matterId, previousStage, newStage) => {
+        EventTracker.logDetail(stepId, traceId, {
+          operation: "stage_change_detected",
+          operationType: "decision",
+          input: {
+            matterId,
+            previousStageId: previousStage?.id,
+            previousStageName: previousStage?.name,
+            newStageId: newStage?.id,
+            newStageName: newStage?.name,
+          },
+          status: "success",
+        });
+      },
+
+      /**
+       * Log task creation with full details
+       */
+      logTaskCreation: (taskData, result, durationMs, status = "success", error = null) => {
+        EventTracker.logDetail(stepId, traceId, {
+          operation: "clio_createTask",
+          operationType: "api_call",
+          input: {
+            matterId: taskData.matterId,
+            name: taskData.name,
+            description: taskData.description,
+            dueDate: taskData.dueDate,
+            assigneeId: taskData.assigneeId,
+            assigneeName: taskData.assigneeName,
+            assigneeType: taskData.assigneeType,
+            taskNumber: taskData.taskNumber,
+          },
+          output: result ? { taskId: result.id || result.taskId } : null,
+          durationMs,
+          status,
+          error: status === "error" ? error : undefined,
         });
       },
     };
@@ -460,7 +572,7 @@ export const EventTracker = {
         ...params,
         durationMs: Date.now() - start,
         status: "error",
-        errorMessage: error.message,
+        error: error, // Pass full error for structured logging
       });
       throw error;
     }

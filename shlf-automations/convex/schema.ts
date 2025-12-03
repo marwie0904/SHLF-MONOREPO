@@ -158,7 +158,8 @@ export default defineSchema({
       v.literal("validation"),    // Input/data validation
       v.literal("calculation"),   // Due date, assignee resolution, etc.
       v.literal("decision"),      // Branching logic, conditionals
-      v.literal("external_call")  // Other external service calls
+      v.literal("external_call"), // Other external service calls
+      v.literal("webhook")        // Incoming webhook data
     ),
 
     // Input parameters (sanitized - no sensitive data)
@@ -177,8 +178,19 @@ export default defineSchema({
       v.literal("skipped")
     ),
 
-    // Error message if status is "error"
+    // Error message if status is "error" (legacy - kept for backward compatibility)
     errorMessage: v.optional(v.string()),
+
+    // Structured error information (new - preferred)
+    error: v.optional(
+      v.object({
+        message: v.string(),
+        stack: v.optional(v.string()),
+        code: v.optional(v.string()),
+        httpStatus: v.optional(v.number()),
+        response: v.optional(v.any()),
+      })
+    ),
 
     // Timestamp of this specific operation
     timestamp: v.number(),

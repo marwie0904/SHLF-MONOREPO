@@ -229,10 +229,14 @@ export class ClioService {
 
   /**
    * Create a task in Clio
-   * @param {Object} taskData - Task data
+   * @param {Object} taskData - Task data (name, description, matter, due_at, assignee)
    * @param {Object} [ctx] - Optional tracking context
+   * @param {Object} [taskMeta] - Optional task metadata for richer logging
+   * @param {string} [taskMeta.assigneeName] - Human-readable assignee name
+   * @param {string} [taskMeta.assigneeType] - Assignee type (Attorney, CSC, VA, etc.)
+   * @param {number} [taskMeta.taskNumber] - Task sequence number in stage
    */
-  static async createTask(taskData, ctx = null) {
+  static async createTask(taskData, ctx = null, taskMeta = {}) {
     const start = Date.now();
     try {
       const response = await this.client.post('/api/v4/tasks', {
@@ -242,7 +246,28 @@ export class ClioService {
           fields: 'id,name,description,status,assignee,matter,due_at',
         },
       });
-      ctx?.logApiCall('clio_createTask', { name: taskData.name, matterId: taskData.matter?.id }, { id: response.data.data.id }, Date.now() - start, 'success');
+
+      // Log with full task details if context available
+      if (ctx?.logTaskCreation) {
+        ctx.logTaskCreation(
+          {
+            matterId: taskData.matter?.id,
+            name: taskData.name,
+            description: taskData.description,
+            dueDate: taskData.due_at,
+            assigneeId: taskData.assignee?.id,
+            assigneeName: taskMeta.assigneeName || response.data.data.assignee?.name,
+            assigneeType: taskMeta.assigneeType || taskData.assignee?.type,
+            taskNumber: taskMeta.taskNumber,
+          },
+          response.data.data,
+          Date.now() - start,
+          'success'
+        );
+      } else {
+        ctx?.logApiCall('clio_createTask', { name: taskData.name, matterId: taskData.matter?.id }, { id: response.data.data.id }, Date.now() - start, 'success');
+      }
+
       return response.data.data;
     } catch (error) {
       // Log detailed error for debugging
@@ -250,7 +275,29 @@ export class ClioService {
       console.error('  Status:', error.response?.status);
       console.error('  Data:', JSON.stringify(error.response?.data, null, 2));
       console.error('  Request data:', JSON.stringify(taskData, null, 2));
-      ctx?.logApiCall('clio_createTask', { name: taskData.name, matterId: taskData.matter?.id }, null, Date.now() - start, 'error', error.message);
+
+      // Log with full task details and structured error
+      if (ctx?.logTaskCreation) {
+        ctx.logTaskCreation(
+          {
+            matterId: taskData.matter?.id,
+            name: taskData.name,
+            description: taskData.description,
+            dueDate: taskData.due_at,
+            assigneeId: taskData.assignee?.id,
+            assigneeName: taskMeta.assigneeName,
+            assigneeType: taskMeta.assigneeType || taskData.assignee?.type,
+            taskNumber: taskMeta.taskNumber,
+          },
+          null,
+          Date.now() - start,
+          'error',
+          error
+        );
+      } else {
+        ctx?.logApiCall('clio_createTask', { name: taskData.name, matterId: taskData.matter?.id }, null, Date.now() - start, 'error', error);
+      }
+
       throw error;
     }
   }

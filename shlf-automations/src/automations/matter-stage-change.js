@@ -35,7 +35,32 @@ export class MatterStageChangeAutomation {
     const timestamp = webhookData.data.matter_stage_updated_at || webhookData.data.updated_at;
     const updatingUser = webhookData.data.user; // User who updated the matter
 
+    // Extract previous stage from webhook (if available)
+    const webhookStageId = webhookData.data.matter_stage?.id;
+    const webhookStageName = webhookData.data.matter_stage?.name;
+
     console.log(`[MATTER] ${matterId} UPDATED`);
+
+    // Step: Log webhook received with full payload
+    const webhookStepId = await EventTracker.startStep(traceId, {
+      layerName: 'webhook',
+      stepName: 'webhook_received',
+      metadata: { matterId },
+    });
+    const webhookCtx = EventTracker.createContext(traceId, webhookStepId);
+
+    // Log the full webhook payload
+    webhookCtx.logWebhook('webhook_received', {
+      eventType: webhookData.type,
+      resourceId: matterId,
+      resourceType: 'matter',
+      webhookId: webhookData.id,
+      stageIdFromWebhook: webhookStageId,
+      stageNameFromWebhook: webhookStageName,
+      rawPayload: webhookData,
+    });
+
+    await EventTracker.endStep(webhookStepId, { status: 'success' });
 
     // Step: Validation - validate webhook payload
     const validationStepId = await EventTracker.startStep(traceId, {
@@ -177,6 +202,23 @@ export class MatterStageChangeAutomation {
           practiceArea: matterDetails.practice_area?.name,
         },
       });
+
+      // Log the stage change detection (before → after)
+      // The webhook contains the state BEFORE the update
+      // The API call returns the CURRENT state (after the update)
+      const currentStage = {
+        id: matterDetails.matter_stage?.id,
+        name: matterDetails.matter_stage?.name,
+      };
+      const previousStage = {
+        id: webhookStageId,
+        name: webhookStageName,
+      };
+
+      // Only log stage change if we have current stage info
+      if (currentStage.id) {
+        fetchMatterCtx.logStageChange(matterId, previousStage, currentStage);
+      }
 
       // Step 2.1: Filter out closed matters
       if (matterDetails.status === 'Closed') {

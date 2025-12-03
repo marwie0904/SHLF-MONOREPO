@@ -183,7 +183,8 @@ export const logDetail = mutation({
       v.literal("validation"),
       v.literal("calculation"),
       v.literal("decision"),
-      v.literal("external_call")
+      v.literal("external_call"),
+      v.literal("webhook")
     ),
     input: v.optional(v.any()),
     output: v.optional(v.any()),
@@ -194,6 +195,15 @@ export const logDetail = mutation({
       v.literal("skipped")
     ),
     errorMessage: v.optional(v.string()),
+    error: v.optional(
+      v.object({
+        message: v.string(),
+        stack: v.optional(v.string()),
+        code: v.optional(v.string()),
+        httpStatus: v.optional(v.number()),
+        response: v.optional(v.any()),
+      })
+    ),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("clio_details", {
@@ -207,6 +217,7 @@ export const logDetail = mutation({
       durationMs: args.durationMs,
       status: args.status,
       errorMessage: args.errorMessage,
+      error: args.error,
       timestamp: Date.now(),
     });
   },
@@ -231,7 +242,8 @@ export const logDetailsBatch = mutation({
           v.literal("validation"),
           v.literal("calculation"),
           v.literal("decision"),
-          v.literal("external_call")
+          v.literal("external_call"),
+          v.literal("webhook")
         ),
         input: v.optional(v.any()),
         output: v.optional(v.any()),
@@ -242,6 +254,15 @@ export const logDetailsBatch = mutation({
           v.literal("skipped")
         ),
         errorMessage: v.optional(v.string()),
+        error: v.optional(
+          v.object({
+            message: v.string(),
+            stack: v.optional(v.string()),
+            code: v.optional(v.string()),
+            httpStatus: v.optional(v.number()),
+            response: v.optional(v.any()),
+          })
+        ),
         timestamp: v.number(),
       })
     ),
