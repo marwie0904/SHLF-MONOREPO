@@ -13,6 +13,69 @@ import { ClioService } from '../services/clio.js';
 const router = express.Router();
 
 /**
+ * TEST MODE CONFIGURATION
+ * When enabled, only webhooks for the specified matter ID will be processed.
+ * Set TEST_MODE=false or remove it to process all matters.
+ */
+const TEST_MODE = {
+  enabled: true,
+  allowedMatterIds: [1675950832], // Add more matter IDs here if needed
+};
+
+/**
+ * Extract matter ID from various webhook data structures (for test mode filtering)
+ */
+const extractMatterIdForFilter = (webhookData) => {
+  // Direct matter webhook
+  if (webhookData.data?.id && !webhookData.data?.matter) {
+    return webhookData.data.id;
+  }
+  // Task/Calendar/Document webhook with nested matter
+  if (webhookData.data?.matter?.id) {
+    return webhookData.data.matter.id;
+  }
+  // Sometimes matter_id is at the top level
+  if (webhookData.data?.matter_id) {
+    return webhookData.data.matter_id;
+  }
+  return null;
+};
+
+/**
+ * Test mode middleware - filters webhooks to only process allowed matters
+ */
+const testModeFilter = (req, res, next) => {
+  // Skip if test mode is disabled
+  if (!TEST_MODE.enabled) {
+    return next();
+  }
+
+  const webhookData = req.body;
+  const matterId = extractMatterIdForFilter(webhookData);
+
+  // If we can't determine matter ID, skip (let the handler deal with it)
+  if (!matterId) {
+    console.log('⚠️  [TEST MODE] Could not extract matter ID from webhook, allowing through');
+    return next();
+  }
+
+  // Check if matter is in allowed list
+  if (TEST_MODE.allowedMatterIds.includes(matterId)) {
+    console.log(`✅ [TEST MODE] Matter ${matterId} is allowed, processing webhook`);
+    return next();
+  }
+
+  // Matter not in allowed list - skip silently
+  console.log(`🚫 [TEST MODE] Matter ${matterId} not in allowed list, skipping`);
+  return res.status(200).json({
+    success: true,
+    action: 'skipped',
+    reason: 'test_mode_filter',
+    message: `Test mode active - only processing matters: ${TEST_MODE.allowedMatterIds.join(', ')}`,
+  });
+};
+
+/**
  * Webhook activation handler - responds to Clio's handshake
  */
 const handleWebhookActivation = (req, res, next) => {
@@ -152,7 +215,7 @@ const withRetry = (handler, endpoint, maxAttempts = 3) => {
  * Webhook: Matter Updates (Stage Changes and Status Changes)
  * Triggered by Clio when a matter is created or updated
  */
-router.post('/matters', handleWebhookActivation, withRetry(async (webhookData, traceId) => {
+router.post('/matters', handleWebhookActivation, testModeFilter, withRetry(async (webhookData, traceId) => {
   console.log('📨 Received matter webhook');
 
   const matterId = webhookData.data?.id;
@@ -194,7 +257,7 @@ router.post('/matters', handleWebhookActivation, withRetry(async (webhookData, t
  * Webhook: Task Updates (Completions) and Deletions
  * Triggered by Clio when a task is updated or deleted
  */
-router.post('/tasks', handleWebhookActivation, withRetry(async (webhookData, traceId) => {
+router.post('/tasks', handleWebhookActivation, testModeFilter, withRetry(async (webhookData, traceId) => {
   console.log('📨 Received task webhook');
   console.log('   Webhook type:', webhookData.type);
   console.log('   Has deleted_at?', !!webhookData.data?.deleted_at);
@@ -214,7 +277,7 @@ router.post('/tasks', handleWebhookActivation, withRetry(async (webhookData, tra
  * Webhook: Calendar Entries (Meetings)
  * Triggered by Clio when a calendar entry is created, updated, or deleted
  */
-router.post('/calendar', handleWebhookActivation, withRetry(async (webhookData, traceId) => {
+router.post('/calendar', handleWebhookActivation, testModeFilter, withRetry(async (webhookData, traceId) => {
   console.log('📨 Received calendar webhook');
 
   // Check if this is a deletion event
@@ -231,7 +294,7 @@ router.post('/calendar', handleWebhookActivation, withRetry(async (webhookData, 
  * Webhook: Documents (Clio Drive)
  * Triggered by Clio when a document is created
  */
-router.post('/documents', handleWebhookActivation, withRetry(async (webhookData, traceId) => {
+router.post('/documents', handleWebhookActivation, testModeFilter, withRetry(async (webhookData, traceId) => {
   console.log('📨 Received document webhook');
 
   return await DocumentCreatedAutomation.process(webhookData, traceId);
@@ -244,6 +307,10 @@ router.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
+    testMode: {
+      enabled: TEST_MODE.enabled,
+      allowedMatterIds: TEST_MODE.enabled ? TEST_MODE.allowedMatterIds : 'all',
+    },
     automations: [
       'matter-stage-change',
       'matter-closed',
