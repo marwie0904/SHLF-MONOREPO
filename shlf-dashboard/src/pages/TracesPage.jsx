@@ -28,6 +28,13 @@ function getEffectiveStatus(trace) {
   const status = trace.status
   const resultAction = trace.resultAction?.toLowerCase() || ''
 
+  // If resultAction contains skip indicators, show as skipped
+  if (resultAction.includes('skipped') || resultAction.includes('skip') ||
+      resultAction === 'already_processed' || resultAction === 'still_processing' ||
+      resultAction === 'no_action' || resultAction === 'ignored') {
+    return 'skipped'
+  }
+
   // If resultAction contains error indicators, override to error
   if (resultAction === 'error' || resultAction.includes('error') || resultAction.includes('failed')) {
     return 'error'
@@ -39,6 +46,26 @@ function getEffectiveStatus(trace) {
   }
 
   return status
+}
+
+// Get skip reason from resultAction
+function getSkipReason(resultAction) {
+  if (!resultAction) return null
+  const action = resultAction.toLowerCase()
+
+  const reasons = {
+    'skipped_test_mode': 'Test mode filter',
+    'skipped_not_completed': 'Task not completed',
+    'skipped_already_processed': 'Already processed',
+    'already_processed': 'Already processed',
+    'still_processing': 'Still processing',
+    'skipped_no_stage': 'No stage found',
+    'skipped_unknown_event': 'Unknown event type',
+    'no_action': 'No action needed',
+    'ignored': 'Ignored',
+  }
+
+  return reasons[action] || (action.includes('skip') ? resultAction : null)
 }
 
 export default function TracesPage() {
@@ -190,12 +217,23 @@ export default function TracesPage() {
                 <td>
                   {(() => {
                     const effectiveStatus = getEffectiveStatus(trace)
+                    const skipReason = getSkipReason(trace.resultAction)
                     return (
                       <>
                         <span className={`status-badge ${effectiveStatus}`}>
                           {effectiveStatus}
                         </span>
-                        {trace.resultAction && trace.resultAction !== effectiveStatus && (
+                        {effectiveStatus === 'skipped' && skipReason && (
+                          <div style={{ fontSize: '11px', color: 'var(--accent-yellow)', marginTop: '4px' }}>
+                            {skipReason}
+                          </div>
+                        )}
+                        {effectiveStatus === 'error' && trace.resultAction && (
+                          <div style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '4px' }}>
+                            {trace.resultAction}
+                          </div>
+                        )}
+                        {effectiveStatus !== 'skipped' && effectiveStatus !== 'error' && trace.resultAction && (
                           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                             {trace.resultAction}
                           </div>

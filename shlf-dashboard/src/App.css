@@ -206,8 +206,8 @@
 }
 
 .status-badge.skipped {
-  background: rgba(139, 152, 165, 0.15);
-  color: var(--text-secondary);
+  background: rgba(255, 212, 0, 0.15);
+  color: var(--accent-yellow);
 }
 
 .status-badge.partial {
