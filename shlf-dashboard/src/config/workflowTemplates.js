@@ -222,15 +222,21 @@ export const taskCompletedWorkflow = {
     type: 'step',
     matchStep: 'webhook_received',
     children: [{
-      id: 'validation',
-      name: 'Validate Timestamp',
+      id: 'queue_check',
+      name: 'Rate Limit Queue',
       layer: 'processing',
       type: 'step',
-      matchStep: 'validation',
+      matchStep: 'queue_check',
       children: [{
-        id: 'idempotency',
-        name: 'Idempotency Check',
+        id: 'validation',
+        name: 'Validate Timestamp',
         layer: 'processing',
+        type: 'step',
+        matchStep: 'validation',
+        children: [{
+          id: 'idempotency',
+          name: 'Idempotency Check',
+          layer: 'processing',
         type: 'step',
         matchStep: 'idempotency_check',
         children: [{
@@ -392,7 +398,7 @@ export const taskCompletedWorkflow = {
             }
           ]
         }]
-      }]
+      }]}]
     }]
   }
 };
@@ -412,12 +418,18 @@ export const taskDeletedWorkflow = {
     type: 'step',
     matchStep: 'webhook_received',
     children: [{
-      id: 'idempotency',
-      name: 'Idempotency Check',
+      id: 'queue_check',
+      name: 'Rate Limit Queue',
       layer: 'processing',
       type: 'step',
-      matchStep: 'idempotency_check',
+      matchStep: 'queue_check',
       children: [{
+        id: 'idempotency',
+        name: 'Idempotency Check',
+        layer: 'processing',
+        type: 'step',
+        matchStep: 'idempotency_check',
+        children: [{
         id: 'search_supabase',
         name: 'Search Task in Supabase',
         layer: 'service',
@@ -491,7 +503,7 @@ export const taskDeletedWorkflow = {
             }
           ]
         }]
-      }]
+      }]}]
     }]
   }
 };

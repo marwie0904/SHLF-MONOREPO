@@ -29,6 +29,9 @@ export class TaskDeletedAutomation {
 
     console.log(`[TASK-DELETE] ${taskId} Processing deletion...`);
 
+    // Ensure trigger name is set to task-deleted (in case it was initially task-completed)
+    await EventTracker.updateTriggerName(traceId, 'task-deleted');
+
     // Step 1: Idempotency check
     const idempotencyStepId = await EventTracker.startStep(traceId, {
       layerName: 'processing',

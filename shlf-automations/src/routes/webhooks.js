@@ -364,6 +364,7 @@ router.post('/documents', handleWebhookActivation, testModeFilter, withRetry(asy
  * Health check endpoint
  */
 router.get('/health', (req, res) => {
+  const queueStats = webhookQueue.getStats();
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -371,13 +372,14 @@ router.get('/health', (req, res) => {
       enabled: config.testing.testMode,
       testMatterId: config.testing.testMode ? config.testing.testMatterId : 'all matters allowed',
     },
+    rateLimit: queueStats.rateLimit,
     automations: [
       'matter-stage-change',
       'matter-closed',
-      'task-completion',
-      'task-deletion',
+      'task-completed',
+      'task-deleted',
       'meeting-scheduled',
-      'calendar-entry-deletion',
+      'calendar-entry-deleted',
       'document-created',
     ],
   });

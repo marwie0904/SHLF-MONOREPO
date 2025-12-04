@@ -4,9 +4,65 @@ import { TokenRefreshService } from './token-refresh.js';
 import { EventTracker } from './event-tracker.js';
 
 /**
+ * Rate Limit Tracker for Clio API
+ * Clio has a rate limit of 50 requests per 10 seconds
+ */
+class RateLimitTracker {
+  constructor() {
+    this.remaining = 50; // Default to max
+    this.limit = 50;
+    this.reset = null;
+    this.lastUpdated = null;
+  }
+
+  /**
+   * Update rate limit info from response headers
+   * @param {Object} headers - Response headers
+   */
+  update(headers) {
+    // Clio uses X-RateLimit-Remaining, X-RateLimit-Limit headers
+    if (headers['x-ratelimit-remaining'] !== undefined) {
+      this.remaining = parseInt(headers['x-ratelimit-remaining'], 10);
+    }
+    if (headers['x-ratelimit-limit'] !== undefined) {
+      this.limit = parseInt(headers['x-ratelimit-limit'], 10);
+    }
+    if (headers['x-ratelimit-reset']) {
+      this.reset = new Date(parseInt(headers['x-ratelimit-reset'], 10) * 1000);
+    }
+    this.lastUpdated = new Date();
+  }
+
+  /**
+   * Check if we should queue requests (rate limit approaching threshold)
+   * @param {number} threshold - Number of remaining requests before queueing (default: 5)
+   * @returns {boolean}
+   */
+  shouldQueue(threshold = 5) {
+    return this.remaining <= threshold;
+  }
+
+  /**
+   * Get current rate limit status
+   */
+  getStatus() {
+    return {
+      remaining: this.remaining,
+      limit: this.limit,
+      reset: this.reset,
+      lastUpdated: this.lastUpdated,
+      shouldQueue: this.shouldQueue(),
+    };
+  }
+}
+
+/**
  * Clio API Integration Layer
  */
 export class ClioService {
+  // Rate limit tracker (singleton)
+  static rateLimitTracker = new RateLimitTracker();
+
   static client = axios.create({
     baseURL: config.clio.apiBaseUrl,
     headers: {
@@ -16,14 +72,23 @@ export class ClioService {
   });
 
   /**
-   * Initialize axios interceptors for automatic token refresh
+   * Initialize axios interceptors for automatic token refresh and rate limit tracking
    * Call this once on app startup
    */
   static initializeInterceptors() {
-    // Response interceptor to handle 401 errors
+    // Response interceptor for rate limit tracking and 401 handling
     this.client.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        // Track rate limit from successful responses
+        this.rateLimitTracker.update(response.headers);
+        return response;
+      },
       async (error) => {
+        // Track rate limit even on errors (if headers present)
+        if (error.response?.headers) {
+          this.rateLimitTracker.update(error.response.headers);
+        }
+
         const originalRequest = error.config;
 
         // Check if it's a 401 error and we haven't already retried
@@ -53,7 +118,24 @@ export class ClioService {
       }
     );
 
-    console.log('🔌 CLIO API interceptors initialized');
+    console.log('🔌 CLIO API interceptors initialized (with rate limit tracking)');
+  }
+
+  /**
+   * Get current rate limit status
+   * @returns {Object} Rate limit status
+   */
+  static getRateLimitStatus() {
+    return this.rateLimitTracker.getStatus();
+  }
+
+  /**
+   * Check if we should queue requests due to rate limit
+   * @param {number} threshold - Remaining requests before queueing (default: 5)
+   * @returns {boolean}
+   */
+  static shouldQueueRequest(threshold = 5) {
+    return this.rateLimitTracker.shouldQueue(threshold);
   }
 
   /**
