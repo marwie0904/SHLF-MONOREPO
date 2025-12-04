@@ -3,7 +3,7 @@ const { searchOpportunitiesByContact } = require('./ghlOpportunityService');
 const { shouldSendConfirmationEmail, sendMeetingConfirmationEmail, shouldSendDiscoveryCallEmail, sendProbateDiscoveryCallEmail, shouldSendTrustAdminEmail, sendTrustAdminMeetingEmail, shouldSendGeneralDiscoveryCallEmail, sendGeneralDiscoveryCallEmail, shouldSendDocReviewEmail, sendDocReviewMeetingEmail } = require('./appointmentEmailService');
 const { sendConfirmationSms, scheduleReminderSms } = require('./appointmentSmsService');
 const { getContact } = require('./ghlService');
-const { startDetail, completeDetail, failDetail } = require('../utils/traceContext');
+const { startStep, completeStep, failStep, startDetail, completeDetail, failDetail } = require('../utils/traceContext');
 
 /**
  * Appointment Service
@@ -559,38 +559,111 @@ async function processAppointmentCreated(webhookData, traceId = null, stepId = n
   let meetingData = null;
   let calendarName = null;
 
-  // Step 1: Try to fetch form submission
-  // Try phone first, then email
+  // ===== STEP 1: Get Form Submission =====
+  let formStepId = null;
+  if (traceId) {
+    try {
+      const step = await startStep(traceId, 'ghl', 'getFormSubmission', {
+        formId,
+        searchQuery: contactPhone || contactEmail,
+        hasPhone: !!contactPhone,
+        hasEmail: !!contactEmail
+      });
+      formStepId = step.stepId;
+    } catch (e) {
+      console.error('Error starting getFormSubmission step:', e.message);
+    }
+  }
+
   const searchQuery = contactPhone || contactEmail;
+  let formSubmissionFound = false;
 
   if (searchQuery) {
-    const submission = await getFormSubmission(formId, searchQuery, traceId, stepId);
+    const submission = await getFormSubmission(formId, searchQuery, traceId, formStepId || stepId);
 
     if (submission) {
+      formSubmissionFound = true;
       meetingData = extractMeetingData(submission);
       calendarName = meetingData.calendarName;
       console.log('📋 Extracted meeting data:', meetingData);
     }
   }
 
-  // Step 2: If no calendar name from form, use webhook calendarName or fetch from API
+  if (formStepId) {
+    try {
+      await completeStep(formStepId, {
+        submissionFound: formSubmissionFound,
+        meetingType: meetingData?.meetingType || null,
+        meeting: meetingData?.meeting || null,
+        calendarName: meetingData?.calendarName || null
+      });
+    } catch (e) {
+      console.error('Error completing getFormSubmission step:', e.message);
+    }
+  }
+
+  // ===== STEP 2: Get Calendar Name (if needed) =====
+  let calendarStepId = null;
+  let calendarSource = formSubmissionFound ? 'form_submission' : null;
+
   if (!calendarName) {
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'ghl', 'getCalendarName', {
+          hasWebhookCalendarName: !!webhookCalendarName,
+          hasCalendarId: !!calendarId
+        });
+        calendarStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting getCalendarName step:', e.message);
+      }
+    }
+
     if (webhookCalendarName) {
       // Use calendar name provided directly in webhook
       calendarName = webhookCalendarName;
+      calendarSource = 'webhook';
       console.log(`📅 Using calendar name from webhook: "${calendarName}"`);
     } else if (calendarId) {
       // Fallback: fetch from calendar API
       console.log('📅 Fetching calendar name from API (fallback)...');
-      const calendar = await getCalendar(calendarId, traceId, stepId);
+      const calendar = await getCalendar(calendarId, traceId, calendarStepId || stepId);
       if (calendar) {
         calendarName = calendar.name;
+        calendarSource = 'api';
+      }
+    }
+
+    if (calendarStepId) {
+      try {
+        await completeStep(calendarStepId, {
+          calendarName: calendarName || null,
+          source: calendarSource || 'not_found'
+        });
+      } catch (e) {
+        console.error('Error completing getCalendarName step:', e.message);
       }
     }
   }
 
-  // Step 3: Build the title
+  // ===== STEP 3: Build Title =====
+  let buildTitleStepId = null;
+  if (traceId) {
+    try {
+      const step = await startStep(traceId, 'processing', 'buildTitle', {
+        hasMeetingData: !!meetingData,
+        hasMeetingType: !!meetingData?.meetingType,
+        calendarName: calendarName || null,
+        contactName
+      });
+      buildTitleStepId = step.stepId;
+    } catch (e) {
+      console.error('Error starting buildTitle step:', e.message);
+    }
+  }
+
   let title;
+  let usedFallback = false;
 
   if (meetingData && meetingData.meetingType) {
     // Full format: Calendar Name - Meeting Type - Meeting - Contact Name
@@ -606,87 +679,288 @@ async function processAppointmentCreated(webhookData, traceId = null, stepId = n
       calendarName: calendarName || 'Appointment',
       contactName: contactName
     });
+    usedFallback = true;
     console.log('⚠️ Using fallback title format (form submission not found or missing data)');
   }
 
   console.log(`🏷️ Final title: "${title}"`);
 
-  // Step 4: Update the appointment
-  const result = await updateAppointmentTitle(appointmentId, title, calendarId, traceId, stepId);
+  if (buildTitleStepId) {
+    try {
+      await completeStep(buildTitleStepId, {
+        title,
+        usedFallback,
+        format: usedFallback ? 'fallback' : 'full'
+      });
+    } catch (e) {
+      console.error('Error completing buildTitle step:', e.message);
+    }
+  }
 
-  // Step 5: Move opportunity to appropriate stage based on meeting type
+  // ===== STEP 4: Update Appointment Title =====
+  let updateTitleStepId = null;
+  if (traceId) {
+    try {
+      const step = await startStep(traceId, 'ghl', 'updateAppointmentTitle', {
+        appointmentId,
+        title,
+        calendarId
+      });
+      updateTitleStepId = step.stepId;
+    } catch (e) {
+      console.error('Error starting updateAppointmentTitle step:', e.message);
+    }
+  }
+
+  const updateResult = await updateAppointmentTitle(appointmentId, title, calendarId, traceId, updateTitleStepId || stepId);
+
+  if (updateTitleStepId) {
+    try {
+      await completeStep(updateTitleStepId, {
+        success: !!updateResult,
+        appointmentId
+      });
+    } catch (e) {
+      console.error('Error completing updateAppointmentTitle step:', e.message);
+    }
+  }
+
+  // ===== STEP 5: Search/Resolve Opportunity =====
   let stageUpdateResult = null;
   let targetStageId = null;
   let resolvedOpportunityId = opportunityId;
+  let opportunitySource = opportunityId ? 'webhook' : null;
 
   // If no opportunityId provided, try to find it by contactId
   if (!resolvedOpportunityId && contactId) {
+    let searchOppStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'ghl', 'searchOpportunity', {
+          contactId,
+          reason: 'No opportunity ID in webhook'
+        });
+        searchOppStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting searchOpportunity step:', e.message);
+      }
+    }
+
     console.log(`🔍 No opportunity ID provided, searching by contact ID: ${contactId}`);
     try {
       const locationId = process.env.GHL_LOCATION_ID;
-      const opportunities = await searchOpportunitiesByContact(contactId, locationId, traceId, stepId);
+      const opportunities = await searchOpportunitiesByContact(contactId, locationId, traceId, searchOppStepId || stepId);
 
       if (opportunities && opportunities.length > 0) {
         // Use the first open opportunity, or fall back to the first one
         const openOpportunity = opportunities.find(opp => opp.status === 'open');
         resolvedOpportunityId = openOpportunity?.id || opportunities[0].id;
+        opportunitySource = 'search';
         console.log(`✅ Found opportunity: ${resolvedOpportunityId} (from ${opportunities.length} total)`);
       } else {
         console.log('⚠️ No opportunities found for contact');
       }
+
+      if (searchOppStepId) {
+        try {
+          await completeStep(searchOppStepId, {
+            opportunitiesFound: opportunities?.length || 0,
+            resolvedOpportunityId: resolvedOpportunityId || null,
+            usedOpenOpportunity: !!opportunities?.find(opp => opp.status === 'open')
+          });
+        } catch (e) {
+          console.error('Error completing searchOpportunity step:', e.message);
+        }
+      }
     } catch (searchError) {
       console.error('❌ Error searching for opportunity:', searchError.message);
+      if (searchOppStepId) {
+        try {
+          await failStep(searchOppStepId, searchError, traceId);
+        } catch (e) {
+          console.error('Error failing searchOpportunity step:', e.message);
+        }
+      }
     }
   }
+
+  // ===== STEP 6: Check Stage Mapping =====
+  let stageMappingStepId = null;
+  if (traceId) {
+    try {
+      const step = await startStep(traceId, 'processing', 'checkStageMapping', {
+        meetingType: meetingData?.meetingType || null,
+        hasOpportunity: !!resolvedOpportunityId
+      });
+      stageMappingStepId = step.stepId;
+    } catch (e) {
+      console.error('Error starting checkStageMapping step:', e.message);
+    }
+  }
+
+  let shouldUpdateStage = false;
+  let skipReason = null;
 
   if (resolvedOpportunityId && meetingData?.meetingType) {
     targetStageId = getStageIdForMeetingType(meetingData.meetingType);
 
     if (targetStageId) {
+      shouldUpdateStage = true;
       console.log(`📊 Meeting type "${meetingData.meetingType}" maps to stage ID: ${targetStageId}`);
-      stageUpdateResult = await updateOpportunityStage(resolvedOpportunityId, targetStageId, traceId, stepId);
     } else {
+      skipReason = 'no_stage_mapping';
       console.log(`⚠️ No stage mapping found for meeting type: "${meetingData.meetingType}", skipping stage update`);
     }
   } else if (!resolvedOpportunityId) {
+    skipReason = 'no_opportunity';
     console.log('⚠️ No opportunity ID found (not provided and not found by contact), skipping stage update');
   } else if (!meetingData?.meetingType) {
+    skipReason = 'no_meeting_type';
     console.log('⚠️ No meeting type found, skipping stage update');
   }
 
-  // Step 6: Send confirmation email for specific meeting types
+  if (stageMappingStepId) {
+    try {
+      await completeStep(stageMappingStepId, {
+        mappingFound: !!targetStageId,
+        targetStageId: targetStageId || null,
+        shouldUpdateStage,
+        skipReason: skipReason || null
+      });
+    } catch (e) {
+      console.error('Error completing checkStageMapping step:', e.message);
+    }
+  }
+
+  // ===== STEP 7: Update Opportunity Stage =====
+  if (shouldUpdateStage) {
+    let updateStageStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'ghl', 'updateOpportunityStage', {
+          opportunityId: resolvedOpportunityId,
+          targetStageId,
+          meetingType: meetingData?.meetingType
+        });
+        updateStageStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting updateOpportunityStage step:', e.message);
+      }
+    }
+
+    stageUpdateResult = await updateOpportunityStage(resolvedOpportunityId, targetStageId, traceId, updateStageStepId || stepId);
+
+    if (updateStageStepId) {
+      try {
+        await completeStep(updateStageStepId, {
+          success: !!stageUpdateResult,
+          opportunityId: resolvedOpportunityId,
+          newStageId: targetStageId
+        });
+      } catch (e) {
+        console.error('Error completing updateOpportunityStage step:', e.message);
+      }
+    }
+  }
+
+  // ===== STEP 8: Check Email Requirements =====
+  let emailCheckStepId = null;
+  if (traceId) {
+    try {
+      const step = await startStep(traceId, 'processing', 'checkEmailRequirements', {
+        meetingType: meetingData?.meetingType || null
+      });
+      emailCheckStepId = step.stepId;
+    } catch (e) {
+      console.error('Error starting checkEmailRequirements step:', e.message);
+    }
+  }
+
   let emailResult = null;
   const requiresConfirmationEmail = meetingData?.meetingType && shouldSendConfirmationEmail(meetingData.meetingType);
   const requiresDiscoveryCallEmail = meetingData?.meetingType && shouldSendDiscoveryCallEmail(meetingData.meetingType);
   const requiresTrustAdminEmail = meetingData?.meetingType && shouldSendTrustAdminEmail(meetingData.meetingType);
   const requiresGeneralDiscoveryCallEmail = meetingData?.meetingType && shouldSendGeneralDiscoveryCallEmail(meetingData.meetingType);
   const requiresDocReviewEmail = meetingData?.meetingType && shouldSendDocReviewEmail(meetingData.meetingType);
+  const requiresAnyEmail = requiresConfirmationEmail || requiresDiscoveryCallEmail || requiresTrustAdminEmail || requiresGeneralDiscoveryCallEmail || requiresDocReviewEmail;
 
-  if (requiresConfirmationEmail || requiresDiscoveryCallEmail || requiresTrustAdminEmail || requiresGeneralDiscoveryCallEmail || requiresDocReviewEmail) {
-    let emailType = 'confirmation';
-    if (requiresDiscoveryCallEmail) emailType = 'probate discovery call';
-    if (requiresTrustAdminEmail) emailType = 'trust admin';
-    if (requiresGeneralDiscoveryCallEmail) emailType = 'general discovery call';
-    if (requiresDocReviewEmail) emailType = 'doc review';
+  let emailType = null;
+  if (requiresConfirmationEmail) emailType = 'confirmation';
+  if (requiresDiscoveryCallEmail) emailType = 'probate_discovery_call';
+  if (requiresTrustAdminEmail) emailType = 'trust_admin';
+  if (requiresGeneralDiscoveryCallEmail) emailType = 'general_discovery_call';
+  if (requiresDocReviewEmail) emailType = 'doc_review';
+
+  if (emailCheckStepId) {
+    try {
+      await completeStep(emailCheckStepId, {
+        requiresEmail: requiresAnyEmail,
+        emailType: emailType || 'none'
+      });
+    } catch (e) {
+      console.error('Error completing checkEmailRequirements step:', e.message);
+    }
+  }
+
+  // Variables for contact details used by email/SMS
+  let appointmentStartTime = null;
+  let appointmentContactId = contactId;
+  let recipientEmail = contactEmail;
+  let recipientName = contactName;
+  let recipientFirstName = null;
+  let recipientPhone = contactPhone;
+
+  if (requiresAnyEmail) {
     console.log(`📧 Meeting type "${meetingData.meetingType}" requires ${emailType} email`);
 
-    // Fetch full appointment details to get start time
-    const appointmentDetails = await getAppointment(appointmentId, traceId, stepId);
+    // ===== STEP 9: Get Appointment Details =====
+    let getApptStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'ghl', 'getAppointmentDetails', {
+          appointmentId,
+          reason: 'Get start time for email'
+        });
+        getApptStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting getAppointmentDetails step:', e.message);
+      }
+    }
+
+    const appointmentDetails = await getAppointment(appointmentId, traceId, getApptStepId || stepId);
     console.log('📅 Appointment details:', JSON.stringify(appointmentDetails, null, 2));
 
     // Extract appointment data (may be nested under 'appointment' key)
     const appointment = appointmentDetails?.appointment || appointmentDetails;
-    const appointmentStartTime = appointment?.startTime || appointment?.start_time;
+    appointmentStartTime = appointment?.startTime || appointment?.start_time;
+    appointmentContactId = appointment?.contactId || appointment?.contact_id || contactId;
     console.log(`📅 Appointment start time: ${appointmentStartTime}`);
 
-    // Get the contact ID from the appointment
-    const appointmentContactId = appointment?.contactId || appointment?.contact_id || contactId;
+    if (getApptStepId) {
+      try {
+        await completeStep(getApptStepId, {
+          found: !!appointmentDetails,
+          startTime: appointmentStartTime || null,
+          contactId: appointmentContactId
+        });
+      } catch (e) {
+        console.error('Error completing getAppointmentDetails step:', e.message);
+      }
+    }
 
-    // Fetch contact to get their email, first name, and phone
-    let recipientEmail = contactEmail;
-    let recipientName = contactName;
-    let recipientFirstName = null;
-    let recipientPhone = contactPhone;
+    // ===== STEP 10: Get Contact Details =====
+    let getContactStepId = null;
+    if (traceId && appointmentContactId) {
+      try {
+        const step = await startStep(traceId, 'ghl', 'getContactDetails', {
+          contactId: appointmentContactId,
+          reason: 'Get email/name for notification'
+        });
+        getContactStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting getContactDetails step:', e.message);
+      }
+    }
 
     if (appointmentContactId) {
       try {
@@ -709,8 +983,44 @@ async function processAppointmentCreated(webhookData, traceId = null, stepId = n
         if (contact?.name || contact?.firstName) {
           recipientName = contact.name || `${contact.firstName} ${contact.lastName || ''}`.trim();
         }
+
+        if (getContactStepId) {
+          try {
+            await completeStep(getContactStepId, {
+              found: true,
+              hasEmail: !!recipientEmail,
+              hasPhone: !!recipientPhone,
+              hasFirstName: !!recipientFirstName
+            });
+          } catch (e) {
+            console.error('Error completing getContactDetails step:', e.message);
+          }
+        }
       } catch (contactError) {
         console.error('⚠️ Could not fetch contact, using webhook data:', contactError.message);
+        if (getContactStepId) {
+          try {
+            await failStep(getContactStepId, contactError, traceId);
+          } catch (e) {
+            console.error('Error failing getContactDetails step:', e.message);
+          }
+        }
+      }
+    }
+
+    // ===== STEP 11: Send Email =====
+    let sendEmailStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'email', 'sendConfirmationEmail', {
+          emailType,
+          recipientEmail,
+          meetingType: meetingData?.meetingType,
+          startTime: appointmentStartTime
+        });
+        sendEmailStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting sendConfirmationEmail step:', e.message);
       }
     }
 
@@ -768,16 +1078,42 @@ async function processAppointmentCreated(webhookData, traceId = null, stepId = n
         meetingType: meetingData.meetingType
       });
     }
+
+    if (sendEmailStepId) {
+      try {
+        await completeStep(sendEmailStepId, {
+          success: emailResult?.success || false,
+          reason: emailResult?.reason || null,
+          emailType
+        });
+      } catch (e) {
+        console.error('Error completing sendConfirmationEmail step:', e.message);
+      }
+    }
   } else if (meetingData?.meetingType) {
     console.log(`📧 Meeting type "${meetingData.meetingType}" does not require confirmation email`);
   }
 
-  // Step 7: Send SMS notifications (after email)
+  // ===== STEP 12: Send SMS Notifications =====
   let smsResult = null;
   let reminderSmsResult = null;
 
   // Only send SMS if we sent an email (same conditions)
   if (emailResult?.success && appointmentContactId) {
+    let sendSmsStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'sms', 'sendConfirmationSms', {
+          contactId: appointmentContactId,
+          appointmentId,
+          startTime: appointmentStartTime
+        });
+        sendSmsStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting sendConfirmationSms step:', e.message);
+      }
+    }
+
     console.log('📱 Sending SMS notifications...');
 
     // Build the event title for SMS
@@ -804,21 +1140,43 @@ async function processAppointmentCreated(webhookData, traceId = null, stepId = n
       contactName: recipientName,
       contactPhone: recipientPhone
     });
+
+    if (sendSmsStepId) {
+      try {
+        await completeStep(sendSmsStepId, {
+          confirmationSent: smsResult?.success || false,
+          reminderScheduled: reminderSmsResult?.success || false
+        });
+      } catch (e) {
+        console.error('Error completing sendConfirmationSms step:', e.message);
+      }
+    }
   } else if (!emailResult?.success) {
     console.log('📱 Skipping SMS - email was not sent successfully');
   } else if (!appointmentContactId) {
     console.log('📱 Skipping SMS - no contact ID available');
   }
 
+  // Determine action for outcome tracking
+  let action = 'appointment_processed';
+  if (emailResult?.success && smsResult?.success) {
+    action = 'appointment_processed_with_notifications';
+  } else if (emailResult?.success) {
+    action = 'appointment_processed_with_email';
+  } else if (stageUpdateResult) {
+    action = 'appointment_processed_with_stage_update';
+  }
+
   return {
     success: true,
+    action,
     appointmentId,
     title,
-    usedFallback: !meetingData || !meetingData.meetingType,
+    usedFallback,
     meetingData,
     stageUpdate: {
       opportunityId: resolvedOpportunityId,
-      opportunityIdSource: opportunityId ? 'webhook' : (resolvedOpportunityId ? 'search' : 'not_found'),
+      opportunityIdSource: opportunitySource || 'not_found',
       targetStageId,
       success: !!stageUpdateResult
     },

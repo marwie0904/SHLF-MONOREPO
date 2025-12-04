@@ -535,12 +535,414 @@ export const taskCompletedWorkflow = {
 };
 
 // ============================================================================
+// APPOINTMENT CREATED WORKFLOW
+// ============================================================================
+export const appointmentCreatedWorkflow = {
+  id: 'appointment-created',
+  name: 'Appointment Created',
+  trigger: '/webhooks/ghl/appointment-created',
+  triggerName: 'appointment-created',
+  root: {
+    id: 'webhook',
+    name: 'Webhook Received',
+    layer: 'webhook',
+    type: 'step',
+    matchStep: 'express:webhook_received',
+    children: [{
+      id: 'rate_limit',
+      name: 'Rate Limit Check',
+      layer: 'processing',
+      type: 'step',
+      matchStep: 'express:rate_limit_check',
+      children: [{
+        id: 'extract_data',
+        name: 'Extract Appointment Data',
+        layer: 'processing',
+        type: 'step',
+        matchStep: 'express:extract_appointment_data',
+        children: [{
+          id: 'validate',
+          name: 'Validate Required Fields',
+          layer: 'processing',
+          type: 'step',
+          matchStep: 'express:validate_required_fields',
+          children: [{
+            id: 'validate_decision',
+            name: 'Validation Passed?',
+            layer: 'decision',
+            type: 'decision',
+            condition: 'Check if appointmentId is present',
+            matchStepOutput: { stepName: 'express:validate_required_fields', outputField: 'isValid' },
+            children: [
+              {
+                label: 'No',
+                value: false,
+                matchValue: false,
+                node: {
+                  id: 'validation_failed',
+                  name: 'Validation Failed',
+                  layer: 'outcome',
+                  type: 'outcome',
+                  status: 'error',
+                  matchAction: 'validation_failed',
+                  children: []
+                }
+              },
+              {
+                label: 'Yes',
+                value: true,
+                matchValue: true,
+                node: {
+                  id: 'process_appointment',
+                  name: 'Process Appointment',
+                  layer: 'service',
+                  type: 'step',
+                  matchStep: 'appointmentService:processAppointmentCreated',
+                  children: [{
+                    id: 'get_form_submission',
+                    name: 'Get Form Submission',
+                    layer: 'external',
+                    type: 'step',
+                    matchStep: 'ghl:getFormSubmission',
+                    children: [{
+                      id: 'form_found_decision',
+                      name: 'Form Submission Found?',
+                      layer: 'decision',
+                      type: 'decision',
+                      condition: 'Check if booking form submission was found',
+                      matchStepOutput: { stepName: 'ghl:getFormSubmission', outputField: 'submissionFound' },
+                      children: [
+                        {
+                          label: 'No',
+                          value: false,
+                          matchValue: false,
+                          node: {
+                            id: 'get_calendar_fallback',
+                            name: 'Get Calendar Name (Fallback)',
+                            layer: 'external',
+                            type: 'step',
+                            matchStep: 'ghl:getCalendarName',
+                            children: [{
+                              id: 'build_title_fallback',
+                              name: 'Build Title (Fallback Format)',
+                              layer: 'processing',
+                              type: 'step',
+                              matchStep: 'processing:buildTitle',
+                              children: [{
+                                id: 'update_title_fallback',
+                                name: 'Update Appointment Title',
+                                layer: 'external',
+                                type: 'step',
+                                matchStep: 'ghl:updateAppointmentTitle',
+                                children: [{
+                                  id: 'check_stage_mapping_fallback',
+                                  name: 'Check Stage Mapping',
+                                  layer: 'processing',
+                                  type: 'step',
+                                  matchStep: 'processing:checkStageMapping',
+                                  children: [{
+                                    id: 'outcome_no_email',
+                                    name: 'Appointment Result',
+                                    layer: 'decision',
+                                    type: 'decision',
+                                    condition: 'Final outcome (no email - no meeting type)',
+                                    matchTraceStatus: true,
+                                    children: [
+                                      { label: 'Success', value: 'success', matchValue: 'appointment_processed', node: { id: 'processed_no_email', name: 'Appointment Processed', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'appointment_processed', children: [] } },
+                                      { label: 'With Stage Update', value: 'success', matchValue: 'appointment_processed_with_stage_update', node: { id: 'processed_with_stage', name: 'Processed + Stage Updated', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'appointment_processed_with_stage_update', children: [] } },
+                                      { label: 'Error', value: 'error', matchValue: 'error', node: { id: 'error_fallback', name: 'Error', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'error', children: [] } }
+                                    ]
+                                  }]
+                                }]
+                              }]
+                            }]
+                          }
+                        },
+                        {
+                          label: 'Yes',
+                          value: true,
+                          matchValue: true,
+                          node: {
+                            id: 'build_title_full',
+                            name: 'Build Title (Full Format)',
+                            layer: 'processing',
+                            type: 'step',
+                            matchStep: 'processing:buildTitle',
+                            children: [{
+                              id: 'update_title',
+                              name: 'Update Appointment Title',
+                              layer: 'external',
+                              type: 'step',
+                              matchStep: 'ghl:updateAppointmentTitle',
+                              children: [{
+                                id: 'search_opportunity',
+                                name: 'Search Opportunity',
+                                layer: 'external',
+                                type: 'step',
+                                matchStep: 'ghl:searchOpportunity',
+                                children: [{
+                                  id: 'check_stage_mapping',
+                                  name: 'Check Stage Mapping',
+                                  layer: 'processing',
+                                  type: 'step',
+                                  matchStep: 'processing:checkStageMapping',
+                                  children: [{
+                                    id: 'should_update_stage_decision',
+                                    name: 'Should Update Stage?',
+                                    layer: 'decision',
+                                    type: 'decision',
+                                    condition: 'Check if meeting type has stage mapping',
+                                    matchStepOutput: { stepName: 'processing:checkStageMapping', outputField: 'shouldUpdateStage' },
+                                    children: [
+                                      {
+                                        label: 'No',
+                                        value: false,
+                                        matchValue: false,
+                                        node: {
+                                          id: 'check_email_no_stage',
+                                          name: 'Check Email Requirements',
+                                          layer: 'processing',
+                                          type: 'step',
+                                          matchStep: 'processing:checkEmailRequirements',
+                                          children: [{
+                                            id: 'email_required_decision_no_stage',
+                                            name: 'Email Required?',
+                                            layer: 'decision',
+                                            type: 'decision',
+                                            condition: 'Check if meeting type requires confirmation email',
+                                            matchStepOutput: { stepName: 'processing:checkEmailRequirements', outputField: 'requiresEmail' },
+                                            children: [
+                                              {
+                                                label: 'No',
+                                                value: false,
+                                                matchValue: false,
+                                                node: {
+                                                  id: 'outcome_no_stage_no_email',
+                                                  name: 'Appointment Processed',
+                                                  layer: 'outcome',
+                                                  type: 'outcome',
+                                                  status: 'success',
+                                                  matchAction: 'appointment_processed',
+                                                  children: []
+                                                }
+                                              },
+                                              {
+                                                label: 'Yes',
+                                                value: true,
+                                                matchValue: true,
+                                                node: {
+                                                  id: 'get_appt_details_no_stage',
+                                                  name: 'Get Appointment Details',
+                                                  layer: 'external',
+                                                  type: 'step',
+                                                  matchStep: 'ghl:getAppointmentDetails',
+                                                  children: [{
+                                                    id: 'get_contact_no_stage',
+                                                    name: 'Get Contact Details',
+                                                    layer: 'external',
+                                                    type: 'step',
+                                                    matchStep: 'ghl:getContactDetails',
+                                                    children: [{
+                                                      id: 'send_email_no_stage',
+                                                      name: 'Send Confirmation Email',
+                                                      layer: 'external',
+                                                      type: 'step',
+                                                      matchStep: 'email:sendConfirmationEmail',
+                                                      children: [{
+                                                        id: 'email_sent_decision_no_stage',
+                                                        name: 'Email Sent?',
+                                                        layer: 'decision',
+                                                        type: 'decision',
+                                                        condition: 'Check if email was sent successfully',
+                                                        matchStepOutput: { stepName: 'email:sendConfirmationEmail', outputField: 'success' },
+                                                        children: [
+                                                          {
+                                                            label: 'No',
+                                                            value: false,
+                                                            matchValue: false,
+                                                            node: {
+                                                              id: 'outcome_no_stage_email_failed',
+                                                              name: 'Processed (Email Failed)',
+                                                              layer: 'outcome',
+                                                              type: 'outcome',
+                                                              status: 'success',
+                                                              matchAction: 'appointment_processed',
+                                                              children: []
+                                                            }
+                                                          },
+                                                          {
+                                                            label: 'Yes',
+                                                            value: true,
+                                                            matchValue: true,
+                                                            node: {
+                                                              id: 'send_sms_no_stage',
+                                                              name: 'Send SMS Notifications',
+                                                              layer: 'external',
+                                                              type: 'step',
+                                                              matchStep: 'sms:sendConfirmationSms',
+                                                              children: [{
+                                                                id: 'outcome_no_stage_with_notifications',
+                                                                name: 'Processed with Notifications',
+                                                                layer: 'outcome',
+                                                                type: 'outcome',
+                                                                status: 'success',
+                                                                matchAction: 'appointment_processed_with_notifications',
+                                                                children: []
+                                                              }]
+                                                            }
+                                                          }
+                                                        ]
+                                                      }]
+                                                    }]
+                                                  }]
+                                                }
+                                              }
+                                            ]
+                                          }]
+                                        }
+                                      },
+                                      {
+                                        label: 'Yes',
+                                        value: true,
+                                        matchValue: true,
+                                        node: {
+                                          id: 'update_stage',
+                                          name: 'Update Opportunity Stage',
+                                          layer: 'external',
+                                          type: 'step',
+                                          matchStep: 'ghl:updateOpportunityStage',
+                                          children: [{
+                                            id: 'check_email_with_stage',
+                                            name: 'Check Email Requirements',
+                                            layer: 'processing',
+                                            type: 'step',
+                                            matchStep: 'processing:checkEmailRequirements',
+                                            children: [{
+                                              id: 'email_required_decision',
+                                              name: 'Email Required?',
+                                              layer: 'decision',
+                                              type: 'decision',
+                                              condition: 'Check if meeting type requires confirmation email',
+                                              matchStepOutput: { stepName: 'processing:checkEmailRequirements', outputField: 'requiresEmail' },
+                                              children: [
+                                                {
+                                                  label: 'No',
+                                                  value: false,
+                                                  matchValue: false,
+                                                  node: {
+                                                    id: 'outcome_stage_no_email',
+                                                    name: 'Processed + Stage Updated',
+                                                    layer: 'outcome',
+                                                    type: 'outcome',
+                                                    status: 'success',
+                                                    matchAction: 'appointment_processed_with_stage_update',
+                                                    children: []
+                                                  }
+                                                },
+                                                {
+                                                  label: 'Yes',
+                                                  value: true,
+                                                  matchValue: true,
+                                                  node: {
+                                                    id: 'get_appt_details',
+                                                    name: 'Get Appointment Details',
+                                                    layer: 'external',
+                                                    type: 'step',
+                                                    matchStep: 'ghl:getAppointmentDetails',
+                                                    children: [{
+                                                      id: 'get_contact',
+                                                      name: 'Get Contact Details',
+                                                      layer: 'external',
+                                                      type: 'step',
+                                                      matchStep: 'ghl:getContactDetails',
+                                                      children: [{
+                                                        id: 'send_email',
+                                                        name: 'Send Confirmation Email',
+                                                        layer: 'external',
+                                                        type: 'step',
+                                                        matchStep: 'email:sendConfirmationEmail',
+                                                        children: [{
+                                                          id: 'email_sent_decision',
+                                                          name: 'Email Sent?',
+                                                          layer: 'decision',
+                                                          type: 'decision',
+                                                          condition: 'Check if email was sent successfully',
+                                                          matchStepOutput: { stepName: 'email:sendConfirmationEmail', outputField: 'success' },
+                                                          children: [
+                                                            {
+                                                              label: 'No',
+                                                              value: false,
+                                                              matchValue: false,
+                                                              node: {
+                                                                id: 'outcome_email_failed',
+                                                                name: 'Processed (Email Failed)',
+                                                                layer: 'outcome',
+                                                                type: 'outcome',
+                                                                status: 'success',
+                                                                matchAction: 'appointment_processed_with_stage_update',
+                                                                children: []
+                                                              }
+                                                            },
+                                                            {
+                                                              label: 'Yes',
+                                                              value: true,
+                                                              matchValue: true,
+                                                              node: {
+                                                                id: 'send_sms',
+                                                                name: 'Send SMS Notifications',
+                                                                layer: 'external',
+                                                                type: 'step',
+                                                                matchStep: 'sms:sendConfirmationSms',
+                                                                children: [{
+                                                                  id: 'outcome_full_success',
+                                                                  name: 'Processed with Notifications',
+                                                                  layer: 'outcome',
+                                                                  type: 'outcome',
+                                                                  status: 'success',
+                                                                  matchAction: 'appointment_processed_with_notifications',
+                                                                  children: []
+                                                                }]
+                                                              }
+                                                            }
+                                                          ]
+                                                        }]
+                                                      }]
+                                                    }]
+                                                  }
+                                                }
+                                              ]
+                                            }]
+                                          }]
+                                        }
+                                      }
+                                    ]
+                                  }]
+                                }]
+                              }]
+                            }]
+                          }
+                        }
+                      ]
+                    }]
+                  }]
+                }
+              }
+            ]
+          }]
+        }]
+      }]
+    }]
+  }
+};
+
+// ============================================================================
 // WORKFLOW REGISTRY
 // ============================================================================
 export const ghlWorkflowTemplates = {
   'opportunity-stage-changed': opportunityStageChangedWorkflow,
   'task-created': taskCreatedWorkflow,
   'task-completed': taskCompletedWorkflow,
+  'appointment-created': appointmentCreatedWorkflow,
 };
 
 /**

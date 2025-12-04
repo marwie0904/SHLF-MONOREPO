@@ -817,6 +817,80 @@ app.post('/webhooks/ghl/appointment-created', async (req, res) => {
     console.log('Headers:', JSON.stringify(req.headers, null, 2));
     console.log('Full Request Body:', JSON.stringify(req.body, null, 2));
 
+    // ===== STEP 1: Webhook Received =====
+    let webhookStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'express', 'webhook_received', {
+          endpoint: '/webhooks/ghl/appointment-created',
+          method: 'POST',
+          contentType: req.headers['content-type'],
+          timestamp: new Date().toISOString()
+        });
+        webhookStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting webhook_received step:', e.message);
+      }
+    }
+
+    // Log custom data if it exists
+    if (req.body.customData) {
+      console.log('Custom Data:', JSON.stringify(req.body.customData, null, 2));
+    }
+
+    // Complete webhook received step
+    if (webhookStepId) {
+      try {
+        await completeStep(webhookStepId, {
+          hasCustomData: !!req.body.customData,
+          hasCalendarData: !!req.body.calendar,
+          bodyKeys: Object.keys(req.body)
+        });
+      } catch (e) {
+        console.error('Error completing webhook_received step:', e.message);
+      }
+    }
+
+    // ===== STEP 2: Rate Limit Check =====
+    let rateLimitStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'express', 'rate_limit_check', {
+          endpoint: '/webhooks/ghl/appointment-created'
+        });
+        rateLimitStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting rate_limit_check step:', e.message);
+      }
+    }
+
+    // Rate limiting is handled by middleware, so we just log that we passed
+    if (rateLimitStepId) {
+      try {
+        await completeStep(rateLimitStepId, {
+          passed: true,
+          message: 'Rate limit check passed'
+        });
+      } catch (e) {
+        console.error('Error completing rate_limit_check step:', e.message);
+      }
+    }
+
+    // ===== STEP 3: Extract Appointment Data =====
+    let extractStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'express', 'extract_appointment_data', {
+          rawBodyKeys: Object.keys(req.body),
+          hasCalendarNested: !!req.body.calendar,
+          hasCustomData: !!req.body.customData
+        });
+        extractStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting extract_appointment_data step:', e.message);
+      }
+    }
+
     // Extract appointment data from GHL webhook
     // Handle multiple possible field names for flexibility
     // NOTE: The correct appointmentId is in calendar.appointmentId or customData.appointmentId
@@ -864,6 +938,22 @@ app.post('/webhooks/ghl/appointment-created', async (req, res) => {
 
     console.log('Extracted webhook data:', JSON.stringify(webhookData, null, 2));
 
+    // Complete extract step
+    if (extractStepId) {
+      try {
+        await completeStep(extractStepId, {
+          appointmentId: webhookData.appointmentId,
+          contactId: webhookData.contactId,
+          calendarId: webhookData.calendarId,
+          calendarName: webhookData.calendarName,
+          opportunityId: webhookData.opportunityId,
+          hasContactInfo: !!(webhookData.contactPhone || webhookData.contactEmail)
+        });
+      } catch (e) {
+        console.error('Error completing extract_appointment_data step:', e.message);
+      }
+    }
+
     // Update trace with context IDs
     if (traceId) {
       await updateTraceContextIds(traceId, {
@@ -873,14 +963,54 @@ app.post('/webhooks/ghl/appointment-created', async (req, res) => {
       });
     }
 
+    // ===== STEP 4: Validate Required Fields =====
+    let validateStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'express', 'validate_required_fields', {
+          appointmentId: webhookData.appointmentId,
+          hasAppointmentId: !!webhookData.appointmentId
+        });
+        validateStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting validate_required_fields step:', e.message);
+      }
+    }
+
     // Validate required fields
     if (!webhookData.appointmentId) {
       console.error('❌ Missing appointmentId in webhook payload');
+
+      if (validateStepId) {
+        try {
+          await completeStep(validateStepId, {
+            isValid: false,
+            missingFields: ['appointmentId'],
+            receivedFields: Object.keys(req.body)
+          });
+        } catch (e) {
+          console.error('Error completing validate_required_fields step:', e.message);
+        }
+      }
+
       return res.status(400).json({
         success: false,
         message: 'Missing required field: appointmentId',
-        receivedFields: Object.keys(req.body)
+        receivedFields: Object.keys(req.body),
+        action: 'validation_failed'
       });
+    }
+
+    // Validation passed
+    if (validateStepId) {
+      try {
+        await completeStep(validateStepId, {
+          isValid: true,
+          appointmentId: webhookData.appointmentId
+        });
+      } catch (e) {
+        console.error('Error completing validate_required_fields step:', e.message);
+      }
     }
 
     // Step: Process the appointment and update title
@@ -896,13 +1026,15 @@ app.post('/webhooks/ghl/appointment-created', async (req, res) => {
 
       res.json({
         success: true,
-        message: 'Appointment title updated successfully',
+        message: 'Appointment processed successfully',
+        action: result.action || 'appointment_processed',
         appointmentId: result.appointmentId,
         newTitle: result.title,
         usedFallback: result.usedFallback,
         meetingData: result.meetingData,
         stageUpdate: result.stageUpdate,
-        emailSent: result.emailSent
+        emailSent: result.emailSent,
+        smsSent: result.smsSent
       });
     } catch (processError) {
       if (processStepId) await failStep(processStepId, processError, traceId);
@@ -914,7 +1046,8 @@ app.post('/webhooks/ghl/appointment-created', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error processing webhook',
-      error: error.message
+      error: error.message,
+      action: 'error'
     });
   }
 });
