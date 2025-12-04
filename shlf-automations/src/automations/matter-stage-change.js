@@ -237,46 +237,36 @@ export class MatterStageChangeAutomation {
         name: matterHistory?.stage_name || 'Unknown',
       };
 
+      // Determine if we have a previous record
+      const hasPreviousRecord = previousStage.id !== null;
+
       const stageChangeStepId = await EventTracker.startStep(traceId, {
         layerName: 'automation',
         stepName: 'detect_stage_change',
         metadata: {
           matterId,
+          hasPreviousRecord,
           previousStageId: previousStage.id,
-          previousStageName: previousStage.name,
+          previousStageName: hasPreviousRecord ? previousStage.name : '(No previous record)',
           newStageId: currentStage.id,
           newStageName: currentStage.name,
         },
       });
       const stageChangeCtx = EventTracker.createContext(traceId, stageChangeStepId);
 
-      // Determine if stage actually changed
-      const stageChanged = previousStage.id !== currentStage.id;
+      // Determine if stage actually changed (null means no previous record, treat as changed)
+      const stageChanged = !hasPreviousRecord || previousStage.id !== currentStage.id;
 
-      // Log stage change details
-      stageChangeCtx.logDetail({
-        operation: 'stage_change_detected',
-        operationType: 'decision',
-        input: {
-          matterId,
-          previousStageId: previousStage.id,
-          previousStageName: previousStage.name,
-          newStageId: currentStage.id,
-          newStageName: currentStage.name,
-        },
-        output: {
-          stageChanged,
-          action: stageChanged ? 'stage_changed' : 'same_stage',
-        },
-        status: 'success',
-      });
+      // Log stage change details using the correct context method
+      stageChangeCtx.logStageChange(matterId, previousStage, currentStage, stageChanged);
 
       await EventTracker.endStep(stageChangeStepId, {
         status: currentStage.id ? 'success' : 'skipped',
         metadata: {
           stageChanged,
+          hasPreviousRecord,
           previousStageId: previousStage.id,
-          previousStageName: previousStage.name,
+          previousStageName: hasPreviousRecord ? previousStage.name : '(No previous record)',
           newStageId: currentStage.id,
           newStageName: currentStage.name,
         },

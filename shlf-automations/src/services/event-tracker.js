@@ -505,17 +505,27 @@ export const EventTracker = {
 
       /**
        * Log a stage change decision
+       * @param {number} matterId - Matter ID
+       * @param {Object} previousStage - Previous stage { id, name }
+       * @param {Object} newStage - New stage { id, name }
+       * @param {boolean} stageChanged - Whether the stage actually changed
        */
-      logStageChange: (matterId, previousStage, newStage) => {
+      logStageChange: (matterId, previousStage, newStage, stageChanged) => {
+        const hasPreviousRecord = previousStage?.id !== null;
         EventTracker.logDetail(stepId, traceId, {
           operation: "stage_change_detected",
           operationType: "decision",
           input: {
             matterId,
             previousStageId: previousStage?.id,
-            previousStageName: previousStage?.name,
+            previousStageName: hasPreviousRecord ? previousStage?.name : "(No previous record)",
             newStageId: newStage?.id,
             newStageName: newStage?.name,
+            hasPreviousRecord,
+          },
+          output: {
+            stageChanged,
+            action: !hasPreviousRecord ? "first_stage_record" : (stageChanged ? "stage_changed" : "same_stage"),
           },
           status: "success",
         });
