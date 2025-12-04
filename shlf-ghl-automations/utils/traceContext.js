@@ -64,24 +64,34 @@ function generateDetailId(stepId, sequence) {
 
 /**
  * Extracts relevant context IDs from request body
+ * Returns undefined instead of null for missing values (Convex compatibility)
  */
 function extractContextIds(body) {
   if (!body || typeof body !== 'object') {
     return {};
   }
 
-  return {
-    contactId: body.contactId || body.contact_id || body['contact-id'] ||
-               body.customData?.contactId || body.customData?.['contact-id'] ||
-               body.invoice?.contactDetails?.id || null,
-    opportunityId: body.opportunityId || body.opportunity_id || body['opportunity-id'] ||
-                   body.customData?.opportunityId || body.customData?.['opportunity-id'] ||
-                   body.invoice?.opportunityDetails?.opportunityId || null,
-    invoiceId: body.invoice?._id || body.invoice?.id || body.invoiceId || body.invoice_id ||
-               body.recordId || body.id || null,
-    appointmentId: body.calendar?.appointmentId || body.appointmentId ||
-                   body.appointment_id || body['appointment-id'] || null,
-  };
+  const result = {};
+
+  const contactId = body.contactId || body.contact_id || body['contact-id'] ||
+             body.customData?.contactId || body.customData?.['contact-id'] ||
+             body.invoice?.contactDetails?.id;
+  if (contactId) result.contactId = contactId;
+
+  const opportunityId = body.opportunityId || body.opportunity_id || body['opportunity-id'] ||
+                 body.customData?.opportunityId || body.customData?.['opportunity-id'] ||
+                 body.invoice?.opportunityDetails?.opportunityId;
+  if (opportunityId) result.opportunityId = opportunityId;
+
+  const invoiceId = body.invoice?._id || body.invoice?.id || body.invoiceId || body.invoice_id ||
+             body.recordId || body.id;
+  if (invoiceId) result.invoiceId = invoiceId;
+
+  const appointmentId = body.calendar?.appointmentId || body.appointmentId ||
+               body.appointment_id || body['appointment-id'];
+  if (appointmentId) result.appointmentId = appointmentId;
+
+  return result;
 }
 
 /**
