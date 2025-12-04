@@ -125,28 +125,25 @@ export const matterStageChangeWorkflow = {
                                           name: 'Delete Previous Tasks',
                                           layer: 'automation',
                                           type: 'step',
-                                          matchStepOutput: { stepName: 'check_rollback_window', outputField: 'withinRollbackWindow', expectedValue: true },
+                                          // No matchStep - this is a virtual node that shows when rollback happens
                                           children: [{
                                             id: 'generate_tasks_after_rollback',
                                             name: 'Generate Tasks',
                                             layer: 'automation',
                                             type: 'step',
                                             matchStep: 'generate_tasks',
-                                            matchStepOutput: { stepName: 'check_rollback_window', outputField: 'withinRollbackWindow', expectedValue: true },
                                             children: [{
                                               id: 'verify_tasks_after_rollback',
                                               name: 'Verify Tasks',
                                               layer: 'automation',
                                               type: 'step',
                                               matchStep: 'verify_tasks',
-                                              matchStepOutput: { stepName: 'check_rollback_window', outputField: 'withinRollbackWindow', expectedValue: true },
                                               children: [{
                                                 id: 'task_result_after_rollback',
                                                 name: 'Task Creation Result',
                                                 layer: 'decision',
                                                 type: 'decision',
                                                 condition: 'Check task creation outcomes',
-                                                matchStepOutput: { stepName: 'check_rollback_window', outputField: 'withinRollbackWindow', expectedValue: true },
                                                 children: [
                                                   { label: 'All Success', value: 'success', node: { id: 'tasks_created_rb', name: 'Tasks Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'created_tasks', children: [] } },
                                                   { label: 'Updated', value: 'updated', node: { id: 'tasks_updated_rb', name: 'Tasks Updated', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'updated_tasks', children: [] } },
@@ -168,21 +165,18 @@ export const matterStageChangeWorkflow = {
                                           layer: 'automation',
                                           type: 'step',
                                           matchStep: 'generate_tasks',
-                                          matchStepOutput: { stepName: 'check_rollback_window', outputField: 'withinRollbackWindow', expectedValue: false },
                                           children: [{
                                             id: 'verify_tasks',
                                             name: 'Verify Tasks',
                                             layer: 'automation',
                                             type: 'step',
                                             matchStep: 'verify_tasks',
-                                            matchStepOutput: { stepName: 'check_rollback_window', outputField: 'withinRollbackWindow', expectedValue: false },
                                             children: [{
                                               id: 'task_result',
                                               name: 'Task Creation Result',
                                               layer: 'decision',
                                               type: 'decision',
                                               condition: 'Check task creation outcomes',
-                                              matchStepOutput: { stepName: 'check_rollback_window', outputField: 'withinRollbackWindow', expectedValue: false },
                                               children: [
                                                 { label: 'All Success', value: 'success', node: { id: 'tasks_created', name: 'Tasks Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'created_tasks', children: [] } },
                                                 { label: 'Updated', value: 'updated', node: { id: 'tasks_updated', name: 'Tasks Updated', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'updated_tasks', children: [] } },
@@ -854,7 +848,8 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
   findTakenNodes(workflow.root);
 
   // Second pass: mark all nodes with status and attach step data
-  function markNode(node, depth = 0, parentTaken = true) {
+  // branchActive: whether this node is in an active branch (for decision matching)
+  function markNode(node, depth = 0, branchActive = true) {
     let taken = false;
     let current = false;
     let stepData = null;
@@ -865,7 +860,8 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
 
     if (node.type === 'step' && node.matchStep) {
       const matchKey = node.matchStep.toLowerCase();
-      taken = stepNames.has(matchKey) && stepOutputMatch;
+      // Only match if branch is active AND step exists AND stepOutput matches
+      taken = branchActive && stepNames.has(matchKey) && stepOutputMatch;
       if (taken) {
         // Attach the matching step data
         stepData = stepsByName[matchKey];
@@ -874,17 +870,18 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
           nodeDetails = stepData.details;
         }
       }
-    } else if (node.type === 'step' && node.matchStepOutput && !node.matchStep) {
-      // Step that only matches based on step output (like "Delete Previous Tasks")
-      taken = stepOutputMatch;
-      if (taken) {
+    } else if (node.type === 'step' && !node.matchStep) {
+      // Step without matchStep (like "Delete Previous Tasks") - taken if branch is active
+      taken = branchActive && stepOutputMatch;
+      if (taken && node.matchStepOutput) {
         // Get step data from the referenced step
         const { stepName } = node.matchStepOutput;
         stepData = stepsByName[stepName?.toLowerCase()];
       }
     } else if (node.type === 'outcome' && node.matchAction) {
       const matchAction = node.matchAction.toLowerCase();
-      taken = resultAction.includes(matchAction) || resultAction === matchAction;
+      // Only match outcomes in active branches
+      taken = branchActive && (resultAction.includes(matchAction) || resultAction === matchAction);
       if (taken) {
         current = true;
         // For outcomes, find any details that match the action
@@ -906,7 +903,7 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
     }
 
     // Mark children (do this first for all node types)
-    // For decisions with matchStepOutput, only mark the matching branch
+    // For decisions with matchStepOutput, only mark the matching branch as active
     let markedChildren;
     if (node.type === 'decision' && node.matchStepOutput) {
       const { stepName, outputField } = node.matchStepOutput;
@@ -915,11 +912,11 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
 
       markedChildren = node.children.map(child => {
         if (child.node) {
-          // Only mark this branch if its matchValue matches the actual value
-          const branchMatches = child.matchValue === actualValue;
+          // Branch is active only if its matchValue matches the actual value
+          const isBranchActive = branchActive && (child.matchValue === actualValue);
           return {
             ...child,
-            node: markNode(child.node, depth + 1, branchMatches),
+            node: markNode(child.node, depth + 1, isBranchActive),
           };
         }
         return child;
@@ -929,10 +926,10 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
         if (child.node) {
           return {
             ...child,
-            node: markNode(child.node, depth + 1, taken),
+            node: markNode(child.node, depth + 1, branchActive),
           };
         } else if (child.id) {
-          return markNode(child, depth + 1, taken);
+          return markNode(child, depth + 1, branchActive);
         }
         return child;
       });
