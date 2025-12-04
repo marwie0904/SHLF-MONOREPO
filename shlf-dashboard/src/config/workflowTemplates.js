@@ -808,83 +808,116 @@ export const documentCreatedWorkflow = {
     type: 'step',
     matchStep: 'webhook_received',
     children: [{
-      id: 'validation',
-      name: 'Validate Timestamp',
+      id: 'queue_check',
+      name: 'Rate Limit Queue',
       layer: 'processing',
       type: 'step',
-      matchStep: 'validation',
+      matchStep: 'queue_check',
       children: [{
-        id: 'idempotency',
-        name: 'Idempotency Check',
+        id: 'validation',
+        name: 'Validate Timestamp',
         layer: 'processing',
         type: 'step',
-        matchStep: 'idempotency_check',
+        matchStep: 'validation',
         children: [{
-          id: 'has_matter',
-          name: 'Has Matter?',
-          layer: 'decision',
-          type: 'decision',
-          condition: 'Check matter association',
-          children: [
-            { label: 'No', value: false, node: { id: 'no_matter', name: 'Missing Matter', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'missing_matter', children: [] } },
-            {
-              label: 'Yes',
-              value: true,
-              node: {
-                id: 'test_mode',
-                name: 'Test Mode Filter',
-                layer: 'decision',
-                type: 'decision',
-                condition: 'Is matter in allowlist?',
-                children: [
-                  { label: 'Blocked', value: false, node: { id: 'test_blocked', name: 'Test Mode Blocked', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_test_mode', children: [] } },
-                  {
-                    label: 'Allowed',
-                    value: true,
-                    node: {
-                      id: 'fetch_matter',
-                      name: 'Fetch Matter',
-                      layer: 'service',
-                      type: 'step',
-                      matchStep: 'fetch_matter',
-                      children: [{
-                        id: 'matter_closed',
-                        name: 'Matter Closed?',
-                        layer: 'decision',
-                        type: 'decision',
-                        condition: 'Check matter status',
-                        children: [
-                          { label: 'Yes', value: true, node: { id: 'closed', name: 'Matter Closed', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_closed_matter', children: [] } },
-                          {
-                            label: 'No',
-                            value: false,
-                            node: {
-                              id: 'fetch_document',
-                              name: 'Fetch Document',
-                              layer: 'service',
-                              type: 'step',
-                              matchStep: 'fetch_document',
-                              children: [{
-                                id: 'in_root',
-                                name: 'In Root Folder?',
-                                layer: 'decision',
-                                type: 'decision',
-                                condition: 'Check if document in matter root',
-                                children: [
-                                  { label: 'Subfolder', value: false, node: { id: 'in_folder', name: 'In Subfolder', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_in_folder', children: [] } },
-                                  { label: 'Root', value: true, node: { id: 'task_created', name: 'Task Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'task_created', children: [] } }
-                                ]
-                              }]
+          id: 'idempotency',
+          name: 'Idempotency Check',
+          layer: 'processing',
+          type: 'step',
+          matchStep: 'idempotency_check',
+          children: [{
+            id: 'has_matter',
+            name: 'Has Matter?',
+            layer: 'decision',
+            type: 'decision',
+            condition: 'Check matter association',
+            children: [
+              { label: 'No', value: false, node: { id: 'no_matter', name: 'Missing Matter', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'missing_matter', children: [] } },
+              {
+                label: 'Yes',
+                value: true,
+                node: {
+                  id: 'test_mode',
+                  name: 'Test Mode Filter',
+                  layer: 'decision',
+                  type: 'decision',
+                  condition: 'Is matter in allowlist?',
+                  children: [
+                    { label: 'Blocked', value: false, node: { id: 'test_blocked', name: 'Test Mode Blocked', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_test_mode', children: [] } },
+                    {
+                      label: 'Allowed',
+                      value: true,
+                      node: {
+                        id: 'fetch_matter',
+                        name: 'Fetch Matter',
+                        layer: 'service',
+                        type: 'step',
+                        matchStep: 'fetch_matter',
+                        children: [{
+                          id: 'matter_closed',
+                          name: 'Matter Closed?',
+                          layer: 'decision',
+                          type: 'decision',
+                          condition: 'Check matter status',
+                          children: [
+                            { label: 'Yes', value: true, node: { id: 'closed', name: 'Matter Closed', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_closed_matter', children: [] } },
+                            {
+                              label: 'No',
+                              value: false,
+                              node: {
+                                id: 'fetch_document',
+                                name: 'Fetch Document',
+                                layer: 'service',
+                                type: 'step',
+                                matchStep: 'fetch_document',
+                                children: [{
+                                  id: 'in_root',
+                                  name: 'In Root Folder?',
+                                  layer: 'decision',
+                                  type: 'decision',
+                                  condition: 'Check if document in matter root',
+                                  children: [
+                                    { label: 'Subfolder', value: false, node: { id: 'in_folder', name: 'In Subfolder', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_in_folder', children: [] } },
+                                    {
+                                      label: 'Root',
+                                      value: true,
+                                      node: {
+                                        id: 'create_task_clio',
+                                        name: 'Create Task in Clio',
+                                        layer: 'service',
+                                        type: 'step',
+                                        matchStep: 'create_task_in_clio',
+                                        children: [{
+                                          id: 'save_task_supabase',
+                                          name: 'Save Task to Supabase',
+                                          layer: 'service',
+                                          type: 'step',
+                                          matchStep: 'save_task_to_supabase',
+                                          children: [{
+                                            id: 'task_created',
+                                            name: 'Task Created',
+                                            layer: 'outcome',
+                                            type: 'outcome',
+                                            status: 'success',
+                                            matchAction: 'task_created',
+                                            children: []
+                                          }]
+                                        }]
+                                      }
+                                    }
+                                  ]
+                                }]
+                              }
                             }
-                          }
-                        ]
-                      }]
+                          ]
+                        }]
+                      }
                     }
-                  }
-                ]
+                  ]
+                }
               }
-            }
-          ]
+            ]
+          }]
         }]
       }]
     }]

@@ -1017,9 +1017,13 @@ async function checkOpportunityStageWithRetry(opportunityId, expectedPipelineId,
 /**
  * Process task completion and check if opportunity should be moved
  * @param {Object} taskData - Task completion webhook data
+ * @param {string} traceId - Optional trace ID for tracking
+ * @param {string} parentStepId - Optional parent step ID for tracking
  * @returns {Promise<Object>} Processing result
  */
-async function processTaskCompletion(taskData) {
+async function processTaskCompletion(taskData, traceId = null, parentStepId = null) {
+  const { startStep, completeStep, failStep, startDetail, completeDetail, failDetail } = require('../utils/traceContext');
+
   try {
     const { contactId, title } = taskData;
     let { opportunityId, taskId } = taskData;
@@ -1028,71 +1032,200 @@ async function processTaskCompletion(taskData) {
 
     if (!contactId) {
       console.log('Missing contactId, skipping');
-      return { success: true, message: 'No contact to process' };
+      return { success: true, message: 'No contact to process', action: 'skipped_no_contact' };
     }
 
-    // If no opportunityId provided, search for it using contactId
+    // ===== STEP 1: Search for Opportunity (if needed) =====
     if (!opportunityId) {
+      let searchStepId = null;
+      if (traceId) {
+        try {
+          const step = await startStep(traceId, 'ghl', 'searchOpportunity', {
+            contactId,
+            reason: 'No opportunityId provided in webhook'
+          });
+          searchStepId = step.stepId;
+        } catch (e) {
+          console.error('Error starting searchOpportunity step:', e.message);
+        }
+      }
+
       console.log('No opportunityId provided, searching by contactId...');
       const locationId = process.env.GHL_LOCATION_ID;
 
       try {
-        const opportunities = await searchOpportunitiesByContact(contactId, locationId);
-        console.log(`Search returned ${opportunities?.length || 0} opportunities:`, JSON.stringify(opportunities, null, 2));
+        const opportunities = await searchOpportunitiesByContact(contactId, locationId, traceId, searchStepId);
+        console.log(`Search returned ${opportunities?.length || 0} opportunities`);
+
+        if (searchStepId) {
+          try {
+            await completeStep(searchStepId, {
+              opportunitiesFound: opportunities?.length || 0
+            });
+          } catch (e) {
+            console.error('Error completing searchOpportunity step:', e.message);
+          }
+        }
 
         if (!opportunities || opportunities.length === 0) {
           console.log('No opportunities found for this contact');
-          return { success: true, message: 'No opportunity found for contact' };
+          return { success: true, message: 'No opportunity found for contact', action: 'no_opportunity_found' };
         }
 
-        // Use the first open opportunity (you can add more logic here if needed)
+        // Use the first open opportunity
         const openOpportunity = opportunities.find(opp => opp.status === 'open');
         opportunityId = openOpportunity?.id || opportunities[0].id;
-
-        // Get stage info from the search result
-        const selectedOpp = openOpportunity || opportunities[0];
-        console.log(`Selected opportunity:`, JSON.stringify(selectedOpp, null, 2));
         console.log(`Found opportunity: ${opportunityId}`);
       } catch (searchError) {
+        if (searchStepId) {
+          try {
+            await failStep(searchStepId, searchError, traceId);
+          } catch (e) {
+            console.error('Error failing searchOpportunity step:', e.message);
+          }
+        }
         console.error('Error searching for opportunity:', searchError.message);
         throw searchError;
       }
     }
 
-    // Get opportunity details to find current stage
+    // ===== STEP 2: Get Opportunity Details =====
+    let getOppStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'ghl', 'getOpportunityDetails', {
+          opportunityId
+        });
+        getOppStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting getOpportunityDetails step:', e.message);
+      }
+    }
+
     const apiKey = process.env.GHL_API_KEY;
-    const oppResponse = await axios.get(
-      `https://services.leadconnectorhq.com/opportunities/${opportunityId}`,
-      {
+    const endpoint = `https://services.leadconnectorhq.com/opportunities/${opportunityId}`;
+
+    // Create detail for API call
+    let getOppDetailId = null;
+    if (traceId && getOppStepId) {
+      try {
+        const detail = await startDetail(traceId, getOppStepId, {
+          detailType: 'api_call',
+          apiProvider: 'ghl',
+          apiEndpoint: endpoint,
+          apiMethod: 'GET'
+        });
+        getOppDetailId = detail.detailId;
+      } catch (e) {
+        console.error('Error starting getOpportunity detail:', e.message);
+      }
+    }
+
+    let opportunityData;
+    let currentStageId;
+    let currentPipelineId;
+
+    try {
+      const oppResponse = await axios.get(endpoint, {
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Version': '2021-07-28'
         }
+      });
+
+      if (getOppDetailId) {
+        try {
+          await completeDetail(getOppDetailId, {
+            responseStatus: oppResponse.status,
+            responseBody: { opportunity: oppResponse.data.opportunity ? 'present' : 'missing' }
+          });
+        } catch (e) {
+          console.error('Error completing getOpportunity detail:', e.message);
+        }
       }
-    );
 
-    console.log('Opportunity API response:', JSON.stringify(oppResponse.data, null, 2));
+      opportunityData = oppResponse.data.opportunity || oppResponse.data;
+      currentStageId = opportunityData.pipelineStageId || opportunityData.stageId;
+      currentPipelineId = opportunityData.pipelineId;
 
-    // Data is nested under 'opportunity' object
-    const opportunityData = oppResponse.data.opportunity || oppResponse.data;
-    const currentStageId = opportunityData.pipelineStageId || opportunityData.stageId;
-    const currentPipelineId = opportunityData.pipelineId;
+      if (getOppStepId) {
+        try {
+          await completeStep(getOppStepId, {
+            currentStageId,
+            currentPipelineId
+          });
+        } catch (e) {
+          console.error('Error completing getOpportunityDetails step:', e.message);
+        }
+      }
+    } catch (oppError) {
+      if (getOppDetailId) {
+        try {
+          await failDetail(getOppDetailId, oppError, traceId);
+        } catch (e) {
+          console.error('Error failing getOpportunity detail:', e.message);
+        }
+      }
+      if (getOppStepId) {
+        try {
+          await failStep(getOppStepId, oppError, traceId);
+        } catch (e) {
+          console.error('Error failing getOpportunityDetails step:', e.message);
+        }
+      }
+      throw oppError;
+    }
 
     console.log(`Current opportunity stage: ${currentStageId}, pipeline: ${currentPipelineId}`);
 
-    // Check if this is the final task that should trigger opportunity move
+    // ===== STEP 3: Check if Final Task =====
+    let checkFinalStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'processing', 'checkFinalTask', {
+          taskTitle: title
+        });
+        checkFinalStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting checkFinalTask step:', e.message);
+      }
+    }
+
     const finalTaskTitle = "Final follow-up call—if no answer, send final text and close the matter.";
+    const isFinalTask = title === finalTaskTitle;
 
-    console.log(`Checking if task "${title}" matches final task: "${finalTaskTitle}"`);
+    if (checkFinalStepId) {
+      try {
+        await completeStep(checkFinalStepId, {
+          isFinalTask,
+          expectedTitle: finalTaskTitle,
+          actualTitle: title
+        });
+      } catch (e) {
+        console.error('Error completing checkFinalTask step:', e.message);
+      }
+    }
 
-    if (title !== finalTaskTitle) {
+    if (!isFinalTask) {
       console.log('Not the final task, skipping opportunity move');
-      return { success: true, message: 'Not the final task' };
+      return { success: true, message: 'Not the final task', action: 'not_final_task', isFinalTask: false };
     }
 
     console.log('Final task completed, proceeding to move opportunity');
 
-    // This was the final task - check if we should move the opportunity
+    // ===== STEP 4: Get Stage Mapping =====
+    let mappingStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'supabase', 'getStageMapping', {
+          sourceStageId: currentStageId
+        });
+        mappingStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting getStageMapping step:', e.message);
+      }
+    }
+
     const { data: mappings, error } = await supabase
       .from('stage_completion_mappings')
       .select('*')
@@ -1101,35 +1234,92 @@ async function processTaskCompletion(taskData) {
       .limit(1);
 
     if (error) {
+      if (mappingStepId) {
+        try {
+          await failStep(mappingStepId, error, traceId);
+        } catch (e) {
+          console.error('Error failing getStageMapping step:', e.message);
+        }
+      }
       console.error('Error fetching stage mapping:', error);
       throw error;
     }
 
+    if (mappingStepId) {
+      try {
+        await completeStep(mappingStepId, {
+          mappingFound: mappings && mappings.length > 0,
+          mappingCount: mappings?.length || 0
+        });
+      } catch (e) {
+        console.error('Error completing getStageMapping step:', e.message);
+      }
+    }
+
     if (!mappings || mappings.length === 0) {
       console.log(`No mapping found for stage ${currentStageId}`);
-      return { success: true, message: 'No stage mapping configured' };
+      return { success: true, message: 'No stage mapping configured', action: 'no_mapping' };
     }
 
     const mapping = mappings[0];
 
-    // Check if target stage ID is available
     if (!mapping.target_stage_id) {
       console.log(`Target stage ID not configured for ${mapping.source_stage_name}`);
-      return { success: true, message: 'Target stage ID not configured yet' };
+      return { success: true, message: 'Target stage ID not configured yet', action: 'no_target_stage' };
+    }
+
+    // ===== STEP 5: Update Opportunity Stage =====
+    let updateStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'ghl', 'updateOpportunityStage', {
+          opportunityId,
+          targetPipelineId: mapping.target_pipeline_id,
+          targetStageId: mapping.target_stage_id,
+          targetStageName: mapping.target_stage_name
+        });
+        updateStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting updateOpportunityStage step:', e.message);
+      }
     }
 
     console.log(`Moving opportunity to pipeline ${mapping.target_pipeline_id}, stage ${mapping.target_stage_id}`);
 
-    // Move the opportunity
-    await updateOpportunityStage(
-      opportunityId,
-      mapping.target_pipeline_id,
-      mapping.target_stage_id
-    );
+    try {
+      await updateOpportunityStage(
+        opportunityId,
+        mapping.target_pipeline_id,
+        mapping.target_stage_id,
+        traceId,
+        updateStepId
+      );
+
+      if (updateStepId) {
+        try {
+          await completeStep(updateStepId, {
+            success: true,
+            movedTo: mapping.target_stage_name
+          });
+        } catch (e) {
+          console.error('Error completing updateOpportunityStage step:', e.message);
+        }
+      }
+    } catch (updateError) {
+      if (updateStepId) {
+        try {
+          await failStep(updateStepId, updateError, traceId);
+        } catch (e) {
+          console.error('Error failing updateOpportunityStage step:', e.message);
+        }
+      }
+      throw updateError;
+    }
 
     return {
       success: true,
       message: `Opportunity moved to ${mapping.target_pipeline_name} - ${mapping.target_stage_name}`,
+      action: 'opportunity_moved',
       movedTo: {
         pipelineId: mapping.target_pipeline_id,
         pipelineName: mapping.target_pipeline_name,

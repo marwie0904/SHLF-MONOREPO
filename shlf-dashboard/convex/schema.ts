@@ -48,6 +48,10 @@ export default defineSchema({
     // For scheduled jobs - the job name
     jobName: v.optional(v.string()),
 
+    // Input/Output data for the trace
+    input: v.optional(v.any()),
+    output: v.optional(v.any()),
+
     // Timestamps (Unix milliseconds)
     dateStarted: v.number(),
     dateFinished: v.optional(v.number()),
@@ -103,6 +107,10 @@ export default defineSchema({
 
     // Order within the trace (auto-incrementing)
     stepOrder: v.optional(v.number()),
+
+    // Input/Output data for the step
+    input: v.optional(v.any()),
+    output: v.optional(v.any()),
 
     // Timestamps (Unix milliseconds)
     dateStarted: v.number(),

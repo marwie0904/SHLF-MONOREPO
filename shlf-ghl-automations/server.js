@@ -418,10 +418,127 @@ app.post('/webhooks/ghl/task-created', async (req, res) => {
     console.log('Headers:', JSON.stringify(req.headers, null, 2));
     console.log('Full Request Body:', JSON.stringify(req.body, null, 2));
 
+    // ===== STEP 1: Webhook Received =====
+    let webhookStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'express', 'webhook_received', {
+          endpoint: '/webhooks/ghl/task-created',
+          method: 'POST',
+          contentType: req.headers['content-type'],
+          timestamp: new Date().toISOString()
+        });
+        webhookStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting webhook_received step:', e.message);
+      }
+    }
+
+    // Complete webhook received step
+    if (webhookStepId) {
+      try {
+        await completeStep(webhookStepId, {
+          bodyKeys: Object.keys(req.body)
+        });
+      } catch (e) {
+        console.error('Error completing webhook_received step:', e.message);
+      }
+    }
+
+    // ===== STEP 2: Rate Limit Check =====
+    let rateLimitStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'express', 'rate_limit_check', {
+          endpoint: '/webhooks/ghl/task-created'
+        });
+        rateLimitStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting rate_limit_check step:', e.message);
+      }
+    }
+
+    // Rate limiting is handled by middleware
+    if (rateLimitStepId) {
+      try {
+        await completeStep(rateLimitStepId, {
+          passed: true,
+          message: 'Rate limit check passed'
+        });
+      } catch (e) {
+        console.error('Error completing rate_limit_check step:', e.message);
+      }
+    }
+
+    // ===== STEP 3: Extract Task Data =====
+    let extractStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'express', 'extract_task_data', {
+          rawBodyKeys: Object.keys(req.body)
+        });
+        extractStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting extract_task_data step:', e.message);
+      }
+    }
+
+    // Extract task data from webhook
+    const taskId = req.body.id || req.body.task?.id;
+    const contactId = req.body.contactId || req.body.task?.contactId;
+    const taskTitle = req.body.title || req.body.task?.title;
+
+    if (extractStepId) {
+      try {
+        await completeStep(extractStepId, {
+          taskId,
+          contactId,
+          taskTitle,
+          hasTaskData: !!taskId
+        });
+      } catch (e) {
+        console.error('Error completing extract_task_data step:', e.message);
+      }
+    }
+
+    // Update trace with context IDs
+    if (traceId && contactId) {
+      await updateTraceContextIds(traceId, { contactId });
+    }
+
+    // ===== STEP 4: Validate Required Fields =====
+    let validateStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'express', 'validate_required_fields', {
+          taskId,
+          taskTitle
+        });
+        validateStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting validate_required_fields step:', e.message);
+      }
+    }
+
+    const validationErrors = [];
+    if (!taskId) validationErrors.push('taskId missing');
+    if (!taskTitle) validationErrors.push('taskTitle missing');
+
+    if (validateStepId) {
+      try {
+        await completeStep(validateStepId, {
+          isValid: validationErrors.length === 0,
+          errors: validationErrors
+        });
+      } catch (e) {
+        console.error('Error completing validate_required_fields step:', e.message);
+      }
+    }
+
     // Step: Process the task creation and sync to Supabase
     let processStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'ghlTaskService', 'processTaskCreation', { taskId: req.body.id || req.body.task?.id });
+      const step = await startStep(traceId, 'ghlTaskService', 'processTaskCreation', { taskId, contactId, taskTitle });
       processStepId = step.stepId;
     }
 
@@ -432,7 +549,8 @@ app.post('/webhooks/ghl/task-created', async (req, res) => {
       res.json({
         success: true,
         message: result.message,
-        taskId: result.taskId
+        taskId: result.taskId,
+        action: 'task_synced'
       });
     } catch (processError) {
       if (processStepId) await failStep(processStepId, processError, traceId);
@@ -459,6 +577,71 @@ app.post('/webhooks/ghl/task-completed', async (req, res) => {
     console.log('Headers:', JSON.stringify(req.headers, null, 2));
     console.log('Full Request Body:', JSON.stringify(req.body, null, 2));
 
+    // ===== STEP 1: Webhook Received =====
+    let webhookStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'express', 'webhook_received', {
+          endpoint: '/webhooks/ghl/task-completed',
+          method: 'POST',
+          contentType: req.headers['content-type'],
+          timestamp: new Date().toISOString()
+        });
+        webhookStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting webhook_received step:', e.message);
+      }
+    }
+
+    // Complete webhook received step
+    if (webhookStepId) {
+      try {
+        await completeStep(webhookStepId, {
+          bodyKeys: Object.keys(req.body)
+        });
+      } catch (e) {
+        console.error('Error completing webhook_received step:', e.message);
+      }
+    }
+
+    // ===== STEP 2: Rate Limit Check =====
+    let rateLimitStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'express', 'rate_limit_check', {
+          endpoint: '/webhooks/ghl/task-completed'
+        });
+        rateLimitStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting rate_limit_check step:', e.message);
+      }
+    }
+
+    // Rate limiting is handled by middleware
+    if (rateLimitStepId) {
+      try {
+        await completeStep(rateLimitStepId, {
+          passed: true,
+          message: 'Rate limit check passed'
+        });
+      } catch (e) {
+        console.error('Error completing rate_limit_check step:', e.message);
+      }
+    }
+
+    // ===== STEP 3: Extract Task Data =====
+    let extractStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'express', 'extract_task_data', {
+          rawBodyKeys: Object.keys(req.body)
+        });
+        extractStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting extract_task_data step:', e.message);
+      }
+    }
+
     // Extract task data from GHL webhook
     const taskData = {
       taskId: req.body.task?.id || req.body.id || req.body.task_id || req.body.taskId,
@@ -478,12 +661,59 @@ app.post('/webhooks/ghl/task-completed', async (req, res) => {
 
     console.log('Extracted task data:', JSON.stringify(taskData, null, 2));
 
+    if (extractStepId) {
+      try {
+        await completeStep(extractStepId, {
+          taskId: taskData.taskId,
+          contactId: taskData.contactId,
+          opportunityId: taskData.opportunityId,
+          title: taskData.title,
+          hasRequiredFields: !!(taskData.contactId && taskData.title)
+        });
+      } catch (e) {
+        console.error('Error completing extract_task_data step:', e.message);
+      }
+    }
+
     // Update trace with context IDs
     if (traceId) {
       await updateTraceContextIds(traceId, {
         contactId: taskData.contactId,
         opportunityId: taskData.opportunityId
       });
+    }
+
+    // ===== STEP 4: Validate Required Fields =====
+    let validateStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'express', 'validate_required_fields', {
+          contactId: taskData.contactId,
+          title: taskData.title
+        });
+        validateStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting validate_required_fields step:', e.message);
+      }
+    }
+
+    const validationErrors = [];
+    if (!taskData.contactId) validationErrors.push('contactId missing');
+    if (!taskData.title) validationErrors.push('title missing');
+
+    if (validateStepId) {
+      try {
+        if (validationErrors.length > 0) {
+          await failStep(validateStepId, new Error(validationErrors.join(', ')), traceId);
+        } else {
+          await completeStep(validateStepId, {
+            isValid: true,
+            errors: []
+          });
+        }
+      } catch (e) {
+        console.error('Error completing validate_required_fields step:', e.message);
+      }
     }
 
     // Validate required fields
@@ -501,12 +731,47 @@ app.post('/webhooks/ghl/task-completed', async (req, res) => {
       });
     }
 
+    // ===== STEP 5: Check Task Completion Status =====
+    let completionCheckStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'express', 'check_completion_status', {
+          completed: taskData.completed
+        });
+        completionCheckStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting check_completion_status step:', e.message);
+      }
+    }
+
     // Check if task is actually completed
     if (!taskData.completed) {
+      if (completionCheckStepId) {
+        try {
+          await completeStep(completionCheckStepId, {
+            isCompleted: false,
+            action: 'skipped'
+          });
+        } catch (e) {
+          console.error('Error completing check_completion_status step:', e.message);
+        }
+      }
       return res.json({
         success: true,
-        message: 'Task not completed, no action taken'
+        message: 'Task not completed, no action taken',
+        action: 'skipped_not_completed'
       });
+    }
+
+    if (completionCheckStepId) {
+      try {
+        await completeStep(completionCheckStepId, {
+          isCompleted: true,
+          action: 'proceed'
+        });
+      } catch (e) {
+        console.error('Error completing check_completion_status step:', e.message);
+      }
     }
 
     // Step: Process the task completion
@@ -523,7 +788,8 @@ app.post('/webhooks/ghl/task-completed', async (req, res) => {
       res.json({
         success: true,
         message: result.message,
-        details: result
+        details: result,
+        action: result.action || 'processed'
       });
     } catch (processError) {
       if (processStepId) await failStep(processStepId, processError, traceId);

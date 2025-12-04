@@ -274,29 +274,44 @@ export const taskCreatedWorkflow = {
     name: 'Webhook Received',
     layer: 'webhook',
     type: 'step',
-    matchStep: 'webhook_received',
+    matchStep: 'express:webhook_received',
     children: [{
-      id: 'process_task',
-      name: 'Process Task Creation',
-      layer: 'service',
+      id: 'rate_limit',
+      name: 'Rate Limit Check',
+      layer: 'processing',
       type: 'step',
-      matchStep: 'ghlTaskService:processTaskCreation',
+      matchStep: 'express:rate_limit_check',
       children: [{
-        id: 'sync_to_supabase',
-        name: 'Sync to Supabase',
-        layer: 'service',
+        id: 'extract_data',
+        name: 'Extract Task Data',
+        layer: 'processing',
         type: 'step',
-        matchStep: 'supabase:syncTask',
+        matchStep: 'express:extract_task_data',
         children: [{
-          id: 'outcome',
-          name: 'Sync Result',
-          layer: 'decision',
-          type: 'decision',
-          condition: 'Final outcome',
-          children: [
-            { label: 'Success', value: 'success', node: { id: 'synced', name: 'Task Synced', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'task_synced', children: [] } },
-            { label: 'Error', value: 'error', node: { id: 'error', name: 'Sync Error', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'error', children: [] } }
-          ]
+          id: 'validate',
+          name: 'Validate Required Fields',
+          layer: 'processing',
+          type: 'step',
+          matchStep: 'express:validate_required_fields',
+          children: [{
+            id: 'process_task',
+            name: 'Process Task Creation',
+            layer: 'service',
+            type: 'step',
+            matchStep: 'ghlTaskService:processTaskCreation',
+            children: [{
+              id: 'outcome',
+              name: 'Sync Result',
+              layer: 'decision',
+              type: 'decision',
+              condition: 'Final outcome',
+              matchTraceStatus: true,
+              children: [
+                { label: 'Success', value: 'success', matchValue: 'task_synced', node: { id: 'synced', name: 'Task Synced', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'task_synced', children: [] } },
+                { label: 'Error', value: 'error', matchValue: 'error', node: { id: 'error', name: 'Sync Error', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'error', children: [] } }
+              ]
+            }]
+          }]
         }]
       }]
     }]
@@ -316,104 +331,204 @@ export const taskCompletedWorkflow = {
     name: 'Webhook Received',
     layer: 'webhook',
     type: 'step',
-    matchStep: 'webhook_received',
+    matchStep: 'express:webhook_received',
     children: [{
-      id: 'fetch_task',
-      name: 'Fetch Task from Clio',
-      layer: 'service',
+      id: 'rate_limit',
+      name: 'Rate Limit Check',
+      layer: 'processing',
       type: 'step',
-      matchStep: 'clio:fetchTask',
+      matchStep: 'express:rate_limit_check',
       children: [{
-        id: 'task_exists_decision',
-        name: 'Task Exists in Clio?',
-        layer: 'decision',
-        type: 'decision',
-        condition: 'Check if task exists in Clio',
-        children: [
-          {
-            label: 'No',
-            value: false,
-            node: {
-              id: 'search_supabase',
-              name: 'Search Task in Supabase',
-              layer: 'service',
-              type: 'step',
-              matchStep: 'supabase:searchTask',
-              children: [{
-                id: 'found_in_supabase',
-                name: 'Task Found?',
-                layer: 'decision',
-                type: 'decision',
-                condition: 'Check if task found in Supabase',
-                children: [
-                  {
-                    label: 'No',
-                    value: false,
-                    node: { id: 'not_found', name: 'Not Found in Supabase', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'not_found', children: [] }
-                  },
-                  {
-                    label: 'Yes',
-                    value: true,
-                    node: {
-                      id: 'delete_from_supabase',
-                      name: 'Delete Task in Supabase',
-                      layer: 'service',
-                      type: 'step',
-                      matchStep: 'supabase:deleteTask',
-                      children: [{
-                        id: 'deleted',
-                        name: 'Task Deleted',
-                        layer: 'outcome',
-                        type: 'outcome',
-                        status: 'success',
-                        matchAction: 'deleted_in_supabase',
-                        children: []
-                      }]
-                    }
-                  }
-                ]
-              }]
-            }
-          },
-          {
-            label: 'Yes',
-            value: true,
-            node: {
-              id: 'check_completed',
-              name: 'Task Completed?',
+        id: 'extract_data',
+        name: 'Extract Task Data',
+        layer: 'processing',
+        type: 'step',
+        matchStep: 'express:extract_task_data',
+        children: [{
+          id: 'validate',
+          name: 'Validate Required Fields',
+          layer: 'processing',
+          type: 'step',
+          matchStep: 'express:validate_required_fields',
+          children: [{
+            id: 'check_completion',
+            name: 'Check Completion Status',
+            layer: 'processing',
+            type: 'step',
+            matchStep: 'express:check_completion_status',
+            children: [{
+              id: 'completion_decision',
+              name: 'Is Task Completed?',
               layer: 'decision',
               type: 'decision',
-              condition: 'Check if task is marked complete',
+              condition: 'Check if task is marked as completed',
+              matchStepOutput: { stepName: 'express:check_completion_status', outputField: 'isCompleted' },
               children: [
                 {
                   label: 'No',
                   value: false,
-                  node: { id: 'not_completed', name: 'Not Completed', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'not_completed', children: [] }
+                  matchValue: false,
+                  node: {
+                    id: 'not_completed',
+                    name: 'Not Completed',
+                    layer: 'outcome',
+                    type: 'outcome',
+                    status: 'skipped',
+                    matchAction: 'skipped_not_completed',
+                    children: []
+                  }
                 },
                 {
                   label: 'Yes',
                   value: true,
+                  matchValue: true,
                   node: {
-                    id: 'attempt_seq',
-                    name: 'Attempt Sequence',
-                    layer: 'automation',
+                    id: 'process_completion',
+                    name: 'Process Task Completion',
+                    layer: 'service',
                     type: 'step',
-                    matchStep: 'automation:attemptSequence',
+                    matchStep: 'ghlOpportunityService:processTaskCompletion',
                     children: [{
-                      id: 'task_created',
-                      name: 'Attempt Task Created',
-                      layer: 'outcome',
-                      type: 'outcome',
-                      status: 'success',
-                      matchAction: 'attempt_task_created',
-                      children: []
+                      id: 'search_opportunity',
+                      name: 'Search Opportunity',
+                      layer: 'external',
+                      type: 'step',
+                      matchStep: 'ghl:searchOpportunity',
+                      children: [{
+                        id: 'opp_found_decision',
+                        name: 'Opportunity Found?',
+                        layer: 'decision',
+                        type: 'decision',
+                        condition: 'Check if opportunity was found for contact',
+                        matchStepOutput: { stepName: 'ghl:searchOpportunity', outputField: 'opportunitiesFound' },
+                        children: [
+                          {
+                            label: 'No',
+                            value: 0,
+                            matchValue: 0,
+                            node: {
+                              id: 'no_opportunity',
+                              name: 'No Opportunity Found',
+                              layer: 'outcome',
+                              type: 'outcome',
+                              status: 'skipped',
+                              matchAction: 'no_opportunity_found',
+                              children: []
+                            }
+                          },
+                          {
+                            label: 'Yes',
+                            value: true,
+                            node: {
+                              id: 'get_opp_details',
+                              name: 'Get Opportunity Details',
+                              layer: 'external',
+                              type: 'step',
+                              matchStep: 'ghl:getOpportunityDetails',
+                              children: [{
+                                id: 'check_final_task',
+                                name: 'Check Final Task',
+                                layer: 'processing',
+                                type: 'step',
+                                matchStep: 'processing:checkFinalTask',
+                                children: [{
+                                  id: 'is_final_task_decision',
+                                  name: 'Is Final Task?',
+                                  layer: 'decision',
+                                  type: 'decision',
+                                  condition: 'Check if this is the final task for the stage',
+                                  matchStepOutput: { stepName: 'processing:checkFinalTask', outputField: 'isFinalTask' },
+                                  children: [
+                                    {
+                                      label: 'No',
+                                      value: false,
+                                      matchValue: false,
+                                      matchTraceAction: 'not_final_task',
+                                      node: {
+                                        id: 'not_final_task',
+                                        name: 'Not Final Task',
+                                        layer: 'outcome',
+                                        type: 'outcome',
+                                        status: 'skipped',
+                                        matchAction: 'not_final_task',
+                                        children: []
+                                      }
+                                    },
+                                    {
+                                      label: 'Yes',
+                                      value: true,
+                                      matchValue: true,
+                                      node: {
+                                        id: 'get_stage_mapping',
+                                        name: 'Get Stage Mapping',
+                                        layer: 'service',
+                                        type: 'step',
+                                        matchStep: 'supabase:getStageMapping',
+                                        children: [{
+                                          id: 'mapping_found_decision',
+                                          name: 'Mapping Found?',
+                                          layer: 'decision',
+                                          type: 'decision',
+                                          condition: 'Check if stage completion mapping exists',
+                                          matchStepOutput: { stepName: 'supabase:getStageMapping', outputField: 'mappingFound' },
+                                          children: [
+                                            {
+                                              label: 'No',
+                                              value: false,
+                                              matchValue: false,
+                                              matchTraceAction: 'no_mapping',
+                                              node: {
+                                                id: 'no_mapping',
+                                                name: 'No Stage Mapping',
+                                                layer: 'outcome',
+                                                type: 'outcome',
+                                                status: 'skipped',
+                                                matchAction: 'no_mapping',
+                                                children: []
+                                              }
+                                            },
+                                            {
+                                              label: 'Yes',
+                                              value: true,
+                                              matchValue: true,
+                                              node: {
+                                                id: 'update_stage',
+                                                name: 'Update Opportunity Stage',
+                                                layer: 'external',
+                                                type: 'step',
+                                                matchStep: 'ghl:updateOpportunityStage',
+                                                children: [{
+                                                  id: 'outcome',
+                                                  name: 'Stage Update Result',
+                                                  layer: 'decision',
+                                                  type: 'decision',
+                                                  condition: 'Final outcome',
+                                                  matchTraceStatus: true,
+                                                  children: [
+                                                    { label: 'Success', value: 'success', matchValue: 'opportunity_moved', node: { id: 'stage_updated', name: 'Opportunity Moved', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'opportunity_moved', children: [] } },
+                                                    { label: 'Error', value: 'error', matchValue: 'error', node: { id: 'error', name: 'Update Error', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'error', children: [] } }
+                                                  ]
+                                                }]
+                                              }
+                                            }
+                                          ]
+                                        }]
+                                      }
+                                    }
+                                  ]
+                                }]
+                              }]
+                            }
+                          }
+                        ]
+                      }]
                     }]
                   }
                 }
               ]
-            }
-          }
-        ]
+            }]
+          }]
+        }]
       }]
     }]
   }
@@ -477,11 +592,19 @@ export function matchGHLTraceToWorkflow(workflow, trace, steps) {
 
   // Derive resultAction from trace data
   let resultAction = '';
-  if (traceStatus === 'completed' && responseBody.success) {
+
+  // First check if responseBody has an explicit action field
+  if (responseBody.action) {
+    resultAction = responseBody.action;
+  } else if (traceStatus === 'completed' && responseBody.success) {
     if (responseBody.tasksCreated > 0) {
       resultAction = 'tasks_created';
     } else if (responseBody.tasksCreated === 0) {
       resultAction = 'no_tasks';
+    } else if (responseBody.stageUpdated) {
+      resultAction = 'stage_updated';
+    } else if (responseBody.taskId) {
+      resultAction = 'task_synced';
     } else {
       resultAction = 'success';
     }
@@ -615,6 +738,11 @@ export function matchGHLTraceToWorkflow(workflow, trace, steps) {
         let isBranchActive = branchActive;
         if ((node.matchStepOutput || node.matchTraceStatus) && branch.matchValue !== undefined) {
           isBranchActive = branchActive && (branch.matchValue === activeBranchValue);
+        }
+
+        // Also check for matchTraceAction on the branch (alternative matching)
+        if (branch.matchTraceAction && resultAction === branch.matchTraceAction) {
+          isBranchActive = branchActive;
         }
 
         markedBranch.node = markNode(branch.node, depth + 1, isBranchActive);

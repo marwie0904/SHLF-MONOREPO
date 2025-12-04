@@ -31,14 +31,22 @@ export class DocumentCreatedAutomation {
   static async process(webhookData, traceId = null) {
     const documentId = webhookData.data.id;
     const timestamp = webhookData.data.created_at;
+    const matterId = webhookData.data.matter?.id;
+    const documentName = webhookData.data.name || 'Unknown Document';
 
     console.log(`[DOCUMENT] ${documentId} CREATED`);
 
     // Step: Validation
     const validationStepId = await EventTracker.startStep(traceId, {
-      layerName: 'automation',
+      layerName: 'processing',
       stepName: 'validation',
-      metadata: { documentId },
+      input: {
+        documentId,
+        documentName,
+        matterId,
+        timestamp,
+        webhookId: webhookData.id,
+      },
     });
 
     // Validate timestamp exists (required for idempotency)
@@ -56,17 +64,34 @@ export class DocumentCreatedAutomation {
         }
       );
 
-      await EventTracker.endStep(validationStepId, { status: 'error', errorMessage: error });
+      await EventTracker.endStep(validationStepId, {
+        status: 'error',
+        errorMessage: error,
+        output: { valid: false, reason: 'missing_timestamp' },
+      });
       throw new Error(error);
     }
 
-    await EventTracker.endStep(validationStepId, { status: 'success' });
+    await EventTracker.endStep(validationStepId, {
+      status: 'success',
+      output: {
+        valid: true,
+        documentId,
+        documentName,
+        matterId,
+        timestamp,
+      },
+    });
 
     // Step: Idempotency check
     const idempotencyStepId = await EventTracker.startStep(traceId, {
       layerName: 'processing',
       stepName: 'idempotency_check',
-      metadata: { documentId },
+      input: {
+        documentId,
+        timestamp,
+        webhookId: webhookData.id,
+      },
     });
 
     const idempotencyKey = SupabaseService.generateIdempotencyKey(
@@ -80,7 +105,14 @@ export class DocumentCreatedAutomation {
       // Check if webhook is still processing
       if (existing.success === null) {
         console.log(`[DOCUMENT] ${documentId} Still processing (concurrent request)`);
-        await EventTracker.endStep(idempotencyStepId, { status: 'skipped', metadata: { reason: 'still_processing' } });
+        await EventTracker.endStep(idempotencyStepId, {
+          status: 'skipped',
+          output: {
+            isDuplicate: true,
+            reason: 'still_processing',
+            processingStartedAt: existing.created_at,
+          },
+        });
         return {
           success: null,
           action: 'still_processing',
@@ -89,7 +121,15 @@ export class DocumentCreatedAutomation {
       }
 
       console.log(`[DOCUMENT] ${documentId} Already processed (idempotency) at ${existing.processed_at}`);
-      await EventTracker.endStep(idempotencyStepId, { status: 'skipped', metadata: { reason: 'already_processed' } });
+      await EventTracker.endStep(idempotencyStepId, {
+        status: 'skipped',
+        output: {
+          isDuplicate: true,
+          reason: 'already_processed',
+          processedAt: existing.processed_at,
+          cachedAction: existing.action,
+        },
+      });
       return {
         success: existing.success,
         action: existing.action,
@@ -98,7 +138,14 @@ export class DocumentCreatedAutomation {
       };
     }
 
-    await EventTracker.endStep(idempotencyStepId, { status: 'success' });
+    await EventTracker.endStep(idempotencyStepId, {
+      status: 'success',
+      output: {
+        isDuplicate: false,
+        isNewRequest: true,
+        idempotencyKey,
+      },
+    });
 
     // Step 0.5: Reserve webhook immediately (prevents duplicate processing)
     await SupabaseService.recordWebhookProcessed({
@@ -116,7 +163,6 @@ export class DocumentCreatedAutomation {
 
     try {
       // Step 1: Validate document has matter
-      const matterId = webhookData.data.matter?.id;
       if (!matterId) {
         const error = `Document missing required matter association`;
         console.error(`[DOCUMENT] ${documentId} ${error}`);
@@ -157,9 +203,13 @@ export class DocumentCreatedAutomation {
 
       // Step: Fetch matter details
       const fetchMatterStepId = await EventTracker.startStep(traceId, {
-        layerName: 'automation',
+        layerName: 'service',
         stepName: 'fetch_matter',
-        metadata: { matterId },
+        input: {
+          matterId,
+          documentId,
+          operation: 'get_matter_details',
+        },
       });
       const fetchMatterCtx = EventTracker.createContext(traceId, fetchMatterStepId);
 
@@ -168,7 +218,15 @@ export class DocumentCreatedAutomation {
       // Filter out closed matters
       if (matterDetails.status === 'Closed') {
         console.log(`[DOCUMENT] ${documentId} SKIPPED (matter is closed)`);
-        await EventTracker.endStep(fetchMatterStepId, { status: 'skipped', metadata: { reason: 'matter_closed' } });
+        await EventTracker.endStep(fetchMatterStepId, {
+          status: 'skipped',
+          output: {
+            matterId,
+            matterStatus: matterDetails.status,
+            matterDisplayNumber: matterDetails.display_number,
+            reason: 'matter_closed',
+          },
+        });
 
         await SupabaseService.updateWebhookProcessed(idempotencyKey, {
           processing_duration_ms: Date.now() - startTime,
@@ -179,22 +237,34 @@ export class DocumentCreatedAutomation {
         return { success: true, action: 'skipped_closed_matter' };
       }
 
-      await EventTracker.endStep(fetchMatterStepId, { status: 'success' });
+      await EventTracker.endStep(fetchMatterStepId, {
+        status: 'success',
+        output: {
+          matterId,
+          matterStatus: matterDetails.status,
+          matterDisplayNumber: matterDetails.display_number,
+          matterDescription: matterDetails.description,
+        },
+      });
 
       // Step: Fetch document details
       const fetchDocumentStepId = await EventTracker.startStep(traceId, {
-        layerName: 'automation',
+        layerName: 'service',
         stepName: 'fetch_document',
-        metadata: { documentId },
+        input: {
+          documentId,
+          matterId,
+          operation: 'get_document_details',
+        },
       });
       const fetchDocumentCtx = EventTracker.createContext(traceId, fetchDocumentStepId);
 
       const document = await ClioService.getDocument(documentId, fetchDocumentCtx);
-      const documentName = document.name || 'Unknown Document';
+      const fetchedDocName = document.name || 'Unknown Document';
       const parentFolder = document.parent;
       const matterDisplayNumber = document.matter.display_number;
 
-      console.log(`[DOCUMENT] ${documentId} Document name: ${documentName}`);
+      console.log(`[DOCUMENT] ${documentId} Document name: ${fetchedDocName}`);
       console.log(`[DOCUMENT] ${documentId} Parent: ${parentFolder ? `${parentFolder.name} (${parentFolder.type})` : 'None'}`);
       console.log(`[DOCUMENT] ${documentId} Matter: ${matterDisplayNumber}`);
 
@@ -203,7 +273,18 @@ export class DocumentCreatedAutomation {
       // Only generate tasks for documents in root (parent name = matter display number)
       if (parentFolder && parentFolder.name !== matterDisplayNumber) {
         console.log(`[DOCUMENT] ${documentId} SKIPPED - Document in subfolder: ${parentFolder.name}`);
-        await EventTracker.endStep(fetchDocumentStepId, { status: 'skipped', metadata: { reason: 'in_subfolder', folder: parentFolder.name } });
+        await EventTracker.endStep(fetchDocumentStepId, {
+          status: 'skipped',
+          output: {
+            documentId,
+            documentName: fetchedDocName,
+            parentFolder: parentFolder.name,
+            parentFolderType: parentFolder.type,
+            matterDisplayNumber,
+            inRoot: false,
+            reason: 'in_subfolder',
+          },
+        });
 
         await SupabaseService.updateWebhookProcessed(idempotencyKey, {
           processing_duration_ms: Date.now() - startTime,
@@ -214,15 +295,31 @@ export class DocumentCreatedAutomation {
         return { success: true, action: 'skipped_in_folder', folder: parentFolder.name };
       }
 
-      await EventTracker.endStep(fetchDocumentStepId, { status: 'success' });
+      await EventTracker.endStep(fetchDocumentStepId, {
+        status: 'success',
+        output: {
+          documentId,
+          documentName: fetchedDocName,
+          parentFolder: parentFolder?.name || matterDisplayNumber,
+          matterDisplayNumber,
+          inRoot: true,
+        },
+      });
 
       console.log(`[DOCUMENT] ${documentId} Document is in root - proceeding with task creation`);
 
-      // Step: Create task
+      // Step: Create task in Clio
       const createTaskStepId = await EventTracker.startStep(traceId, {
-        layerName: 'automation',
-        stepName: 'create_task',
-        metadata: { matterId, documentId },
+        layerName: 'service',
+        stepName: 'create_task_in_clio',
+        input: {
+          matterId,
+          documentId,
+          documentName: fetchedDocName,
+          taskName: this.TASK_NAME,
+          assigneeId: this.ASSIGNEE_ID,
+          dueDays: this.DUE_DAYS,
+        },
       });
       const createTaskCtx = EventTracker.createContext(traceId, createTaskStepId);
 
@@ -233,7 +330,7 @@ export class DocumentCreatedAutomation {
       console.log(`[DOCUMENT] ${documentId} Due date: ${dueDateFormatted}`);
 
       // Create task description with document name
-      const taskDescription = `New document: ${documentName}`;
+      const taskDescription = `New document: ${fetchedDocName}`;
 
       // Create task in Clio
       const newTask = await ClioService.createTask({
@@ -245,6 +342,30 @@ export class DocumentCreatedAutomation {
       }, createTaskCtx);
 
       console.log(`[DOCUMENT] ${documentId} Task created: ${newTask.id}`);
+
+      await EventTracker.endStep(createTaskStepId, {
+        status: 'success',
+        output: {
+          taskId: newTask.id,
+          taskName: newTask.name,
+          taskDescription,
+          matterId,
+          assigneeId: this.ASSIGNEE_ID,
+          dueDate: dueDateFormatted,
+        },
+      });
+
+      // Step: Save task to Supabase
+      const saveTaskStepId = await EventTracker.startStep(traceId, {
+        layerName: 'service',
+        stepName: 'save_task_to_supabase',
+        input: {
+          taskId: newTask.id,
+          taskName: newTask.name,
+          matterId,
+          documentId,
+        },
+      });
 
       // Record task in Supabase
       await SupabaseService.insertTask({
@@ -264,7 +385,15 @@ export class DocumentCreatedAutomation {
         due_date_generated: new Date().toISOString(),
       }, createTaskCtx);
 
-      await EventTracker.endStep(createTaskStepId, { status: 'success', metadata: { taskId: newTask.id } });
+      await EventTracker.endStep(saveTaskStepId, {
+        status: 'success',
+        output: {
+          taskId: newTask.id,
+          taskName: newTask.name,
+          matterId,
+          savedAt: new Date().toISOString(),
+        },
+      });
 
       // Update webhook to success
       await SupabaseService.updateWebhookProcessed(idempotencyKey, {
@@ -280,7 +409,10 @@ export class DocumentCreatedAutomation {
         success: true,
         action: 'task_created',
         taskId: newTask.id,
+        taskName: newTask.name,
         matterId,
+        documentId,
+        documentName: fetchedDocName,
       };
 
     } catch (error) {
