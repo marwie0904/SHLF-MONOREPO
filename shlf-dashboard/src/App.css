@@ -1878,3 +1878,196 @@
 .wf-tree-container.show-taken .wf-branch.not-taken {
   display: none;
 }
+
+/* ============================================================================
+   OPERATION SUMMARY ENHANCEMENTS
+   ============================================================================ */
+
+/* Task Creation Enhanced Display */
+.operation-summary.task-created .task-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.task-number-badge {
+  background: var(--accent-blue);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.task-name-value {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.operation-summary.task-created .description {
+  margin-bottom: 10px;
+  padding: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+}
+
+.description-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+/* Verification Display */
+.operation-summary.verification {
+  padding: 8px 0;
+}
+
+.operation-summary.verification .summary-row.warning {
+  background: rgba(255, 212, 0, 0.1);
+  padding: 6px 8px;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+.operation-summary.verification .summary-row.warning .summary-value {
+  color: var(--accent-yellow);
+}
+
+.summary-value.success {
+  color: var(--accent-green);
+  font-weight: 600;
+}
+
+.summary-value.warning {
+  color: var(--accent-yellow);
+  font-weight: 600;
+}
+
+/* Task Status Table in Verification */
+.verification-tasks-table {
+  margin-top: 12px;
+}
+
+.task-status-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.task-status-table th {
+  text-align: left;
+  padding: 6px 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.task-status-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.task-status-table tr:last-child td {
+  border-bottom: none;
+}
+
+.task-status-table .status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* Test Mode Filter Display */
+.operation-summary.test-mode {
+  padding: 8px 0;
+}
+
+.operation-summary.test-mode .summary-value.success {
+  background: rgba(0, 186, 124, 0.15);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.operation-summary.test-mode .summary-value.warning {
+  background: rgba(255, 212, 0, 0.15);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* Badge Enhancements */
+.badge-small {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  margin-left: 6px;
+  font-weight: 500;
+}
+
+/* Summary Row Spacing */
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.summary-label {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.summary-value {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.summary-value.highlight {
+  color: var(--accent-blue);
+  font-weight: 600;
+}
+
+/* Stage Change Display */
+.operation-summary.stage-change .stage-transition {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.stage-from, .stage-to {
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 4px;
+}
+
+.stage-from {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+.stage-to {
+  background: rgba(0, 186, 124, 0.15);
+  color: var(--accent-green);
+}
+
+.stage-arrow {
+  color: var(--text-muted);
+  font-size: 16px;
+}

@@ -3,6 +3,7 @@ import { SupabaseService } from './supabase.js';
 import { calculateDueDate, formatForClio } from '../utils/date-helpers.js';
 import { resolveAssignee } from '../utils/assignee-resolver.js';
 import { ERROR_CODES } from '../constants/error-codes.js';
+import { EventTracker } from './event-tracker.js';
 
 /**
  * Task Verification Service
@@ -25,9 +26,10 @@ export class TaskVerificationService {
    * @param {number} params.expectedCount - Expected task count
    * @param {string} params.context - 'stage_change' or 'meeting_scheduled'
    * @param {string} params.calendarEntryId - (Optional) Calendar entry ID for meeting context
+   * @param {string} traceId - (Optional) Trace ID for event tracking
    * @returns {Object} Verification results
    */
-  static async verifyTaskGeneration(params) {
+  static async verifyTaskGeneration(params, traceId = null) {
     const {
       matterId,
       stageId,
@@ -39,11 +41,23 @@ export class TaskVerificationService {
       calendarEntryId = null
     } = params;
 
+    const startTime = Date.now();
+
+    // Start verify_tasks step
+    const verifyStepId = await EventTracker.startStep(traceId, {
+      layerName: 'automation',
+      stepName: 'verify_tasks',
+      metadata: { matterId, context, expectedCount },
+    });
+    const verifyCtx = EventTracker.createContext(traceId, verifyStepId);
+
     console.log(`[VERIFY] ${matterId} Starting verification (context: ${context}, expected: ${expectedCount} tasks)`);
 
     // Step 1: Wait 30 seconds for task creation to settle
     console.log(`[VERIFY] ${matterId} Waiting 30 seconds for task generation to complete...`);
+    const waitStart = Date.now();
     await new Promise(resolve => setTimeout(resolve, 30000));
+    const waitDurationMs = Date.now() - waitStart;
 
     // Step 2: Get expected task numbers
     let expectedTaskNumbers;
@@ -82,8 +96,43 @@ export class TaskVerificationService {
     const allTaskNumbers = relevantTasks.map(t => t.task_number);
     const hasAllTasks = expectedTaskNumbers.every(num => allTaskNumbers.includes(num));
 
+    // Build individual task details for logging
+    const individualTasks = relevantTasks.map(t => ({
+      taskId: t.task_id,
+      taskNumber: t.task_number,
+      taskName: t.task_name,
+      status: t.status || (t.completed ? 'completed' : 'pending'),
+    }));
+
     if (hasAllTasks) {
       console.log(`[VERIFY] ${matterId} ✓ All ${expectedTaskNumbers.length} tasks verified successfully`);
+
+      // Log successful verification
+      verifyCtx.logVerification({
+        waitDurationMs,
+        expectedCount: expectedTaskNumbers.length,
+        matterId,
+        stageId,
+        stageName,
+        context,
+      }, {
+        foundCount: relevantTasks.length,
+        missingTaskNumbers: [],
+        tasksRegenerated: 0,
+        individualTasks,
+        allTasksFound: true,
+      }, Date.now() - startTime);
+
+      await EventTracker.endStep(verifyStepId, {
+        status: 'success',
+        metadata: {
+          expectedCount: expectedTaskNumbers.length,
+          foundCount: relevantTasks.length,
+          missingCount: 0,
+          regeneratedCount: 0,
+        },
+      });
+
       return {
         success: true,
         tasksVerified: relevantTasks.length,
@@ -107,6 +156,33 @@ export class TaskVerificationService {
     });
 
     console.log(`[VERIFY] ${matterId} Regenerated ${regenerated.success} tasks, ${regenerated.failed} failed`);
+
+    // Log verification with regeneration results
+    verifyCtx.logVerification({
+      waitDurationMs,
+      expectedCount: expectedTaskNumbers.length,
+      matterId,
+      stageId,
+      stageName,
+      context,
+    }, {
+      foundCount: relevantTasks.length,
+      missingTaskNumbers,
+      tasksRegenerated: regenerated.success,
+      individualTasks,
+      allTasksFound: false,
+    }, Date.now() - startTime);
+
+    await EventTracker.endStep(verifyStepId, {
+      status: regenerated.failed > 0 ? 'error' : 'success',
+      metadata: {
+        expectedCount: expectedTaskNumbers.length,
+        foundCount: relevantTasks.length,
+        missingCount: missingTaskNumbers.length,
+        regeneratedCount: regenerated.success,
+        failedCount: regenerated.failed,
+      },
+    });
 
     return {
       success: regenerated.failed === 0,

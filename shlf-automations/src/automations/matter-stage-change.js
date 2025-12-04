@@ -145,23 +145,42 @@ export class MatterStageChangeAutomation {
 
     await EventTracker.endStep(idempotencyStepId, { status: 'success' });
 
-    // TEMPORARY: Test mode filter - only process specific matter ID
-    if (config.testing.testMode && matterId !== config.testing.testMatterId) {
-      console.log(`[MATTER] ${matterId} SKIPPED (test mode - matter ${matterId} !== ${config.testing.testMatterId})`);
-
-      // Record as processed (skipped)
-      await SupabaseService.recordWebhookProcessed({
-        idempotency_key: idempotencyKey,
-        webhook_id: webhookData.id,
-        event_type: 'matter.updated',
-        resource_type: 'matter',
-        resource_id: matterId,
-        success: true,
-        action: 'skipped_test_mode',
-        webhook_payload: webhookData,
+    // Step: Test mode filter - only process specific matter ID when test mode is enabled
+    if (config.testing.testMode) {
+      const testModeStepId = await EventTracker.startStep(traceId, {
+        layerName: 'processing',
+        stepName: 'test_mode_filter',
+        metadata: { matterId },
       });
+      const testModeCtx = EventTracker.createContext(traceId, testModeStepId);
 
-      return { success: true, action: 'skipped_test_mode' };
+      const isAllowed = matterId === config.testing.testMatterId;
+      testModeCtx.logTestModeFilter(matterId, matterId, config.testing.testMatterId, isAllowed);
+
+      if (!isAllowed) {
+        console.log(`[MATTER] ${matterId} SKIPPED (test mode - matter ${matterId} !== ${config.testing.testMatterId})`);
+
+        await EventTracker.endStep(testModeStepId, {
+          status: 'skipped',
+          metadata: { reason: 'not_in_allowlist', testMatterId: config.testing.testMatterId },
+        });
+
+        // Record as processed (skipped)
+        await SupabaseService.recordWebhookProcessed({
+          idempotency_key: idempotencyKey,
+          webhook_id: webhookData.id,
+          event_type: 'matter.updated',
+          resource_type: 'matter',
+          resource_id: matterId,
+          success: true,
+          action: 'skipped_test_mode',
+          webhook_payload: webhookData,
+        });
+
+        return { success: true, action: 'skipped_test_mode' };
+      }
+
+      await EventTracker.endStep(testModeStepId, { status: 'success' });
     }
 
     // Step 0.5: Reserve webhook immediately (prevents duplicate processing)
@@ -203,7 +222,7 @@ export class MatterStageChangeAutomation {
         },
       });
 
-      // Log the stage change detection (before → after)
+      // Step: Detect stage change (before → after)
       // The webhook contains the state BEFORE the update
       // The API call returns the CURRENT state (after the update)
       const currentStage = {
@@ -215,10 +234,34 @@ export class MatterStageChangeAutomation {
         name: webhookStageName,
       };
 
-      // Only log stage change if we have current stage info
+      const stageChangeStepId = await EventTracker.startStep(traceId, {
+        layerName: 'automation',
+        stepName: 'detect_stage_change',
+        metadata: {
+          matterId,
+          previousStageId: previousStage.id,
+          previousStageName: previousStage.name,
+          newStageId: currentStage.id,
+          newStageName: currentStage.name,
+        },
+      });
+      const stageChangeCtx = EventTracker.createContext(traceId, stageChangeStepId);
+
+      // Log stage change details
       if (currentStage.id) {
-        fetchMatterCtx.logStageChange(matterId, previousStage, currentStage);
+        stageChangeCtx.logStageChange(matterId, previousStage, currentStage);
       }
+
+      await EventTracker.endStep(stageChangeStepId, {
+        status: currentStage.id ? 'success' : 'skipped',
+        metadata: {
+          stageChanged: currentStage.id !== previousStage.id,
+          previousStageId: previousStage.id,
+          previousStageName: previousStage.name,
+          newStageId: currentStage.id,
+          newStageName: currentStage.name,
+        },
+      });
 
       // Step 2.1: Filter out closed matters
       if (matterDetails.status === 'Closed') {
@@ -532,7 +575,7 @@ export class MatterStageChangeAutomation {
             expectedCount: tasksToCreate.length,
             context: 'stage_change',
             calendarEntryId: null
-          });
+          }, traceId);
 
           // Update result with verification data
           if (verificationResult.tasksRegenerated > 0) {

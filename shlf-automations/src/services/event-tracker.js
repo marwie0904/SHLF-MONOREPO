@@ -533,15 +533,91 @@ export const EventTracker = {
             name: taskData.name,
             description: taskData.description,
             dueDate: taskData.dueDate,
+            dueDateSource: taskData.dueDateSource,
             assigneeId: taskData.assigneeId,
             assigneeName: taskData.assigneeName,
             assigneeType: taskData.assigneeType,
+            assigneeSource: taskData.assigneeSource,
             taskNumber: taskData.taskNumber,
+            stageId: taskData.stageId,
+            stageName: taskData.stageName,
+            calendarEntryId: taskData.calendarEntryId,
           },
           output: result ? { taskId: result.id || result.taskId } : null,
           durationMs,
           status,
           error: status === "error" ? error : undefined,
+        });
+      },
+
+      /**
+       * Log webhook received with standardized format
+       * @param {Object} webhookData - The raw webhook payload
+       * @param {string} resourceType - e.g., 'matter', 'task', 'calendar_entry', 'document'
+       */
+      logWebhookReceived: (webhookData, resourceType) => {
+        EventTracker.logDetail(stepId, traceId, {
+          operation: "webhook_received",
+          operationType: "webhook",
+          input: {
+            eventType: webhookData.type,
+            resourceType,
+            resourceId: webhookData.data?.id,
+            webhookId: webhookData.id,
+            timestamp: webhookData.occurred_at || webhookData.data?.created_at || webhookData.data?.updated_at,
+            rawPayload: webhookData,
+          },
+          status: "success",
+        });
+      },
+
+      /**
+       * Log test mode filter decision
+       * @param {number} resourceId - The resource ID being filtered
+       * @param {number} resourceMatterId - The matter ID associated with the resource
+       * @param {number} testMatterId - The configured test matter ID
+       * @param {boolean} allowed - Whether the resource passed the filter
+       */
+      logTestModeFilter: (resourceId, resourceMatterId, testMatterId, allowed) => {
+        EventTracker.logDetail(stepId, traceId, {
+          operation: "test_mode_filter",
+          operationType: "decision",
+          input: { resourceId, resourceMatterId, testMatterId },
+          output: {
+            allowed,
+            reason: allowed ? "in_allowlist" : "not_in_allowlist",
+          },
+          status: allowed ? "success" : "skipped",
+        });
+      },
+
+      /**
+       * Log task verification operation with full details
+       * @param {Object} params - Verification parameters
+       * @param {Object} result - Verification results
+       * @param {number} durationMs - Total duration
+       */
+      logVerification: (params, result, durationMs) => {
+        EventTracker.logDetail(stepId, traceId, {
+          operation: "verify_task_generation",
+          operationType: "calculation",
+          input: {
+            waitDurationMs: params.waitDurationMs,
+            expectedCount: params.expectedCount,
+            matterId: params.matterId,
+            stageId: params.stageId,
+            stageName: params.stageName,
+            context: params.context,
+          },
+          output: {
+            foundCount: result.foundCount,
+            missingTaskNumbers: result.missingTaskNumbers,
+            tasksRegenerated: result.tasksRegenerated,
+            individualTasks: result.individualTasks,
+            allTasksFound: result.allTasksFound,
+          },
+          durationMs,
+          status: result.allTasksFound ? "success" : "warning",
         });
       },
     };

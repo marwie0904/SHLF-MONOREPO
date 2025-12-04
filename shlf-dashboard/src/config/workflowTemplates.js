@@ -41,90 +41,104 @@ export const matterStageChangeWorkflow = {
         children: [{
           id: 'test_mode',
           name: 'Test Mode Filter',
-          layer: 'decision',
-          type: 'decision',
-          condition: 'Is matter in test mode allowlist?',
-          children: [
-            {
-              label: 'Blocked',
-              value: false,
-              node: { id: 'test_blocked', name: 'Test Mode Blocked', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_test_mode', children: [] }
-            },
-            {
-              label: 'Allowed',
-              value: true,
-              node: {
-                id: 'fetch_matter',
-                name: 'Fetch Matter',
-                layer: 'service',
-                type: 'step',
-                matchStep: 'fetch_matter',
-                children: [{
-                  id: 'matter_closed',
-                  name: 'Matter Closed?',
-                  layer: 'decision',
-                  type: 'decision',
-                  condition: 'Check current matter status',
-                  children: [
-                    {
-                      label: 'Yes',
-                      value: true,
-                      node: { id: 'closed', name: 'Matter Closed', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_closed_matter', children: [] }
-                    },
-                    {
-                      label: 'No',
-                      value: false,
-                      node: {
-                        id: 'has_stage',
-                        name: 'Has Stage?',
-                        layer: 'decision',
-                        type: 'decision',
-                        condition: 'Check if matter has stage info',
-                        children: [
-                          {
-                            label: 'No',
-                            value: false,
-                            node: { id: 'no_stage', name: 'No Stage', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'missing_stage', children: [] }
-                          },
-                          {
-                            label: 'Yes',
-                            value: true,
-                            node: {
-                              id: 'stage_change',
-                              name: 'Detect Stage Change',
-                              layer: 'automation',
-                              type: 'step',
-                              matchStep: 'stage_change_detected',
-                              children: [{
-                                id: 'generate_tasks',
-                                name: 'Generate Tasks',
+          layer: 'processing',
+          type: 'step',
+          matchStep: 'test_mode_filter',
+          children: [{
+            id: 'test_mode_decision',
+            name: 'In Allowlist?',
+            layer: 'decision',
+            type: 'decision',
+            condition: 'Is matter in test mode allowlist?',
+            children: [
+              {
+                label: 'Blocked',
+                value: false,
+                node: { id: 'test_blocked', name: 'Test Mode Blocked', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_test_mode', children: [] }
+              },
+              {
+                label: 'Allowed',
+                value: true,
+                node: {
+                  id: 'fetch_matter',
+                  name: 'Fetch Matter',
+                  layer: 'service',
+                  type: 'step',
+                  matchStep: 'fetch_matter',
+                  children: [{
+                    id: 'matter_closed',
+                    name: 'Matter Closed?',
+                    layer: 'decision',
+                    type: 'decision',
+                    condition: 'Check current matter status',
+                    children: [
+                      {
+                        label: 'Yes',
+                        value: true,
+                        node: { id: 'closed', name: 'Matter Closed', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_closed_matter', children: [] }
+                      },
+                      {
+                        label: 'No',
+                        value: false,
+                        node: {
+                          id: 'has_stage',
+                          name: 'Has Stage?',
+                          layer: 'decision',
+                          type: 'decision',
+                          condition: 'Check if matter has stage info',
+                          children: [
+                            {
+                              label: 'No',
+                              value: false,
+                              node: { id: 'no_stage', name: 'No Stage', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'missing_stage', children: [] }
+                            },
+                            {
+                              label: 'Yes',
+                              value: true,
+                              node: {
+                                id: 'stage_change',
+                                name: 'Detect Stage Change',
                                 layer: 'automation',
                                 type: 'step',
-                                matchStep: 'generate_tasks',
+                                matchStep: 'detect_stage_change',
                                 children: [{
-                                  id: 'task_result',
-                                  name: 'Task Creation Result',
-                                  layer: 'decision',
-                                  type: 'decision',
-                                  condition: 'Check task creation outcomes',
-                                  children: [
-                                    { label: 'All Success', value: 'success', node: { id: 'tasks_created', name: 'Tasks Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'created_tasks', children: [] } },
-                                    { label: 'Updated', value: 'updated', node: { id: 'tasks_updated', name: 'Tasks Updated', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'updated_tasks', children: [] } },
-                                    { label: 'Partial', value: 'partial', node: { id: 'partial', name: 'Partial Failure', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'partial_failure', children: [] } },
-                                    { label: 'Error', value: 'error', node: { id: 'error', name: 'Error', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'error', children: [] } }
-                                  ]
+                                  id: 'generate_tasks',
+                                  name: 'Generate Tasks',
+                                  layer: 'automation',
+                                  type: 'step',
+                                  matchStep: 'generate_tasks',
+                                  children: [{
+                                    id: 'verify_tasks',
+                                    name: 'Verify Tasks',
+                                    layer: 'automation',
+                                    type: 'step',
+                                    matchStep: 'verify_tasks',
+                                    children: [{
+                                      id: 'task_result',
+                                      name: 'Task Creation Result',
+                                      layer: 'decision',
+                                      type: 'decision',
+                                      condition: 'Check task creation outcomes',
+                                      children: [
+                                        { label: 'All Success', value: 'success', node: { id: 'tasks_created', name: 'Tasks Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'created_tasks', children: [] } },
+                                        { label: 'Updated', value: 'updated', node: { id: 'tasks_updated', name: 'Tasks Updated', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'updated_tasks', children: [] } },
+                                        { label: 'Partial', value: 'partial', node: { id: 'partial', name: 'Partial Failure', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'partial_failure', children: [] } },
+                                        { label: 'Error', value: 'error', node: { id: 'error', name: 'Error', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'error', children: [] } }
+                                      ]
+                                    }]
+                                  }]
                                 }]
-                              }]
+                              }
                             }
-                          }
-                        ]
+                          ]
+                        }
                       }
-                    }
-                  ]
-                }]
+                    ]
+                  }]
+                }
               }
-            }
-          ]
+            ]
+          }]
         }]
       }]
     }]

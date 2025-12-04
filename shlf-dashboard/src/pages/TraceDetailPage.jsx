@@ -434,37 +434,62 @@ function renderOperationSummary(detail) {
   if (operation === 'clio_createTask' || operation === 'task_created') {
     return (
       <div className="operation-summary task-created">
-        <div className="summary-row">
-          <span className="summary-label">Task:</span>
-          <span className="summary-value">{input?.name || output?.name || '-'}</span>
+        <div className="summary-row task-header">
+          <span className="task-number-badge">#{input?.taskNumber || '-'}</span>
+          <span className="task-name-value">{input?.name || output?.name || '-'}</span>
         </div>
-        {input?.taskNumber && (
-          <div className="summary-row">
-            <span className="summary-label">Task #:</span>
-            <span className="summary-value">{input.taskNumber}</span>
+        {input?.description && (
+          <div className="summary-row description">
+            <span className="summary-value description-text">{input.description}</span>
           </div>
         )}
-        {input?.assigneeName && (
-          <div className="summary-row">
-            <span className="summary-label">Assignee:</span>
-            <span className="summary-value">
-              {input.assigneeName}
-              {input.assigneeType && <span className="badge-small">{input.assigneeType}</span>}
-            </span>
-          </div>
-        )}
-        {input?.dueDate && (
-          <div className="summary-row">
-            <span className="summary-label">Due:</span>
-            <span className="summary-value">{formatTime(new Date(input.dueDate).getTime())}</span>
-          </div>
-        )}
-        {output?.taskId && (
-          <div className="summary-row">
-            <span className="summary-label">Task ID:</span>
-            <span className="summary-value highlight">{output.taskId}</span>
-          </div>
-        )}
+        <div className="summary-grid">
+          {input?.assigneeName && (
+            <div className="summary-row">
+              <span className="summary-label">Assignee:</span>
+              <span className="summary-value">
+                {input.assigneeName}
+                {input.assigneeType && <span className="badge-small">{input.assigneeType}</span>}
+              </span>
+            </div>
+          )}
+          {input?.assigneeId && (
+            <div className="summary-row">
+              <span className="summary-label">Assignee ID:</span>
+              <span className="summary-value">{input.assigneeId}</span>
+            </div>
+          )}
+          {input?.dueDate && (
+            <div className="summary-row">
+              <span className="summary-label">Due Date:</span>
+              <span className="summary-value">{formatTime(new Date(input.dueDate).getTime())}</span>
+            </div>
+          )}
+          {input?.dueDateSource && (
+            <div className="summary-row">
+              <span className="summary-label">Due Source:</span>
+              <span className="summary-value badge-small">{input.dueDateSource}</span>
+            </div>
+          )}
+          {input?.stageName && (
+            <div className="summary-row">
+              <span className="summary-label">Stage:</span>
+              <span className="summary-value">{input.stageName}</span>
+            </div>
+          )}
+          {input?.matterId && (
+            <div className="summary-row">
+              <span className="summary-label">Matter ID:</span>
+              <span className="summary-value highlight">{input.matterId}</span>
+            </div>
+          )}
+          {output?.taskId && (
+            <div className="summary-row">
+              <span className="summary-label">Clio Task ID:</span>
+              <span className="summary-value highlight">{output.taskId}</span>
+            </div>
+          )}
+        </div>
       </div>
     )
   }
@@ -504,6 +529,86 @@ function renderOperationSummary(detail) {
     )
   }
 
+  // Verification operation
+  if (operation === 'verify_task_generation') {
+    return (
+      <div className="operation-summary verification">
+        <div className="summary-row">
+          <span className="summary-label">Wait Duration:</span>
+          <span className="summary-value">{formatDuration(input?.waitDurationMs)}</span>
+        </div>
+        <div className="summary-row">
+          <span className="summary-label">Expected:</span>
+          <span className="summary-value">{input?.expectedCount} tasks</span>
+        </div>
+        <div className="summary-row">
+          <span className="summary-label">Found:</span>
+          <span className={`summary-value ${output?.foundCount === input?.expectedCount ? 'success' : 'warning'}`}>
+            {output?.foundCount} tasks
+          </span>
+        </div>
+        {output?.missingTaskNumbers?.length > 0 && (
+          <div className="summary-row warning">
+            <span className="summary-label">Missing:</span>
+            <span className="summary-value">{output.missingTaskNumbers.join(', ')}</span>
+          </div>
+        )}
+        {output?.tasksRegenerated > 0 && (
+          <div className="summary-row">
+            <span className="summary-label">Regenerated:</span>
+            <span className="summary-value">{output.tasksRegenerated} tasks</span>
+          </div>
+        )}
+        {output?.individualTasks?.length > 0 && (
+          <div className="verification-tasks-table">
+            <table className="task-status-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Task Name</th>
+                  <th>Status</th>
+                  <th>Clio ID</th>
+                </tr>
+              </thead>
+              <tbody>
+                {output.individualTasks.map((t, i) => (
+                  <tr key={i}>
+                    <td>{t.taskNumber}</td>
+                    <td>{t.taskName}</td>
+                    <td><span className={`status-dot ${t.status}`} /></td>
+                    <td>{t.taskId}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Test mode filter operation
+  if (operation === 'test_mode_filter') {
+    return (
+      <div className="operation-summary test-mode">
+        <div className="summary-row">
+          <span className="summary-label">Matter ID:</span>
+          <span className="summary-value">{input?.resourceMatterId || input?.resourceId}</span>
+        </div>
+        <div className="summary-row">
+          <span className="summary-label">Test Matter ID:</span>
+          <span className="summary-value">{input?.testMatterId}</span>
+        </div>
+        <div className="summary-row">
+          <span className="summary-label">Allowed:</span>
+          <span className={`summary-value ${output?.allowed ? 'success' : 'warning'}`}>
+            {output?.allowed ? 'Yes (In Allowlist)' : 'No (Filtered Out)'}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
   // Decision operations
   if (operationType === 'decision') {
     return (
@@ -518,6 +623,14 @@ function renderOperationSummary(detail) {
           <div className="summary-row">
             <span className="summary-label">Reason:</span>
             <span className="summary-value">{output.reason}</span>
+          </div>
+        )}
+        {output?.allowed !== undefined && (
+          <div className="summary-row">
+            <span className="summary-label">Result:</span>
+            <span className={`summary-value ${output.allowed ? 'success' : 'warning'}`}>
+              {output.allowed ? 'Allowed' : 'Blocked'}
+            </span>
           </div>
         )}
       </div>
