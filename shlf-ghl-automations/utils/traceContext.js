@@ -141,14 +141,44 @@ function formatError(error) {
 }
 
 /**
+ * Sanitizes object keys to only contain ASCII characters
+ * Convex doesn't allow non-ASCII characters in field names
+ */
+function sanitizeObjectKeys(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeObjectKeys(item));
+  }
+
+  const sanitized = {};
+  for (const [key, value] of Object.entries(obj)) {
+    // Replace non-ASCII characters with ASCII equivalents or remove them
+    const sanitizedKey = key
+      .replace(/—/g, '-')  // em-dash to hyphen
+      .replace(/–/g, '-')  // en-dash to hyphen
+      .replace(/'/g, "'")  // smart single quote
+      .replace(/'/g, "'")  // smart single quote
+      .replace(/"/g, '"')  // smart double quote
+      .replace(/"/g, '"')  // smart double quote
+      .replace(/[^\x00-\x7F]/g, ''); // remove any remaining non-ASCII
+
+    sanitized[sanitizedKey] = sanitizeObjectKeys(value);
+  }
+  return sanitized;
+}
+
+/**
  * Truncates large payloads for storage
  */
 function truncatePayload(payload, maxSize = 50000) {
   if (!payload) return payload;
 
-  const str = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  // First sanitize object keys for Convex compatibility
+  const sanitizedPayload = sanitizeObjectKeys(payload);
+
+  const str = typeof sanitizedPayload === 'string' ? sanitizedPayload : JSON.stringify(sanitizedPayload);
   if (str.length <= maxSize) {
-    return payload;
+    return sanitizedPayload;
   }
 
   return {
@@ -598,6 +628,7 @@ module.exports = {
   // Data utilities
   extractContextIds,
   sanitizeHeaders,
+  sanitizeObjectKeys,
   formatError,
   truncatePayload,
 
