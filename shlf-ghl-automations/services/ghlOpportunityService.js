@@ -145,9 +145,11 @@ async function deleteGHLTask(contactId, taskId, traceId = null, stepId = null) {
  * Delete tasks from previous stage change within grace period
  * @param {string} opportunityId - GHL opportunity ID
  * @param {string} contactId - GHL contact ID
+ * @param {string} traceId - Optional trace ID for tracking
+ * @param {string} stepId - Optional step ID for tracking
  * @returns {Promise<Object>} Result with count of deleted tasks
  */
-async function deletePreviousStageTasks(opportunityId, contactId) {
+async function deletePreviousStageTasks(opportunityId, contactId, traceId = null, stepId = null) {
   try {
     const recentChanges = await getRecentStageChanges(opportunityId);
 
@@ -170,7 +172,7 @@ async function deletePreviousStageTasks(opportunityId, contactId) {
     let deletedCount = 0;
     for (const taskId of taskIds) {
       try {
-        await deleteGHLTask(contactId, taskId);
+        await deleteGHLTask(contactId, taskId, traceId, stepId);
         deletedCount++;
       } catch (deleteError) {
         console.error(`Failed to delete task ${taskId}:`, deleteError.message);
@@ -367,9 +369,11 @@ function calculateDueDate(taskData) {
  * Implements 2-minute grace period: if stage changes again within 2 minutes,
  * tasks from the previous stage change are deleted.
  * @param {Object} webhookData - Webhook data from GHL
+ * @param {string} traceId - Optional trace ID for tracking
+ * @param {string} stepId - Optional step ID for tracking
  * @returns {Promise<Object>} Processing result
  */
-async function processOpportunityStageChange(webhookData) {
+async function processOpportunityStageChange(webhookData, traceId = null, stepId = null) {
   try {
     const { opportunityId, stageName, stageId, contactId, pipelineId, previousStageName, previousStageId, opportunityName } = webhookData;
 
@@ -383,7 +387,7 @@ async function processOpportunityStageChange(webhookData) {
     let deletionResult = { deletedCount: 0, taskIds: [] };
     if (contactId) {
       console.log('Checking for recent stage changes within 2-minute grace period...');
-      deletionResult = await deletePreviousStageTasks(opportunityId, contactId);
+      deletionResult = await deletePreviousStageTasks(opportunityId, contactId, traceId, stepId);
       if (deletionResult.deletedCount > 0) {
         console.log(`Grace period cleanup: Deleted ${deletionResult.deletedCount} tasks from previous stage change`);
       }
@@ -428,7 +432,7 @@ async function processOpportunityStageChange(webhookData) {
     const createdTaskIds = [];
     for (const task of tasks) {
       try {
-        const createdTask = await createGHLTask(task, opportunityId, contactId);
+        const createdTask = await createGHLTask(task, opportunityId, contactId, traceId, stepId);
         createdTasks.push(createdTask);
         // Extract task ID from response
         if (createdTask.task?.id) {
