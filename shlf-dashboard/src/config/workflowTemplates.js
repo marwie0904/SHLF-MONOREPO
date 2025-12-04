@@ -635,6 +635,7 @@ export function getWorkflowTemplate(triggerName) {
 /**
  * Match trace data to workflow template and determine taken path
  * Returns the workflow with each node marked as: 'taken', 'not-taken', or 'current'
+ * Also attaches matching step data and details to each node
  */
 export function matchTraceToWorkflow(workflow, trace, steps) {
   if (!workflow) return null;
@@ -643,26 +644,35 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
   const resultAction = trace?.resultAction?.toLowerCase() || '';
   const traceStatus = trace?.status?.toLowerCase() || '';
 
-  // Get all step names (case-insensitive)
-  const stepNames = new Set(steps.map(s => s.stepName?.toLowerCase()).filter(Boolean));
+  // Build a map of step names to their full step data
+  const stepsByName = {};
+  steps.forEach(step => {
+    if (step.stepName) {
+      stepsByName[step.stepName.toLowerCase()] = step;
+    }
+  });
 
-  // Get all operations from details for more granular matching
-  const operations = new Set();
+  // Get all step names (case-insensitive)
+  const stepNames = new Set(Object.keys(stepsByName));
+
+  // Build a map of all details/operations across all steps
+  const allDetails = [];
   steps.forEach(step => {
     if (step.details && Array.isArray(step.details)) {
       step.details.forEach(detail => {
-        if (detail.operation) {
-          operations.add(detail.operation.toLowerCase());
-        }
+        allDetails.push({
+          ...detail,
+          parentStepName: step.stepName,
+          parentStepId: step.stepId,
+        });
       });
     }
   });
 
   // Debug logging
   console.log('[WorkflowMatch] Step names:', Array.from(stepNames));
-  console.log('[WorkflowMatch] Operations:', Array.from(operations));
+  console.log('[WorkflowMatch] All details count:', allDetails.length);
   console.log('[WorkflowMatch] Result action:', resultAction);
-  console.log('[WorkflowMatch] Trace status:', traceStatus);
 
   // Track the last step in the chain to mark as "current"
   let lastMatchedStep = null;
@@ -699,12 +709,10 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
     if (node.children) {
       node.children.forEach(child => {
         if (child.node) {
-          // Branch child
           if (findTakenNodes(child.node, depth + 1)) {
             taken = true;
           }
         } else if (child.id) {
-          // Direct child node
           if (findTakenNodes(child, depth + 1)) {
             taken = true;
           }
@@ -718,19 +726,34 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
   // Find taken nodes first
   findTakenNodes(workflow.root);
 
-  // Second pass: mark all nodes with status
+  // Second pass: mark all nodes with status and attach step data
   function markNode(node, depth = 0, parentTaken = true) {
     let taken = false;
     let current = false;
+    let stepData = null;
+    let nodeDetails = [];
 
     if (node.type === 'step' && node.matchStep) {
-      taken = stepNames.has(node.matchStep.toLowerCase());
+      const matchKey = node.matchStep.toLowerCase();
+      taken = stepNames.has(matchKey);
+      if (taken) {
+        // Attach the matching step data
+        stepData = stepsByName[matchKey];
+        // Get details from this step
+        if (stepData?.details) {
+          nodeDetails = stepData.details;
+        }
+      }
     } else if (node.type === 'outcome' && node.matchAction) {
       const matchAction = node.matchAction.toLowerCase();
       taken = resultAction.includes(matchAction) || resultAction === matchAction;
-      // Mark as current if this is the final outcome
       if (taken) {
         current = true;
+        // For outcomes, find any details that match the action
+        nodeDetails = allDetails.filter(d =>
+          d.operation?.toLowerCase().includes(matchAction) ||
+          d.output?.action?.toLowerCase() === matchAction
+        );
       }
     } else if (node.type === 'decision') {
       // Decisions are taken if any child branch leads to a taken node
@@ -741,11 +764,19 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
         }
         return false;
       });
+
+      // For decisions, try to find relevant details
+      if (taken && node.matchStep) {
+        const matchKey = node.matchStep.toLowerCase();
+        stepData = stepsByName[matchKey];
+        if (stepData?.details) {
+          nodeDetails = stepData.details;
+        }
+      }
     }
 
-    // For steps, mark as taken if we have matching step AND check if it's current
+    // For steps, check if it's current
     if (node.type === 'step' && taken) {
-      // Check if this is the last matched step (current)
       if (node.id === lastMatchedStep) {
         current = true;
       }
@@ -754,13 +785,11 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
     // Mark children
     const markedChildren = node.children.map(child => {
       if (child.node) {
-        // Decision branch
         return {
           ...child,
           node: markNode(child.node, depth + 1, taken),
         };
       } else if (child.id) {
-        // Direct child node
         return markNode(child, depth + 1, taken);
       }
       return child;
@@ -769,6 +798,8 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
     return {
       ...node,
       status: current ? 'current' : (taken ? 'taken' : 'not-taken'),
+      stepData,
+      details: nodeDetails,
       children: markedChildren,
     };
   }
@@ -776,5 +807,8 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
   return {
     ...workflow,
     root: markNode(workflow.root),
+    trace,
+    allSteps: steps,
+    allDetails,
   };
 }

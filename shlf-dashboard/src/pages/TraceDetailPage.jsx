@@ -642,6 +642,186 @@ function DetailItem({ detail, system }) {
   )
 }
 
+// Workflow Detail Panel - shows details for selected workflow node
+function WorkflowDetailPanel({ selectedItem, trace, steps, system, onClose, effectiveTraceStatus }) {
+  const [expandedSections, setExpandedSections] = useState({})
+
+  const toggleSection = (key) => {
+    setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const renderJsonSection = (data, label, key, defaultOpen = false) => {
+    if (!data || (Array.isArray(data) && data.length === 0) || (typeof data === 'object' && Object.keys(data).length === 0)) return null
+    const isExpanded = expandedSections[key] ?? defaultOpen
+
+    return (
+      <div className="panel-section">
+        <div className="panel-section-header" onClick={() => toggleSection(key)}>
+          <span>{isExpanded ? '▼' : '▶'} {label}</span>
+        </div>
+        {isExpanded && (
+          <div className="panel-json">
+            <pre>{JSON.stringify(data, null, 2)}</pre>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // If nothing selected, show trace summary
+  if (!selectedItem.item || selectedItem.type === 'trace') {
+    return (
+      <div className="detail-panel workflow-detail-panel">
+        <div className="detail-panel-header">
+          <div>
+            <h2>{trace.triggerName}</h2>
+            <span className="panel-subtitle">{trace.source || 'webhook'}</span>
+          </div>
+        </div>
+        <div className="detail-panel-body">
+          <div className="panel-section">
+            <div className="panel-grid">
+              <div className="panel-stat">
+                <span className="panel-stat-label">Status</span>
+                <span className={`status-badge ${effectiveTraceStatus}`}>{effectiveTraceStatus}</span>
+              </div>
+              <div className="panel-stat">
+                <span className="panel-stat-label">Duration</span>
+                <span className="panel-stat-value">{formatDuration(trace.durationMs)}</span>
+              </div>
+              <div className="panel-stat">
+                <span className="panel-stat-label">Matter ID</span>
+                <span className="panel-stat-value highlight">{trace.matterId || '-'}</span>
+              </div>
+              <div className="panel-stat">
+                <span className="panel-stat-label">Result</span>
+                <span className="panel-stat-value">{trace.resultAction || '-'}</span>
+              </div>
+            </div>
+          </div>
+          <div className="panel-hint">
+            <span className="hint-icon">👆</span>
+            <span>Click a node in the workflow to see its details</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Get the node - either from workflow-node or step selection
+  const node = selectedItem.type === 'workflow-node' ? selectedItem.item : selectedItem.workflowNode
+  const stepData = node?.stepData || selectedItem.item
+  const nodeDetails = node?.details || stepData?.details || []
+  const hasStepData = stepData && (stepData.stepId || stepData.stepName)
+
+  // Determine status
+  const status = hasStepData ? getEffectiveStepStatus(stepData, system) : (node?.status || 'not-taken')
+  const skipReason = status === 'skipped' && hasStepData ? getStepSkipReason(stepData) : null
+
+  return (
+    <div className="detail-panel workflow-detail-panel">
+      <div className="detail-panel-header">
+        <div>
+          <h2>{node?.name || stepData?.stepName || 'Unknown'}</h2>
+          <span className="panel-subtitle">{node?.layer || stepData?.layerName || node?.type}</span>
+        </div>
+        <button className="panel-close" onClick={onClose}>×</button>
+      </div>
+
+      <div className="detail-panel-body">
+        {/* Status & Basic Info */}
+        <div className="panel-section">
+          <div className="panel-grid">
+            <div className="panel-stat">
+              <span className="panel-stat-label">Status</span>
+              <span className={`status-badge ${status}`}>{status}</span>
+              {skipReason && <div className="skip-reason-badge">{skipReason}</div>}
+            </div>
+            <div className="panel-stat">
+              <span className="panel-stat-label">Type</span>
+              <span className="panel-stat-value">{node?.type || 'step'}</span>
+            </div>
+            {hasStepData && (
+              <>
+                <div className="panel-stat">
+                  <span className="panel-stat-label">Duration</span>
+                  <span className="panel-stat-value">{formatDuration(stepData.durationMs)}</span>
+                </div>
+                <div className="panel-stat">
+                  <span className="panel-stat-label">Started</span>
+                  <span className="panel-stat-value">{formatTime(stepData.dateStarted)}</span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Decision condition */}
+        {node?.condition && (
+          <div className="panel-section">
+            <div className="panel-stat">
+              <span className="panel-stat-label">Condition</span>
+              <span className="panel-stat-value">{node.condition}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Outcome badge */}
+        {node?.type === 'outcome' && (
+          <div className="panel-section">
+            <div className="panel-stat">
+              <span className="panel-stat-label">Outcome</span>
+              <span className={`wf-outcome-badge ${node.status === 'current' ? 'success' : node.status}`}>
+                {trace?.resultAction || node.status}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {(stepData?.errorMessage || stepData?.error) && (
+          <div className="panel-section error">
+            <div className="panel-error">
+              <strong>Error:</strong> {stepData.errorMessage || stepData.error?.message}
+            </div>
+            {stepData.error?.stack && (
+              <div className="panel-json error-stack">
+                <pre>{stepData.error.stack}</pre>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Step Metadata */}
+        {hasStepData && renderJsonSection(stepData.metadata, 'Step Metadata', 'stepMetadata')}
+
+        {/* Operations/Details - show each one with input/output */}
+        {nodeDetails.length > 0 && (
+          <div className="panel-section">
+            <h3 className="panel-section-title">Operations ({nodeDetails.length})</h3>
+            <div className="panel-details-list">
+              {nodeDetails.map((detail, idx) => (
+                <DetailItem key={detail.detailId || idx} detail={detail} system={system} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* If no step data and not-taken */}
+        {!hasStepData && nodeDetails.length === 0 && (
+          <div className="panel-section muted">
+            <p className="panel-note">
+              {status === 'not-taken'
+                ? 'This step was not executed in this trace'
+                : 'No detailed operation data available for this node'}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function TraceDetailPage() {
   const { system, traceId } = useParams()
   const navigate = useNavigate()
@@ -720,8 +900,27 @@ export default function TraceDetailPage() {
 
       {/* Workflow View */}
       {system === 'clio' && viewMode === 'workflow' && (
-        <div className="trace-detail-workflow">
-          <WorkflowVisualization trace={trace} steps={steps} />
+        <div className="trace-detail-layout workflow-layout">
+          <div className="trace-detail-workflow">
+            <WorkflowVisualization
+              trace={trace}
+              steps={steps}
+              selectedNodeId={selectedItem.type === 'workflow-node' ? selectedItem.item?.id : null}
+              onNodeSelect={(node) => {
+                // The node now contains stepData and details from matching
+                setSelectedItem({ type: 'workflow-node', item: node, workflowNode: node })
+              }}
+            />
+          </div>
+          {/* Right: Detail Panel */}
+          <WorkflowDetailPanel
+            selectedItem={selectedItem}
+            trace={trace}
+            steps={steps}
+            system={system}
+            onClose={() => setSelectedItem({ type: 'trace', item: trace })}
+            effectiveTraceStatus={effectiveTraceStatus}
+          />
         </div>
       )}
 

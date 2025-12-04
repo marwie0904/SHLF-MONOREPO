@@ -577,6 +577,52 @@
   overflow: hidden;
 }
 
+/* Workflow Layout - for side-by-side workflow + detail panel */
+.trace-detail-layout.workflow-layout {
+  flex-direction: row;
+}
+
+.trace-detail-layout.workflow-layout .trace-detail-workflow {
+  flex: 2;
+  min-width: 0;
+  overflow: auto;
+}
+
+.trace-detail-layout.workflow-layout .workflow-detail-panel {
+  flex: 1;
+  min-width: 320px;
+  max-width: 400px;
+}
+
+/* Panel hint */
+.panel-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.panel-hint .hint-icon {
+  font-size: 18px;
+}
+
+/* Panel note for muted sections */
+.panel-section.muted {
+  opacity: 0.7;
+}
+
+.panel-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0;
+}
+
 /* ======================================
    FLOW GRAPH (Left Side)
    ====================================== */
@@ -1433,6 +1479,9 @@
   border-radius: 12px;
   border: 1px solid var(--border-color);
   min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .wf-visualization.empty {
@@ -1536,10 +1585,9 @@
 /* Tree Container */
 .wf-tree-container {
   padding: 30px;
-  overflow-x: auto;
-  display: flex;
-  justify-content: center;
-  min-width: fit-content;
+  overflow: auto;
+  flex: 1;
+  display: block;
 }
 
 .wf-tree-container.show-taken .wf-branch.not-taken {
@@ -1548,10 +1596,9 @@
 
 /* Tree Node - Centers content vertically */
 .wf-tree-node {
-  display: flex;
+  display: inline-flex;
   flex-direction: column;
   align-items: center;
-  width: fit-content;
 }
 
 /* Node Card */
@@ -1571,6 +1618,17 @@
 
 .wf-node:hover {
   border-color: var(--text-muted);
+  cursor: pointer;
+}
+
+/* Selected node */
+.wf-node.selected {
+  border-color: var(--accent-blue) !important;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.3) !important;
+}
+
+.wf-node.selected .wf-node-icon {
+  background: var(--accent-blue);
 }
 
 /* Taken nodes */
@@ -1756,7 +1814,6 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: fit-content;
 }
 
 /* Horizontal Branch Line - spans the full width of branches */
