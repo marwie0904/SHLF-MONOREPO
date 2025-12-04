@@ -373,7 +373,9 @@ function calculateDueDate(taskData) {
  * @param {string} stepId - Optional step ID for tracking
  * @returns {Promise<Object>} Processing result
  */
-async function processOpportunityStageChange(webhookData, traceId = null, stepId = null) {
+async function processOpportunityStageChange(webhookData, traceId = null, parentStepId = null) {
+  const { startStep, completeStep, failStep } = require('../utils/traceContext');
+
   try {
     const { opportunityId, stageName, stageId, contactId, pipelineId, previousStageName, previousStageId, opportunityName } = webhookData;
 
@@ -383,22 +385,72 @@ async function processOpportunityStageChange(webhookData, traceId = null, stepId
 
     console.log(`Processing opportunity ${opportunityId} - Stage: ${stageName}`);
 
-    // Step 1: Check for recent stage changes within grace period and delete their tasks
+    // ===== STEP 1: Check Grace Period =====
+    let graceStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'ghlOpportunityService', 'checkGracePeriod', {
+          opportunityId,
+          contactId,
+          gracePeriodMs: STAGE_CHANGE_GRACE_PERIOD_MS
+        });
+        graceStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting grace period step:', e.message);
+      }
+    }
+
     let deletionResult = { deletedCount: 0, taskIds: [] };
     if (contactId) {
       console.log('Checking for recent stage changes within 2-minute grace period...');
-      deletionResult = await deletePreviousStageTasks(opportunityId, contactId, traceId, stepId);
+      deletionResult = await deletePreviousStageTasks(opportunityId, contactId, traceId, parentStepId);
       if (deletionResult.deletedCount > 0) {
         console.log(`Grace period cleanup: Deleted ${deletionResult.deletedCount} tasks from previous stage change`);
       }
     }
 
-    // Step 2: Get tasks for this stage from Supabase
+    if (graceStepId) {
+      try {
+        await completeStep(graceStepId, {
+          recentChangesFound: deletionResult.deletedCount > 0,
+          tasksDeleted: deletionResult.deletedCount,
+          deletedTaskIds: deletionResult.taskIds
+        });
+      } catch (e) {
+        console.error('Error completing grace period step:', e.message);
+      }
+    }
+
+    // ===== STEP 2: Get Task Templates =====
+    let templatesStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'supabase', 'getTaskTemplates', {
+          stageName,
+          tableName: 'ghl_task_list'
+        });
+        templatesStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting templates step:', e.message);
+      }
+    }
+
     const tasks = await getTasksForStage(stageName);
+
+    if (templatesStepId) {
+      try {
+        await completeStep(templatesStepId, {
+          tasksFound: tasks.length,
+          taskNames: tasks.map(t => t.task_name)
+        });
+      } catch (e) {
+        console.error('Error completing templates step:', e.message);
+      }
+    }
 
     if (tasks.length === 0) {
       console.log(`No tasks configured for stage: ${stageName}`);
-      // Still record the stage change even if no tasks, so we can track if user changes again
+      // Record stage change even if no tasks
       await recordStageChange({
         opportunityId,
         opportunityName: opportunityName || null,
@@ -416,7 +468,21 @@ async function processOpportunityStageChange(webhookData, traceId = null, stepId
       };
     }
 
-    // Step 3: Record this stage change BEFORE creating tasks
+    // ===== STEP 3: Record Stage Change =====
+    let recordStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'supabase', 'recordStageChange', {
+          opportunityId,
+          previousStage: previousStageName,
+          newStage: stageName
+        });
+        recordStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting record step:', e.message);
+      }
+    }
+
     const stageChangeRecord = await recordStageChange({
       opportunityId,
       opportunityName: opportunityName || null,
@@ -424,17 +490,43 @@ async function processOpportunityStageChange(webhookData, traceId = null, stepId
       previousStageId: previousStageId || null,
       newStage: stageName,
       newStageId: stageId || null,
-      taskIds: [] // Will update after tasks are created
+      taskIds: []
     });
 
-    // Step 4: Create tasks in GHL
+    if (recordStepId) {
+      try {
+        await completeStep(recordStepId, {
+          recordId: stageChangeRecord.id,
+          success: true
+        });
+      } catch (e) {
+        console.error('Error completing record step:', e.message);
+      }
+    }
+
+    // ===== STEP 4: Create GHL Tasks =====
+    let createTasksStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'ghl', 'createTasks', {
+          taskCount: tasks.length,
+          contactId,
+          stageName
+        });
+        createTasksStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting create tasks step:', e.message);
+      }
+    }
+
     const createdTasks = [];
     const createdTaskIds = [];
+    const taskErrors = [];
+
     for (const task of tasks) {
       try {
-        const createdTask = await createGHLTask(task, opportunityId, contactId, traceId, stepId);
+        const createdTask = await createGHLTask(task, opportunityId, contactId, traceId, createTasksStepId);
         createdTasks.push(createdTask);
-        // Extract task ID from response
         if (createdTask.task?.id) {
           createdTaskIds.push(createdTask.task.id);
         } else if (createdTask.id) {
@@ -442,13 +534,49 @@ async function processOpportunityStageChange(webhookData, traceId = null, stepId
         }
       } catch (taskError) {
         console.error(`Error creating task ${task.task_number}:`, taskError.message);
-        // Continue creating other tasks even if one fails
+        taskErrors.push({ taskNumber: task.task_number, error: taskError.message });
       }
     }
 
-    // Step 5: Update the stage change record with created task IDs
+    if (createTasksStepId) {
+      try {
+        await completeStep(createTasksStepId, {
+          tasksCreated: createdTasks.length,
+          taskIds: createdTaskIds,
+          errors: taskErrors.length > 0 ? taskErrors : undefined
+        });
+      } catch (e) {
+        console.error('Error completing create tasks step:', e.message);
+      }
+    }
+
+    // ===== STEP 5: Update Stage Change with Task IDs =====
     if (createdTaskIds.length > 0) {
+      let updateStepId = null;
+      if (traceId) {
+        try {
+          const step = await startStep(traceId, 'supabase', 'updateStageChangeTaskIds', {
+            recordId: stageChangeRecord.id,
+            taskCount: createdTaskIds.length
+          });
+          updateStepId = step.stepId;
+        } catch (e) {
+          console.error('Error starting update step:', e.message);
+        }
+      }
+
       await updateStageChangeTaskIds(stageChangeRecord.id, createdTaskIds);
+
+      if (updateStepId) {
+        try {
+          await completeStep(updateStepId, {
+            success: true,
+            taskIds: createdTaskIds
+          });
+        } catch (e) {
+          console.error('Error completing update step:', e.message);
+        }
+      }
     }
 
     console.log(`Successfully created ${createdTasks.length} out of ${tasks.length} tasks`);

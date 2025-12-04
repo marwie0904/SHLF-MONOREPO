@@ -1004,12 +1004,12 @@ export default function TraceDetailPage() {
           ← Back to Traces
         </button>
         <div className="trace-detail-title">
-          <h1>{system === 'clio' ? trace.triggerName : trace.endpoint}</h1>
+          <h1>{system === 'clio' ? trace.triggerName : (trace.endpoint?.split('/').pop() || trace.endpoint)}</h1>
           <span className={`status-badge ${effectiveTraceStatus}`}>{effectiveTraceStatus}</span>
           <span className="trace-id">ID: {trace.traceId}</span>
         </div>
-        {/* View Mode Toggle - Only for Clio */}
-        {system === 'clio' && (
+        {/* View Mode Toggle - Clio and GHL */}
+        {(system === 'clio' || system === 'ghl') && (
           <div className="view-mode-toggle">
             <button
               className={`view-mode-btn ${viewMode === 'workflow' ? 'active' : ''}`}
@@ -1028,12 +1028,13 @@ export default function TraceDetailPage() {
       </div>
 
       {/* Workflow View */}
-      {system === 'clio' && viewMode === 'workflow' && (
+      {(system === 'clio' || system === 'ghl') && viewMode === 'workflow' && (
         <div className="trace-detail-layout workflow-layout">
           <div className="trace-detail-workflow">
             <WorkflowVisualization
               trace={trace}
               steps={steps}
+              system={system}
               selectedNodeId={selectedItem.type === 'workflow-node' ? selectedItem.item?.id : null}
               onNodeSelect={(node) => {
                 // The node now contains stepData and details from matching
@@ -1054,7 +1055,7 @@ export default function TraceDetailPage() {
       )}
 
       {/* Steps View (original layout) */}
-      {(system !== 'clio' || viewMode === 'steps') && (
+      {viewMode === 'steps' && (
         <div className="trace-detail-layout">
           {/* Left: Flow Graph */}
           <div className="flow-graph">

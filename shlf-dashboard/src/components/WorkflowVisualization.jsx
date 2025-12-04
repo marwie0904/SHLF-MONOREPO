@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { getWorkflowTemplate, matchTraceToWorkflow } from '../config/workflowTemplates'
+import { getGHLWorkflowTemplate, matchGHLTraceToWorkflow } from '../config/ghlWorkflowTemplates'
 
 /**
  * Get icon for node type/layer
@@ -204,21 +205,32 @@ function WorkflowLegend() {
 /**
  * Main Workflow Visualization Component
  */
-export default function WorkflowVisualization({ trace, steps, selectedNodeId, onNodeSelect }) {
+export default function WorkflowVisualization({ trace, steps, system = 'clio', selectedNodeId, onNodeSelect }) {
   const [showAll, setShowAll] = useState(true)
 
   // Get workflow template and match with trace data
   const matchedWorkflow = useMemo(() => {
-    const template = getWorkflowTemplate(trace?.triggerName)
-    if (!template) return null
-    return matchTraceToWorkflow(template, trace, steps)
-  }, [trace, steps])
+    if (system === 'ghl') {
+      // GHL uses endpoint to identify workflow
+      const template = getGHLWorkflowTemplate(trace?.endpoint)
+      if (!template) return null
+      return matchGHLTraceToWorkflow(template, trace, steps)
+    } else {
+      // Clio uses triggerName
+      const template = getWorkflowTemplate(trace?.triggerName)
+      if (!template) return null
+      return matchTraceToWorkflow(template, trace, steps)
+    }
+  }, [trace, steps, system])
 
   if (!matchedWorkflow) {
+    const identifier = system === 'ghl'
+      ? trace?.endpoint?.split('/').pop()
+      : trace?.triggerName
     return (
       <div className="wf-visualization empty">
         <div className="wf-empty-state">
-          <p>No workflow template for: {trace?.triggerName}</p>
+          <p>No workflow template for: {identifier}</p>
         </div>
       </div>
     )

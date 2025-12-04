@@ -205,7 +205,11 @@ export default function TracesPage() {
               <tr key={trace._id}>
                 <td>
                   <div className="trigger-cell">
-                    <span className="trigger-name">{trace.triggerName}</span>
+                    <span className="trigger-name">
+                      {system === 'ghl'
+                        ? (trace.endpoint?.split('/').pop() || trace.triggerName || '-')
+                        : trace.triggerName}
+                    </span>
                     <span className="trigger-time">
                       {formatTime(trace.dateStarted)}
                       <br />
