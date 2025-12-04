@@ -338,36 +338,79 @@ export const taskDeletedWorkflow = {
       type: 'step',
       matchStep: 'idempotency_check',
       children: [{
-        id: 'test_mode',
-        name: 'Test Mode Filter',
-        layer: 'decision',
-        type: 'decision',
-        condition: 'Is task matter in allowlist?',
-        children: [
-          { label: 'Blocked', value: false, node: { id: 'test_blocked', name: 'Test Mode Blocked', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_test_mode', children: [] } },
-          {
-            label: 'Allowed',
-            value: true,
-            node: {
-              id: 'update_status',
-              name: 'Update Task Status',
-              layer: 'service',
-              type: 'step',
-              matchStep: 'update_task_status',
-              children: [{
-                id: 'task_found',
-                name: 'Task in Database?',
+        id: 'check_task',
+        name: 'Check Task in Supabase',
+        layer: 'service',
+        type: 'step',
+        matchStep: 'check_task_exists',
+        children: [{
+          id: 'task_found',
+          name: 'Task Found?',
+          layer: 'decision',
+          type: 'decision',
+          condition: 'Check if task exists in database',
+          children: [
+            {
+              label: 'No',
+              value: false,
+              node: {
+                id: 'not_found',
+                name: 'Task Not Found',
+                layer: 'outcome',
+                type: 'outcome',
+                status: 'skipped',
+                matchAction: 'task_not_found',
+                children: []
+              }
+            },
+            {
+              label: 'Yes',
+              value: true,
+              node: {
+                id: 'test_mode',
+                name: 'Test Mode Filter',
                 layer: 'decision',
                 type: 'decision',
-                condition: 'Check if task exists in Supabase',
+                condition: 'Is task matter in allowlist?',
                 children: [
-                  { label: 'No', value: false, node: { id: 'not_found', name: 'Task Not Found', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'task_not_found', children: [] } },
-                  { label: 'Yes', value: true, node: { id: 'marked_deleted', name: 'Marked as Deleted', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'task_marked_deleted', children: [] } }
+                  {
+                    label: 'Blocked',
+                    value: false,
+                    node: {
+                      id: 'test_blocked',
+                      name: 'Test Mode Blocked',
+                      layer: 'outcome',
+                      type: 'outcome',
+                      status: 'skipped',
+                      matchAction: 'skipped_test_mode',
+                      children: []
+                    }
+                  },
+                  {
+                    label: 'Allowed',
+                    value: true,
+                    node: {
+                      id: 'delete_supabase',
+                      name: 'Delete from Supabase',
+                      layer: 'service',
+                      type: 'step',
+                      matchStep: 'delete_from_supabase',
+                      children: [{
+                        id: 'deleted',
+                        name: 'Deleted in Supabase',
+                        layer: 'outcome',
+                        type: 'outcome',
+                        status: 'success',
+                        matchAction: 'deleted_in_supabase',
+                        children: []
+                      }]
+                    }
+                  }
                 ]
-              }]
+              }
             }
-          }
-        ]
+          ]
+        }]
       }]
     }]
   }

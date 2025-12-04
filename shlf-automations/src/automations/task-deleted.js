@@ -10,8 +10,9 @@ import { config } from '../config/index.js';
  *
  * Process:
  * 1. Get task ID from webhook
- * 2. Mark task as deleted in Supabase (soft delete)
- * 3. This keeps Supabase in sync with Clio while preserving history
+ * 2. Check if task exists in Supabase
+ * 3. Mark task as deleted in Supabase (soft delete)
+ * 4. This keeps Supabase in sync with Clio while preserving history
  */
 
 export class TaskDeletedAutomation {
@@ -23,26 +24,40 @@ export class TaskDeletedAutomation {
    */
   static async process(webhookData, traceId = null) {
     const taskId = webhookData.data.id;
+    const matterId = webhookData.data.matter?.id || null;
+    const deletedAt = webhookData.data.deleted_at || webhookData.occurred_at;
 
     console.log(`[TASK-DELETE] ${taskId} Processing deletion...`);
 
-    // Step: Idempotency check
+    // Step 1: Idempotency check
     const idempotencyStepId = await EventTracker.startStep(traceId, {
       layerName: 'processing',
       stepName: 'idempotency_check',
-      metadata: { taskId },
+      input: {
+        taskId,
+        deletedAt,
+        webhookId: webhookData.id,
+      },
     });
+
     const idempotencyKey = SupabaseService.generateIdempotencyKey(
       'task.deleted',
       taskId,
-      webhookData.data.deleted_at || webhookData.occurred_at
+      deletedAt
     );
 
     const existing = await SupabaseService.checkWebhookProcessed(idempotencyKey);
     if (existing) {
       if (existing.success === null) {
         console.log(`[TASK-DELETE] ${taskId} Still processing (concurrent request)`);
-        await EventTracker.endStep(idempotencyStepId, { status: 'skipped', metadata: { reason: 'still_processing' } });
+        await EventTracker.endStep(idempotencyStepId, {
+          status: 'skipped',
+          output: {
+            isDuplicate: true,
+            reason: 'still_processing',
+            processing_started_at: existing.created_at,
+          },
+        });
         return {
           success: null,
           action: 'still_processing',
@@ -51,7 +66,15 @@ export class TaskDeletedAutomation {
       }
 
       console.log(`[TASK-DELETE] ${taskId} Already processed at ${existing.processed_at}`);
-      await EventTracker.endStep(idempotencyStepId, { status: 'skipped', metadata: { reason: 'already_processed' } });
+      await EventTracker.endStep(idempotencyStepId, {
+        status: 'skipped',
+        output: {
+          isDuplicate: true,
+          reason: 'already_processed',
+          processed_at: existing.processed_at,
+          cachedAction: existing.action,
+        },
+      });
       return {
         success: existing.success,
         action: existing.action,
@@ -60,9 +83,16 @@ export class TaskDeletedAutomation {
       };
     }
 
-    await EventTracker.endStep(idempotencyStepId, { status: 'success' });
+    await EventTracker.endStep(idempotencyStepId, {
+      status: 'success',
+      output: {
+        isDuplicate: false,
+        isNewRequest: true,
+        idempotencyKey,
+      },
+    });
 
-    // Step 0.5: Reserve webhook immediately
+    // Reserve webhook immediately
     await SupabaseService.recordWebhookProcessed({
       idempotency_key: idempotencyKey,
       webhook_id: webhookData.id,
@@ -77,20 +107,27 @@ export class TaskDeletedAutomation {
     const startTime = Date.now();
 
     try {
-      // Step: Update task status
-      const updateTaskStepId = await EventTracker.startStep(traceId, {
-        layerName: 'automation',
-        stepName: 'update_task_status',
-        metadata: { taskId },
+      // Step 2: Check if task exists in Supabase
+      const checkStepId = await EventTracker.startStep(traceId, {
+        layerName: 'service',
+        stepName: 'check_task_exists',
+        input: {
+          taskId,
+          operation: 'lookup_task_in_supabase',
+        },
       });
-      const updateTaskCtx = EventTracker.createContext(traceId, updateTaskStepId);
 
-      // Check if task exists in Supabase
-      const existingTask = await SupabaseService.getTaskById(taskId, updateTaskCtx);
+      const existingTask = await SupabaseService.getTaskById(taskId);
 
       if (!existingTask) {
         console.log(`[TASK-DELETE] ${taskId} Task not found in Supabase - already deleted or never tracked`);
-        await EventTracker.endStep(updateTaskStepId, { status: 'skipped', metadata: { reason: 'task_not_found' } });
+        await EventTracker.endStep(checkStepId, {
+          status: 'skipped',
+          output: {
+            found: false,
+            reason: 'task_not_in_database',
+          },
+        });
 
         // Update webhook to success (nothing to delete)
         await SupabaseService.updateWebhookProcessed(idempotencyKey, {
@@ -103,10 +140,22 @@ export class TaskDeletedAutomation {
         return { success: true, action: 'task_not_found' };
       }
 
+      // Task found
+      await EventTracker.endStep(checkStepId, {
+        status: 'success',
+        output: {
+          found: true,
+          taskId: existingTask.task_id,
+          taskName: existingTask.task_name,
+          matterId: existingTask.matter_id,
+          stageName: existingTask.stage_name,
+          currentStatus: existingTask.status,
+        },
+      });
+
       // TEST MODE: Safety check - only process tasks from test matter
       if (config.testing.testMode && existingTask.matter_id !== config.testing.testMatterId) {
         console.log(`[TASK-DELETE] ${taskId} SKIPPED (test mode - matter ${existingTask.matter_id} !== ${config.testing.testMatterId})`);
-        await EventTracker.endStep(updateTaskStepId, { status: 'skipped', metadata: { reason: 'test_mode_filter' } });
 
         await SupabaseService.updateWebhookProcessed(idempotencyKey, {
           processing_duration_ms: Date.now() - startTime,
@@ -117,28 +166,55 @@ export class TaskDeletedAutomation {
         return { success: true, action: 'skipped_test_mode' };
       }
 
-      // Mark task as deleted in Supabase (soft delete)
+      // Step 3: Delete from Supabase (soft delete)
+      const deleteStepId = await EventTracker.startStep(traceId, {
+        layerName: 'service',
+        stepName: 'delete_from_supabase',
+        input: {
+          taskId,
+          taskName: existingTask.task_name,
+          matterId: existingTask.matter_id,
+          stageName: existingTask.stage_name,
+          previousStatus: existingTask.status,
+          operation: 'soft_delete_task',
+        },
+      });
+
       console.log(`[TASK-DELETE] ${taskId} Marking task as deleted: ${existingTask.task_name}`);
       console.log(`[TASK-DELETE] ${taskId} Matter: ${existingTask.matter_id}, Stage: ${existingTask.stage_name}`);
 
       await SupabaseService.updateTask(taskId, {
         status: 'deleted',
         last_updated: new Date().toISOString(),
-      }, updateTaskCtx);
+      });
 
-      await EventTracker.endStep(updateTaskStepId, { status: 'success', metadata: { taskName: existingTask.task_name, matterId: existingTask.matter_id } });
+      const deletedTimestamp = new Date().toISOString();
+
+      await EventTracker.endStep(deleteStepId, {
+        status: 'success',
+        output: {
+          success: true,
+          taskId,
+          taskName: existingTask.task_name,
+          matterId: existingTask.matter_id,
+          previousStatus: existingTask.status,
+          newStatus: 'deleted',
+          deletedAt: deletedTimestamp,
+        },
+      });
 
       // Update webhook to success
       await SupabaseService.updateWebhookProcessed(idempotencyKey, {
         processing_duration_ms: Date.now() - startTime,
         success: true,
-        action: 'task_marked_deleted',
+        action: 'deleted_in_supabase',
       });
 
       console.log(`[TASK-DELETE] ${taskId} COMPLETED - Marked as deleted in Supabase\n`);
       return {
         success: true,
-        action: 'task_marked_deleted',
+        action: 'deleted_in_supabase',
+        taskId,
         taskName: existingTask.task_name,
         matterId: existingTask.matter_id,
       };
