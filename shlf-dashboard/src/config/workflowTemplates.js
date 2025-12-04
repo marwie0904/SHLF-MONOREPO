@@ -910,10 +910,17 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
       const step = stepsByName[stepName?.toLowerCase()];
       const actualValue = step?.output?.[outputField];
 
+      // Debug logging
+      console.log(`[WorkflowMatch] Decision ${node.id}: stepName=${stepName}, outputField=${outputField}, actualValue=${actualValue}, step exists=${!!step}`);
+
+      // If step doesn't exist or output is undefined, default to false (no rollback)
+      const valueToMatch = actualValue !== undefined ? actualValue : false;
+
       markedChildren = node.children.map(child => {
         if (child.node) {
           // Branch is active only if its matchValue matches the actual value
-          const isBranchActive = branchActive && (child.matchValue === actualValue);
+          const isBranchActive = branchActive && (child.matchValue === valueToMatch);
+          console.log(`[WorkflowMatch] Branch ${child.label}: matchValue=${child.matchValue}, valueToMatch=${valueToMatch}, isBranchActive=${isBranchActive}`);
           return {
             ...child,
             node: markNode(child.node, depth + 1, isBranchActive),
