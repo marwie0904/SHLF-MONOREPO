@@ -215,6 +215,28 @@
   color: var(--accent-yellow);
 }
 
+/* System Badge */
+.system-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.system-badge.clio {
+  background: rgba(138, 43, 226, 0.15);
+  color: #a855f7;
+}
+
+.system-badge.ghl {
+  background: rgba(29, 155, 240, 0.15);
+  color: var(--accent-blue);
+}
+
 .skip-reason-badge {
   display: inline-block;
   margin-top: 6px;

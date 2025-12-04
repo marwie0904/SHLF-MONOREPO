@@ -70,7 +70,7 @@ function getSkipReason(resultAction) {
 
 export default function TracesPage() {
   const navigate = useNavigate()
-  const [system, setSystem] = useState('clio')
+  const [system, setSystem] = useState('all')
   const [statusFilter, setStatusFilter] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [searchType, setSearchType] = useState('matterId')
@@ -115,6 +115,12 @@ export default function TracesPage() {
       <div className="filters-bar">
         <div className="header-nav">
           <button
+            className={`nav-btn ${system === 'all' ? 'active' : ''}`}
+            onClick={() => { setSystem('all'); setSearchTerm(''); setStatusFilter(''); }}
+          >
+            All
+          </button>
+          <button
             className={`nav-btn ${system === 'clio' ? 'active' : ''}`}
             onClick={() => { setSystem('clio'); setSearchTerm(''); }}
           >
@@ -128,53 +134,59 @@ export default function TracesPage() {
           </button>
         </div>
 
-        {/* Search */}
-        <select
-          className="filter-select"
-          value={searchType}
-          onChange={(e) => setSearchType(e.target.value)}
-        >
-          {system === 'clio' ? (
-            <option value="matterId">Matter ID</option>
-          ) : (
-            <>
-              <option value="contactId">Contact ID</option>
-              <option value="opportunityId">Opportunity ID</option>
-            </>
-          )}
-        </select>
+        {/* Search - hidden in "all" mode */}
+        {system !== 'all' && (
+          <>
+            <select
+              className="filter-select"
+              value={searchType}
+              onChange={(e) => setSearchType(e.target.value)}
+            >
+              {system === 'clio' ? (
+                <option value="matterId">Matter ID</option>
+              ) : (
+                <>
+                  <option value="contactId">Contact ID</option>
+                  <option value="opportunityId">Opportunity ID</option>
+                </>
+              )}
+            </select>
 
-        <input
-          type="text"
-          className="search-input"
-          placeholder={`Search by ${searchType}...`}
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+            <input
+              type="text"
+              className="search-input"
+              placeholder={`Search by ${searchType}...`}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </>
+        )}
 
-        {/* Status Filter */}
-        <select
-          className="filter-select"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">All Status</option>
-          {system === 'clio' ? (
-            <>
-              <option value="success">Success</option>
-              <option value="error">Error</option>
-              <option value="in_progress">In Progress</option>
-              <option value="skipped">Skipped</option>
-            </>
-          ) : (
-            <>
-              <option value="completed">Completed</option>
-              <option value="failed">Failed</option>
-              <option value="started">Started</option>
-              <option value="partial">Partial</option>
-            </>
-          )}
-        </select>
+        {/* Status Filter - hidden in "all" mode */}
+        {system !== 'all' && (
+          <select
+            className="filter-select"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">All Status</option>
+            {system === 'clio' ? (
+              <>
+                <option value="success">Success</option>
+                <option value="error">Error</option>
+                <option value="in_progress">In Progress</option>
+                <option value="skipped">Skipped</option>
+              </>
+            ) : (
+              <>
+                <option value="completed">Completed</option>
+                <option value="failed">Failed</option>
+                <option value="started">Started</option>
+                <option value="partial">Partial</option>
+              </>
+            )}
+          </select>
+        )}
       </div>
 
       {/* Traces Table */}
@@ -192,77 +204,91 @@ export default function TracesPage() {
         <table className="traces-table">
           <thead>
             <tr>
+              {system === 'all' && <th>System</th>}
               <th>Trigger</th>
               <th>Endpoint</th>
               <th>Status</th>
-              <th>{system === 'clio' ? 'Matter ID' : 'Contact/Opp ID'}</th>
+              <th>{system === 'all' ? 'ID' : (system === 'clio' ? 'Matter ID' : 'Contact/Opp ID')}</th>
               <th>Duration</th>
               <th>Action</th>
             </tr>
           </thead>
           <tbody>
-            {traces.map((trace) => (
-              <tr key={trace._id}>
-                <td>
-                  <div className="trigger-cell">
-                    <span className="trigger-name">
-                      {system === 'ghl'
-                        ? (trace.endpoint?.split('/').pop() || trace.triggerName || '-')
-                        : trace.triggerName}
-                    </span>
-                    <span className="trigger-time">
-                      {formatTime(trace.dateStarted)}
-                      <br />
-                      {formatTimeRange(trace.dateStarted, trace.dateFinished)}
-                    </span>
-                  </div>
-                </td>
-                <td className="endpoint-cell">{trace.endpoint || '-'}</td>
-                <td>
-                  {(() => {
-                    const effectiveStatus = getEffectiveStatus(trace)
-                    const skipReason = getSkipReason(trace.resultAction)
-                    return (
-                      <>
-                        <span className={`status-badge ${effectiveStatus}`}>
-                          {effectiveStatus}
-                        </span>
-                        {effectiveStatus === 'skipped' && skipReason && (
-                          <div style={{ fontSize: '11px', color: 'var(--accent-yellow)', marginTop: '4px' }}>
-                            {skipReason}
-                          </div>
-                        )}
-                        {effectiveStatus === 'error' && trace.resultAction && (
-                          <div style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '4px' }}>
-                            {trace.resultAction}
-                          </div>
-                        )}
-                        {effectiveStatus !== 'skipped' && effectiveStatus !== 'error' && trace.resultAction && (
-                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                            {trace.resultAction}
-                          </div>
-                        )}
-                      </>
-                    )
-                  })()}
-                </td>
-                <td className="id-cell">
-                  {system === 'clio'
-                    ? (trace.matterId || '-')
-                    : (trace.contactId || trace.opportunityId || '-')
-                  }
-                </td>
-                <td className="duration-cell">{formatDuration(trace.durationMs)}</td>
-                <td>
-                  <button
-                    className="view-btn"
-                    onClick={() => handleViewDetails(trace.traceId)}
-                  >
-                    View Details
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {traces.map((trace) => {
+              // Determine the trace's system (for "all" mode, use trace.system; otherwise use selected system)
+              const traceSystem = trace.system || system;
+              const isGhl = traceSystem === 'ghl';
+
+              return (
+                <tr key={trace._id}>
+                  {system === 'all' && (
+                    <td>
+                      <span className={`system-badge ${traceSystem}`}>
+                        {traceSystem.toUpperCase()}
+                      </span>
+                    </td>
+                  )}
+                  <td>
+                    <div className="trigger-cell">
+                      <span className="trigger-name">
+                        {isGhl
+                          ? (trace.endpoint?.split('/').pop() || trace.triggerName || '-')
+                          : trace.triggerName}
+                      </span>
+                      <span className="trigger-time">
+                        {formatTime(trace.dateStarted)}
+                        <br />
+                        {formatTimeRange(trace.dateStarted, trace.dateFinished)}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="endpoint-cell">{trace.endpoint || '-'}</td>
+                  <td>
+                    {(() => {
+                      const effectiveStatus = getEffectiveStatus(trace)
+                      const skipReason = getSkipReason(trace.resultAction)
+                      return (
+                        <>
+                          <span className={`status-badge ${effectiveStatus}`}>
+                            {effectiveStatus}
+                          </span>
+                          {effectiveStatus === 'skipped' && skipReason && (
+                            <div style={{ fontSize: '11px', color: 'var(--accent-yellow)', marginTop: '4px' }}>
+                              {skipReason}
+                            </div>
+                          )}
+                          {effectiveStatus === 'error' && trace.resultAction && (
+                            <div style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '4px' }}>
+                              {trace.resultAction}
+                            </div>
+                          )}
+                          {effectiveStatus !== 'skipped' && effectiveStatus !== 'error' && trace.resultAction && (
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                              {trace.resultAction}
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </td>
+                  <td className="id-cell">
+                    {isGhl
+                      ? (trace.contactId || trace.opportunityId || '-')
+                      : (trace.matterId || '-')
+                    }
+                  </td>
+                  <td className="duration-cell">{formatDuration(trace.durationMs)}</td>
+                  <td>
+                    <button
+                      className="view-btn"
+                      onClick={() => navigate(`/trace/${traceSystem}/${trace.traceId}`)}
+                    >
+                      View Details
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}
