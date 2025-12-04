@@ -125,7 +125,15 @@ const extractMatterId = (webhookData) => {
  */
 const determineTriggerName = (webhookData, endpoint) => {
   // Check for deletion events
-  if (webhookData.data?.deleted_at || webhookData.type === 'activity.deleted') {
+  // Clio sends deletion info in multiple ways:
+  // 1. data.deleted_at field
+  // 2. type === 'activity.deleted'
+  // 3. meta.event === 'deleted'
+  const isDeleted = webhookData.data?.deleted_at ||
+                    webhookData.type === 'activity.deleted' ||
+                    webhookData.meta?.event === 'deleted';
+
+  if (isDeleted) {
     if (endpoint === '/tasks') return 'task-deleted';
     if (endpoint === '/calendar') return 'calendar-entry-deleted';
   }
@@ -319,13 +327,20 @@ router.post('/matters', handleWebhookActivation, testModeFilter, withRetry(async
  */
 router.post('/tasks', handleWebhookActivation, testModeFilter, withRetry(async (webhookData, traceId) => {
   console.log('📨 Received task webhook');
-  console.log('   Webhook type:', webhookData.type);
+  console.log('   Webhook meta.event:', webhookData.meta?.event);
   console.log('   Has deleted_at?', !!webhookData.data?.deleted_at);
 
   // Check if this is a deletion event
-  // Clio sends deleted_at field for deleted resources OR type='activity.deleted'
-  if (webhookData.data?.deleted_at || webhookData.type === 'activity.deleted') {
-    console.log('   Task deletion detected');
+  // Clio sends deletion info in multiple ways:
+  // 1. data.deleted_at field
+  // 2. type === 'activity.deleted'
+  // 3. meta.event === 'deleted'
+  const isDeleted = webhookData.data?.deleted_at ||
+                    webhookData.type === 'activity.deleted' ||
+                    webhookData.meta?.event === 'deleted';
+
+  if (isDeleted) {
+    console.log('   Task deletion detected (meta.event or deleted_at)');
     return await TaskDeletedAutomation.process(webhookData, traceId);
   }
 
@@ -339,9 +354,13 @@ router.post('/tasks', handleWebhookActivation, testModeFilter, withRetry(async (
  */
 router.post('/calendar', handleWebhookActivation, testModeFilter, withRetry(async (webhookData, traceId) => {
   console.log('📨 Received calendar webhook');
+  console.log('   Webhook meta.event:', webhookData.meta?.event);
 
   // Check if this is a deletion event
-  if (webhookData.data?.deleted_at) {
+  const isDeleted = webhookData.data?.deleted_at ||
+                    webhookData.meta?.event === 'deleted';
+
+  if (isDeleted) {
     console.log('   Calendar entry deletion detected');
     return await CalendarEntryDeletedAutomation.process(webhookData, traceId);
   }
