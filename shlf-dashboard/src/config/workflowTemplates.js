@@ -113,34 +113,40 @@ export const matterStageChangeWorkflow = {
                                     layer: 'decision',
                                     type: 'decision',
                                     condition: 'Check if stage changed within rollback window',
+                                    // Match based on check_rollback_window step output
+                                    matchStepOutput: { stepName: 'check_rollback_window', outputField: 'withinRollbackWindow' },
                                     children: [
                                       {
                                         label: 'Yes',
                                         value: true,
+                                        matchValue: true, // Match when withinRollbackWindow === true
                                         node: {
                                           id: 'delete_previous',
                                           name: 'Delete Previous Tasks',
                                           layer: 'automation',
                                           type: 'step',
-                                          matchAction: 'rollback_triggered',
+                                          matchStepOutput: { stepName: 'check_rollback_window', outputField: 'withinRollbackWindow', expectedValue: true },
                                           children: [{
                                             id: 'generate_tasks_after_rollback',
                                             name: 'Generate Tasks',
                                             layer: 'automation',
                                             type: 'step',
                                             matchStep: 'generate_tasks',
+                                            matchStepOutput: { stepName: 'check_rollback_window', outputField: 'withinRollbackWindow', expectedValue: true },
                                             children: [{
                                               id: 'verify_tasks_after_rollback',
                                               name: 'Verify Tasks',
                                               layer: 'automation',
                                               type: 'step',
                                               matchStep: 'verify_tasks',
+                                              matchStepOutput: { stepName: 'check_rollback_window', outputField: 'withinRollbackWindow', expectedValue: true },
                                               children: [{
                                                 id: 'task_result_after_rollback',
                                                 name: 'Task Creation Result',
                                                 layer: 'decision',
                                                 type: 'decision',
                                                 condition: 'Check task creation outcomes',
+                                                matchStepOutput: { stepName: 'check_rollback_window', outputField: 'withinRollbackWindow', expectedValue: true },
                                                 children: [
                                                   { label: 'All Success', value: 'success', node: { id: 'tasks_created_rb', name: 'Tasks Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'created_tasks', children: [] } },
                                                   { label: 'Updated', value: 'updated', node: { id: 'tasks_updated_rb', name: 'Tasks Updated', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'updated_tasks', children: [] } },
@@ -155,24 +161,28 @@ export const matterStageChangeWorkflow = {
                                       {
                                         label: 'No',
                                         value: false,
+                                        matchValue: false, // Match when withinRollbackWindow === false
                                         node: {
                                           id: 'generate_tasks',
                                           name: 'Generate Tasks',
                                           layer: 'automation',
                                           type: 'step',
                                           matchStep: 'generate_tasks',
+                                          matchStepOutput: { stepName: 'check_rollback_window', outputField: 'withinRollbackWindow', expectedValue: false },
                                           children: [{
                                             id: 'verify_tasks',
                                             name: 'Verify Tasks',
                                             layer: 'automation',
                                             type: 'step',
                                             matchStep: 'verify_tasks',
+                                            matchStepOutput: { stepName: 'check_rollback_window', outputField: 'withinRollbackWindow', expectedValue: false },
                                             children: [{
                                               id: 'task_result',
                                               name: 'Task Creation Result',
                                               layer: 'decision',
                                               type: 'decision',
                                               condition: 'Check task creation outcomes',
+                                              matchStepOutput: { stepName: 'check_rollback_window', outputField: 'withinRollbackWindow', expectedValue: false },
                                               children: [
                                                 { label: 'All Success', value: 'success', node: { id: 'tasks_created', name: 'Tasks Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'created_tasks', children: [] } },
                                                 { label: 'Updated', value: 'updated', node: { id: 'tasks_updated', name: 'Tasks Updated', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'updated_tasks', children: [] } },
@@ -746,6 +756,25 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
   console.log('[WorkflowMatch] All details count:', allDetails.length);
   console.log('[WorkflowMatch] Result action:', resultAction);
 
+  // Helper: Check if a node's matchStepOutput condition is satisfied
+  function checkStepOutputMatch(node) {
+    if (!node.matchStepOutput) return true; // No condition = always match
+
+    const { stepName, outputField, expectedValue } = node.matchStepOutput;
+    const step = stepsByName[stepName?.toLowerCase()];
+    if (!step || !step.output) return false;
+
+    const actualValue = step.output[outputField];
+
+    // If expectedValue is specified, check equality
+    if (expectedValue !== undefined) {
+      return actualValue === expectedValue;
+    }
+
+    // Otherwise just check if the field exists and is truthy
+    return !!actualValue;
+  }
+
   // Track the last step in the chain to mark as "current"
   let lastMatchedStep = null;
   let lastMatchedDepth = -1;
@@ -754,8 +783,18 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
   function findTakenNodes(node, depth = 0) {
     let taken = false;
 
+    // Check matchStepOutput constraint first
+    const stepOutputMatch = checkStepOutputMatch(node);
+
     if (node.type === 'step' && node.matchStep) {
-      taken = stepNames.has(node.matchStep.toLowerCase());
+      taken = stepNames.has(node.matchStep.toLowerCase()) && stepOutputMatch;
+      if (taken && depth > lastMatchedDepth) {
+        lastMatchedStep = node.id;
+        lastMatchedDepth = depth;
+      }
+    } else if (node.type === 'step' && node.matchStepOutput && !node.matchStep) {
+      // Step that only matches based on step output (like "Delete Previous Tasks")
+      taken = stepOutputMatch;
       if (taken && depth > lastMatchedDepth) {
         lastMatchedStep = node.id;
         lastMatchedDepth = depth;
@@ -769,16 +808,32 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
         lastMatchedDepth = depth + 100; // Outcomes are always "last"
       }
     } else if (node.type === 'decision') {
-      // Decisions are taken if any child branch was taken
-      node.children.forEach(branch => {
-        if (branch.node && findTakenNodes(branch.node, depth + 1)) {
-          taken = true;
-        }
-      });
+      // For decisions with matchStepOutput, check which branch matches
+      if (node.matchStepOutput) {
+        const { stepName, outputField } = node.matchStepOutput;
+        const step = stepsByName[stepName?.toLowerCase()];
+        const actualValue = step?.output?.[outputField];
+
+        // Find the branch that matches the actual value
+        node.children.forEach(branch => {
+          if (branch.matchValue !== undefined && branch.matchValue === actualValue) {
+            if (branch.node && findTakenNodes(branch.node, depth + 1)) {
+              taken = true;
+            }
+          }
+        });
+      } else {
+        // Decisions are taken if any child branch was taken
+        node.children.forEach(branch => {
+          if (branch.node && findTakenNodes(branch.node, depth + 1)) {
+            taken = true;
+          }
+        });
+      }
     }
 
-    // Check children for steps
-    if (node.children) {
+    // Check children for steps (only if not a decision with matchStepOutput)
+    if (node.children && !(node.type === 'decision' && node.matchStepOutput)) {
       node.children.forEach(child => {
         if (child.node) {
           if (findTakenNodes(child.node, depth + 1)) {
@@ -805,9 +860,12 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
     let stepData = null;
     let nodeDetails = [];
 
+    // Check matchStepOutput constraint
+    const stepOutputMatch = checkStepOutputMatch(node);
+
     if (node.type === 'step' && node.matchStep) {
       const matchKey = node.matchStep.toLowerCase();
-      taken = stepNames.has(matchKey);
+      taken = stepNames.has(matchKey) && stepOutputMatch;
       if (taken) {
         // Attach the matching step data
         stepData = stepsByName[matchKey];
@@ -815,6 +873,14 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
         if (stepData?.details) {
           nodeDetails = stepData.details;
         }
+      }
+    } else if (node.type === 'step' && node.matchStepOutput && !node.matchStep) {
+      // Step that only matches based on step output (like "Delete Previous Tasks")
+      taken = stepOutputMatch;
+      if (taken) {
+        // Get step data from the referenced step
+        const { stepName } = node.matchStepOutput;
+        stepData = stepsByName[stepName?.toLowerCase()];
       }
     } else if (node.type === 'outcome' && node.matchAction) {
       const matchAction = node.matchAction.toLowerCase();
@@ -840,17 +906,37 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
     }
 
     // Mark children (do this first for all node types)
-    const markedChildren = node.children.map(child => {
-      if (child.node) {
-        return {
-          ...child,
-          node: markNode(child.node, depth + 1, taken),
-        };
-      } else if (child.id) {
-        return markNode(child, depth + 1, taken);
-      }
-      return child;
-    });
+    // For decisions with matchStepOutput, only mark the matching branch
+    let markedChildren;
+    if (node.type === 'decision' && node.matchStepOutput) {
+      const { stepName, outputField } = node.matchStepOutput;
+      const step = stepsByName[stepName?.toLowerCase()];
+      const actualValue = step?.output?.[outputField];
+
+      markedChildren = node.children.map(child => {
+        if (child.node) {
+          // Only mark this branch if its matchValue matches the actual value
+          const branchMatches = child.matchValue === actualValue;
+          return {
+            ...child,
+            node: markNode(child.node, depth + 1, branchMatches),
+          };
+        }
+        return child;
+      });
+    } else {
+      markedChildren = node.children.map(child => {
+        if (child.node) {
+          return {
+            ...child,
+            node: markNode(child.node, depth + 1, taken),
+          };
+        } else if (child.id) {
+          return markNode(child, depth + 1, taken);
+        }
+        return child;
+      });
+    }
 
     // For decisions, check if any marked child branch is taken
     if (node.type === 'decision') {
@@ -865,6 +951,15 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
       if (taken && node.matchStep) {
         const matchKey = node.matchStep.toLowerCase();
         stepData = stepsByName[matchKey];
+        if (stepData?.details) {
+          nodeDetails = stepData.details;
+        }
+      }
+
+      // For decisions with matchStepOutput, attach the step data
+      if (taken && node.matchStepOutput) {
+        const { stepName } = node.matchStepOutput;
+        stepData = stepsByName[stepName?.toLowerCase()];
         if (stepData?.details) {
           nodeDetails = stepData.details;
         }
