@@ -540,6 +540,7 @@ export class MeetingScheduledAutomation {
       let tasksLinked = 0;
       let tasksFailed = 0;
       let failures = [];
+      let createdTasksList = []; // Track created tasks with full details
       let action = 'no_changes';
 
       // Step 7: Generate/Update Tasks
@@ -621,11 +622,12 @@ export class MeetingScheduledAutomation {
         tasksCreated = result.tasksCreated;
         tasksFailed = result.tasksFailed || 0;
         failures = result.failures || [];
+        createdTasksList = result.tasks || []; // Capture created tasks
         action = 'tasks_created';
         console.log(`[CALENDAR] ${calendarEntryId} Created ${tasksCreated} new tasks`);
       }
 
-      // End generate_tasks step with output
+      // End generate_tasks step with output (including tasks array like matter-stage-change)
       await EventTracker.endStep(generateTasksStepId, {
         status: tasksFailed > 0 ? 'error' : 'success',
         output: {
@@ -636,6 +638,7 @@ export class MeetingScheduledAutomation {
           tasksFailed,
           stageName: mapping.stage_name,
           meetingDate,
+          tasks: createdTasksList, // Full task details array
         },
       });
 
@@ -669,13 +672,13 @@ export class MeetingScheduledAutomation {
       }
 
       // Update webhook to success
+      // Note: tasks_linked is tracked in 'action' field, not as separate column
       await SupabaseService.updateWebhookProcessed(idempotencyKey, {
         processing_duration_ms: Date.now() - startTime,
         success: true,
         action,
         tasks_created: tasksCreated,
         tasks_updated: tasksUpdated,
-        tasks_linked: tasksLinked,
       });
 
       console.log(`[CALENDAR] ${calendarEntryId} COMPLETED - Created: ${tasksCreated}, Updated: ${tasksUpdated}, Linked: ${tasksLinked}\n`);
@@ -717,6 +720,7 @@ export class MeetingScheduledAutomation {
     let tasksCreated = 0;
     let tasksFailed = 0;
     const failures = [];
+    const createdTasks = []; // Track all created tasks with full details
 
     for (const template of taskTemplates) {
       console.log(`[CALENDAR] ${calendarEntryId} Processing template: ${template.task_title} (task_number: ${template.task_number})`);
@@ -975,6 +979,17 @@ export class MeetingScheduledAutomation {
           }
 
           tasksCreated++;
+          // Track created task with full details
+          createdTasks.push({
+            taskNumber: template.task_number,
+            taskId: newTask.id,
+            taskName: newTask.name,
+            taskDescription: newTask.description || template.task_desc,
+            assignee: assignee.name,
+            assigneeId: assignee.id,
+            dueDate: dueDateFormatted,
+            status: 'created',
+          });
           console.log(`[CALENDAR] ${calendarEntryId} Created: ${template.task_title}`);
         }
 
@@ -987,10 +1002,22 @@ export class MeetingScheduledAutomation {
           error: error.message,
           error_code: ERROR_CODES.CLIO_API_FAILED,
         });
+        // Track failed tasks too
+        createdTasks.push({
+          taskNumber: template.task_number,
+          taskId: null,
+          taskName: template.task_title,
+          taskDescription: template.task_desc,
+          assignee: null,
+          assigneeId: null,
+          dueDate: null,
+          status: 'failed',
+          error: error.message,
+        });
       }
     }
 
-    return { tasksCreated, tasksFailed, failures };
+    return { tasksCreated, tasksFailed, failures, tasks: createdTasks };
   }
 
   /**

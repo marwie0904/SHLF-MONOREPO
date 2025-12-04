@@ -80,17 +80,22 @@ export class TaskVerificationService {
       expectedTaskNumbers = result.expectedTaskNumbers;
     }
 
-    // Step 3: Query Supabase for recently generated tasks
-    const actualTasks = await SupabaseService.getRecentTasksByMatterAndStage(
-      matterId,
-      stageId,
-      1 // last 1 minute
-    );
-
-    // Filter by calendar_entry_id if meeting context
-    const relevantTasks = calendarEntryId
-      ? actualTasks.filter(t => t.calendar_entry_id === calendarEntryId)
-      : actualTasks;
+    // Step 3: Query Supabase for generated tasks
+    let relevantTasks;
+    if (calendarEntryId) {
+      // For meeting context, query directly by calendar_entry_id (more reliable)
+      // Include completed tasks to avoid regenerating them
+      relevantTasks = await SupabaseService.getTasksByCalendarEntryId(calendarEntryId, true);
+      console.log(`[VERIFY] ${matterId} Queried by calendar_entry_id: ${calendarEntryId}, found ${relevantTasks.length} tasks`);
+    } else {
+      // For stage change, use time-based query
+      const actualTasks = await SupabaseService.getRecentTasksByMatterAndStage(
+        matterId,
+        stageId,
+        2 // last 2 minutes (increased from 1 minute for more reliability)
+      );
+      relevantTasks = actualTasks;
+    }
 
     console.log(`[VERIFY] ${matterId} Found ${relevantTasks.length} tasks in Supabase`);
 

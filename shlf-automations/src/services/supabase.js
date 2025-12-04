@@ -388,17 +388,23 @@ export class SupabaseService {
    * @param {number} calendarEntryId - Calendar entry ID
    * @param {Object} [ctx] - Optional tracking context
    */
-  static async getTasksByCalendarEntryId(calendarEntryId, ctx = null) {
+  static async getTasksByCalendarEntryId(calendarEntryId, includeCompleted = false, ctx = null) {
     const start = Date.now();
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('tasks')
         .select('*')
-        .eq('calendar_entry_id', calendarEntryId)
-        .eq('completed', false);
+        .eq('calendar_entry_id', calendarEntryId);
+
+      // Filter to only incomplete tasks unless includeCompleted is true
+      if (!includeCompleted) {
+        query = query.eq('completed', false);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
-      ctx?.logDbQuery('supabase_getTasksByCalendarEntryId', { calendarEntryId }, { count: (data || []).length }, Date.now() - start, 'success');
+      ctx?.logDbQuery('supabase_getTasksByCalendarEntryId', { calendarEntryId, includeCompleted }, { count: (data || []).length }, Date.now() - start, 'success');
       return data || [];
     } catch (error) {
       ctx?.logDbQuery('supabase_getTasksByCalendarEntryId', { calendarEntryId }, null, Date.now() - start, 'error', error.message);
