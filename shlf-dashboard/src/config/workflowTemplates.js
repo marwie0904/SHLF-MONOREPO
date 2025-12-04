@@ -261,7 +261,59 @@ export const taskCompletionWorkflow = {
                   type: 'decision',
                   condition: 'Check if task exists in Clio',
                   children: [
-                    { label: 'Deleted', value: false, node: { id: 'task_deleted', name: 'Task Deleted', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'task_deleted', children: [] } },
+                    {
+                      label: 'Deleted',
+                      value: false,
+                      node: {
+                        id: 'search_supabase_deleted',
+                        name: 'Search Task in Supabase',
+                        layer: 'service',
+                        type: 'step',
+                        matchStep: 'search_task_in_supabase',
+                        children: [{
+                          id: 'task_found_deleted',
+                          name: 'Task Found?',
+                          layer: 'decision',
+                          type: 'decision',
+                          condition: 'Check if task exists in database',
+                          children: [
+                            {
+                              label: 'No',
+                              value: false,
+                              node: {
+                                id: 'not_found_deleted',
+                                name: 'Not Found in Supabase',
+                                layer: 'outcome',
+                                type: 'outcome',
+                                status: 'skipped',
+                                matchAction: 'not_found',
+                                children: []
+                              }
+                            },
+                            {
+                              label: 'Yes',
+                              value: true,
+                              node: {
+                                id: 'delete_supabase_deleted',
+                                name: 'Delete Task in Supabase',
+                                layer: 'service',
+                                type: 'step',
+                                matchStep: 'delete_task_in_supabase',
+                                children: [{
+                                  id: 'deleted_in_supabase',
+                                  name: 'Task Deleted in Supabase',
+                                  layer: 'outcome',
+                                  type: 'outcome',
+                                  status: 'success',
+                                  matchAction: 'deleted_in_supabase',
+                                  children: []
+                                }]
+                              }
+                            }
+                          ]
+                        }]
+                      }
+                    },
                     {
                       label: 'Exists',
                       value: true,
@@ -366,11 +418,11 @@ export const taskDeletedWorkflow = {
       type: 'step',
       matchStep: 'idempotency_check',
       children: [{
-        id: 'check_task',
-        name: 'Check Task in Supabase',
+        id: 'search_supabase',
+        name: 'Search Task in Supabase',
         layer: 'service',
         type: 'step',
-        matchStep: 'check_task_exists',
+        matchStep: 'search_task_in_supabase',
         children: [{
           id: 'task_found',
           name: 'Task Found?',
@@ -383,7 +435,7 @@ export const taskDeletedWorkflow = {
               value: false,
               node: {
                 id: 'not_found',
-                name: 'Task Not Found',
+                name: 'Not Found in Supabase',
                 layer: 'outcome',
                 type: 'outcome',
                 status: 'skipped',
@@ -419,13 +471,13 @@ export const taskDeletedWorkflow = {
                     value: true,
                     node: {
                       id: 'delete_supabase',
-                      name: 'Delete from Supabase',
+                      name: 'Delete Task in Supabase',
                       layer: 'service',
                       type: 'step',
-                      matchStep: 'delete_from_supabase',
+                      matchStep: 'delete_task_in_supabase',
                       children: [{
                         id: 'deleted',
-                        name: 'Deleted in Supabase',
+                        name: 'Task Deleted in Supabase',
                         layer: 'outcome',
                         type: 'outcome',
                         status: 'success',

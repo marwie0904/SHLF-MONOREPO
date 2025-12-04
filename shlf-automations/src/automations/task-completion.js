@@ -138,29 +138,103 @@ export class TaskCompletionAutomation {
         // If we get a 404, the task was deleted in Clio
         if (fetchError.response?.status === 404 || fetchError.message?.includes('404')) {
           console.log(`[TASK] ${taskId} Not found in Clio (404) - task was deleted`);
-          await EventTracker.endStep(fetchTaskStepId, { status: 'skipped', metadata: { reason: 'task_deleted_in_clio' } });
+          await EventTracker.endStep(fetchTaskStepId, {
+            status: 'skipped',
+            output: {
+              found: false,
+              reason: 'task_deleted_in_clio',
+              httpStatus: 404,
+            },
+          });
 
-          // Get task from Supabase to mark it as deleted
+          // Step: Search for task in Supabase
+          const searchSupabaseStepId = await EventTracker.startStep(traceId, {
+            layerName: 'service',
+            stepName: 'search_task_in_supabase',
+            input: {
+              taskId,
+              operation: 'search_task_record',
+            },
+          });
+
           const taskRecord = await SupabaseService.getTaskById(taskId);
 
           if (taskRecord) {
+            await EventTracker.endStep(searchSupabaseStepId, {
+              status: 'success',
+              output: {
+                found: true,
+                taskId: taskRecord.task_id,
+                matterId: taskRecord.matter_id,
+                taskNumber: taskRecord.task_number,
+                taskName: taskRecord.task_name,
+                taskDescription: taskRecord.task_desc,
+                assignee: taskRecord.assigned_user,
+                assigneeId: taskRecord.assigned_user_id,
+                stageName: taskRecord.stage_name,
+                currentStatus: taskRecord.status,
+              },
+            });
+
             console.log(`[TASK] ${taskId} Marking as deleted: ${taskRecord.task_name}`);
 
-            // Update task status to deleted
+            // Step: Delete task in Supabase
+            const deleteSupabaseStepId = await EventTracker.startStep(traceId, {
+              layerName: 'service',
+              stepName: 'delete_task_in_supabase',
+              input: {
+                taskId,
+                matterId: taskRecord.matter_id,
+                taskNumber: taskRecord.task_number,
+                taskName: taskRecord.task_name,
+                taskDescription: taskRecord.task_desc,
+                assignee: taskRecord.assigned_user,
+                operation: 'soft_delete_task',
+              },
+            });
+
             await SupabaseService.updateTask(taskId, {
               status: 'deleted',
               last_updated: new Date().toISOString(),
             });
 
+            await EventTracker.endStep(deleteSupabaseStepId, {
+              status: 'success',
+              output: {
+                success: true,
+                taskId,
+                matterId: taskRecord.matter_id,
+                taskNumber: taskRecord.task_number,
+                taskName: taskRecord.task_name,
+                previousStatus: taskRecord.status,
+                newStatus: 'deleted',
+                deletedAt: new Date().toISOString(),
+              },
+            });
+
             await SupabaseService.updateWebhookProcessed(idempotencyKey, {
               processing_duration_ms: Date.now() - startTime,
               success: true,
-              action: 'task_deleted',
+              action: 'deleted_in_supabase',
             });
 
             console.log(`[TASK] ${taskId} COMPLETED (marked as deleted)\n`);
-            return { success: true, action: 'task_deleted' };
+            return {
+              success: true,
+              action: 'deleted_in_supabase',
+              taskId,
+              matterId: taskRecord.matter_id,
+              taskName: taskRecord.task_name,
+            };
           } else {
+            await EventTracker.endStep(searchSupabaseStepId, {
+              status: 'skipped',
+              output: {
+                found: false,
+                reason: 'task_not_in_database',
+              },
+            });
+
             console.log(`[TASK] ${taskId} Not found in Supabase either - skipping`);
 
             await SupabaseService.updateWebhookProcessed(idempotencyKey, {

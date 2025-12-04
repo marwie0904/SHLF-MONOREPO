@@ -107,13 +107,13 @@ export class TaskDeletedAutomation {
     const startTime = Date.now();
 
     try {
-      // Step 2: Check if task exists in Supabase
+      // Step 2: Search for task in Supabase
       const checkStepId = await EventTracker.startStep(traceId, {
         layerName: 'service',
-        stepName: 'check_task_exists',
+        stepName: 'search_task_in_supabase',
         input: {
           taskId,
-          operation: 'lookup_task_in_supabase',
+          operation: 'search_task_record',
         },
       });
 
@@ -140,14 +140,18 @@ export class TaskDeletedAutomation {
         return { success: true, action: 'task_not_found' };
       }
 
-      // Task found
+      // Task found - include full metadata
       await EventTracker.endStep(checkStepId, {
         status: 'success',
         output: {
           found: true,
           taskId: existingTask.task_id,
-          taskName: existingTask.task_name,
           matterId: existingTask.matter_id,
+          taskNumber: existingTask.task_number,
+          taskName: existingTask.task_name,
+          taskDescription: existingTask.task_desc,
+          assignee: existingTask.assigned_user,
+          assigneeId: existingTask.assigned_user_id,
           stageName: existingTask.stage_name,
           currentStatus: existingTask.status,
         },
@@ -166,14 +170,17 @@ export class TaskDeletedAutomation {
         return { success: true, action: 'skipped_test_mode' };
       }
 
-      // Step 3: Delete from Supabase (soft delete)
+      // Step 3: Delete task in Supabase (soft delete)
       const deleteStepId = await EventTracker.startStep(traceId, {
         layerName: 'service',
-        stepName: 'delete_from_supabase',
+        stepName: 'delete_task_in_supabase',
         input: {
           taskId,
-          taskName: existingTask.task_name,
           matterId: existingTask.matter_id,
+          taskNumber: existingTask.task_number,
+          taskName: existingTask.task_name,
+          taskDescription: existingTask.task_desc,
+          assignee: existingTask.assigned_user,
           stageName: existingTask.stage_name,
           previousStatus: existingTask.status,
           operation: 'soft_delete_task',
@@ -195,8 +202,9 @@ export class TaskDeletedAutomation {
         output: {
           success: true,
           taskId,
-          taskName: existingTask.task_name,
           matterId: existingTask.matter_id,
+          taskNumber: existingTask.task_number,
+          taskName: existingTask.task_name,
           previousStatus: existingTask.status,
           newStatus: 'deleted',
           deletedAt: deletedTimestamp,
