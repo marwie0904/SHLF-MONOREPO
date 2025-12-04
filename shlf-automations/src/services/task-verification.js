@@ -43,11 +43,19 @@ export class TaskVerificationService {
 
     const startTime = Date.now();
 
-    // Start verify_tasks step
+    // Start verify_tasks step with input
     const verifyStepId = await EventTracker.startStep(traceId, {
       layerName: 'automation',
       stepName: 'verify_tasks',
-      metadata: { matterId, context, expectedCount },
+      input: {
+        matterId,
+        stageId,
+        stageName,
+        expectedCount,
+        context,
+        calendarEntryId,
+        waitDuration: '30 seconds',
+      },
     });
     const verifyCtx = EventTracker.createContext(traceId, verifyStepId);
 
@@ -96,12 +104,17 @@ export class TaskVerificationService {
     const allTaskNumbers = relevantTasks.map(t => t.task_number);
     const hasAllTasks = expectedTaskNumbers.every(num => allTaskNumbers.includes(num));
 
-    // Build individual task details for logging
+    // Build individual task details for logging (full details)
     const individualTasks = relevantTasks.map(t => ({
       taskId: t.task_id,
       taskNumber: t.task_number,
       taskName: t.task_name,
+      taskDescription: t.task_desc,
+      assigneeId: t.assigned_user_id,
+      assigneeName: t.assigned_user,
+      dueDate: t.due_date,
       status: t.status || (t.completed ? 'completed' : 'pending'),
+      createdAt: t.task_date_generated,
     }));
 
     if (hasAllTasks) {
@@ -125,11 +138,14 @@ export class TaskVerificationService {
 
       await EventTracker.endStep(verifyStepId, {
         status: 'success',
-        metadata: {
+        output: {
+          success: true,
           expectedCount: expectedTaskNumbers.length,
           foundCount: relevantTasks.length,
           missingCount: 0,
           regeneratedCount: 0,
+          allTasksVerified: true,
+          tasks: individualTasks,
         },
       });
 
@@ -137,7 +153,8 @@ export class TaskVerificationService {
         success: true,
         tasksVerified: relevantTasks.length,
         tasksRegenerated: 0,
-        missingTaskNumbers: []
+        missingTaskNumbers: [],
+        tasks: individualTasks,
       };
     }
 
@@ -175,12 +192,17 @@ export class TaskVerificationService {
 
     await EventTracker.endStep(verifyStepId, {
       status: regenerated.failed > 0 ? 'error' : 'success',
-      metadata: {
+      output: {
+        success: regenerated.failed === 0,
         expectedCount: expectedTaskNumbers.length,
         foundCount: relevantTasks.length,
         missingCount: missingTaskNumbers.length,
         regeneratedCount: regenerated.success,
         failedCount: regenerated.failed,
+        allTasksVerified: regenerated.failed === 0,
+        tasks: individualTasks,
+        missingTaskNumbers,
+        failures: regenerated.failures,
       },
     });
 
@@ -190,7 +212,8 @@ export class TaskVerificationService {
       tasksRegenerated: regenerated.success,
       tasksFailed: regenerated.failed,
       missingTaskNumbers,
-      failures: regenerated.failures
+      failures: regenerated.failures,
+      tasks: individualTasks,
     };
   }
 

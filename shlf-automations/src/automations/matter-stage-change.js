@@ -647,6 +647,7 @@ export class MatterStageChangeAutomation {
           failures: result.failures,
           action: result.tasksFailed > 0 ? 'partial_failure' :
                   (result.tasksUpdated > 0 ? 'updated_tasks' : 'created_tasks'),
+          tasks: result.tasks || [], // Full task details array
         },
       });
 
@@ -752,6 +753,7 @@ export class MatterStageChangeAutomation {
     let tasksCreated = 0;
     let tasksFailed = 0;
     const failures = [];
+    const createdTasks = []; // Track all created tasks with full details
 
     for (const template of taskTemplates) {
       try {
@@ -969,6 +971,16 @@ export class MatterStageChangeAutomation {
 
           // Task successfully created and recorded
           tasksCreated++;
+          createdTasks.push({
+            taskNumber: template.task_number,
+            taskTitle: template.task_title,
+            taskDescription: template['task-description'] || template.task_description || template.task_desc,
+            assignee: assignee?.name || 'Unassigned',
+            assigneeId: assignee?.id || null,
+            dueDate: dueDateFormatted || null,
+            status: 'created',
+            clioTaskId: clioTask.id,
+          });
         } catch (supabaseError) {
           console.error(`[MATTER] ${matterId} Supabase sync failed: ${supabaseError.message}`);
 
@@ -987,6 +999,17 @@ export class MatterStageChangeAutomation {
 
           // Count as success (task exists in Clio)
           tasksCreated++;
+          createdTasks.push({
+            taskNumber: template.task_number,
+            taskTitle: template.task_title,
+            taskDescription: template['task-description'] || template.task_description || template.task_desc,
+            assignee: assignee?.name || 'Unassigned',
+            assigneeId: assignee?.id || null,
+            dueDate: dueDateFormatted || null,
+            status: 'created', // Still created in Clio
+            clioTaskId: clioTask.id,
+            syncError: supabaseError.message,
+          });
         }
 
       } catch (error) {
@@ -998,10 +1021,21 @@ export class MatterStageChangeAutomation {
           error: error.message,
           error_code: 'UNKNOWN_ERROR',
         });
+        // Track failed tasks too
+        createdTasks.push({
+          taskNumber: template.task_number,
+          taskTitle: template.task_title,
+          taskDescription: template['task-description'] || template.task_description || template.task_desc,
+          assignee: null,
+          assigneeId: null,
+          dueDate: null,
+          status: 'failed',
+          error: error.message,
+        });
       }
     }
 
-    return { tasksCreated, tasksFailed, failures };
+    return { tasksCreated, tasksFailed, failures, tasks: createdTasks };
   }
 
   /**
@@ -1015,6 +1049,7 @@ export class MatterStageChangeAutomation {
     let tasksUpdated = 0;
     let tasksFailed = 0;
     const failures = [];
+    const tasks = []; // Track all processed tasks with full details
 
     for (const template of taskTemplates) {
       try {
@@ -1133,6 +1168,16 @@ export class MatterStageChangeAutomation {
             });
 
             tasksUpdated++;
+            tasks.push({
+              taskNumber: template.task_number,
+              taskTitle: template.task_title,
+              taskDescription: template['task-description'] || template.task_description || template.task_desc,
+              assignee: assignee?.name || 'Unassigned',
+              assigneeId: assignee?.id || null,
+              dueDate: dueDateFormatted || null,
+              status: 'updated',
+              clioTaskId: existingTask.task_id,
+            });
           } catch (updateError) {
             // If task was deleted in Clio (404), create a new one
             if (updateError.response?.status === 404 || updateError.message?.includes('404')) {
@@ -1178,6 +1223,16 @@ export class MatterStageChangeAutomation {
               });
 
               tasksCreated++;
+              tasks.push({
+                taskNumber: template.task_number,
+                taskTitle: template.task_title,
+                taskDescription: template['task-description'] || template.task_description || template.task_desc,
+                assignee: assignee?.name || 'Unassigned',
+                assigneeId: assignee?.id || null,
+                dueDate: dueDateFormatted || null,
+                status: 'created',
+                clioTaskId: clioTask.id,
+              });
             } else {
               // Other error - rethrow
               throw updateError;
@@ -1219,6 +1274,16 @@ export class MatterStageChangeAutomation {
           });
 
           tasksCreated++;
+          tasks.push({
+            taskNumber: template.task_number,
+            taskTitle: template.task_title,
+            taskDescription: template['task-description'] || template.task_description || template.task_desc,
+            assignee: assignee?.name || 'Unassigned',
+            assigneeId: assignee?.id || null,
+            dueDate: dueDateFormatted || null,
+            status: 'created',
+            clioTaskId: clioTask.id,
+          });
         }
 
       } catch (error) {
@@ -1230,10 +1295,21 @@ export class MatterStageChangeAutomation {
           error: error.message,
           error_code: 'UNKNOWN_ERROR',
         });
+        // Track failed tasks too
+        tasks.push({
+          taskNumber: template.task_number,
+          taskTitle: template.task_title,
+          taskDescription: template['task-description'] || template.task_description || template.task_desc,
+          assignee: null,
+          assigneeId: null,
+          dueDate: null,
+          status: 'failed',
+          error: error.message,
+        });
       }
     }
 
-    return { tasksCreated, tasksUpdated, tasksFailed, failures };
+    return { tasksCreated, tasksUpdated, tasksFailed, failures, tasks };
   }
 
   /**
