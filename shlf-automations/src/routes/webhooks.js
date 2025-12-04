@@ -138,7 +138,7 @@ const determineTriggerName = (webhookData, endpoint) => {
   // Default triggers by endpoint
   const triggerMap = {
     '/matters': 'matter-stage-change',
-    '/tasks': 'task-completion',
+    '/tasks': 'task-completed',
     '/calendar': 'meeting-scheduled',
     '/documents': 'document-created',
   };

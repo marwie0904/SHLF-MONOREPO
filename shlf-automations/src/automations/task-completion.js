@@ -138,6 +138,10 @@ export class TaskCompletionAutomation {
         // If we get a 404, the task was deleted in Clio
         if (fetchError.response?.status === 404 || fetchError.message?.includes('404')) {
           console.log(`[TASK] ${taskId} Not found in Clio (404) - task was deleted`);
+
+          // Update trigger name to task-deleted since this is actually a deletion
+          await EventTracker.updateTriggerName(traceId, 'task-deleted');
+
           await EventTracker.endStep(fetchTaskStepId, {
             status: 'skipped',
             output: {

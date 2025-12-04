@@ -208,13 +208,13 @@ export const matterStageChangeWorkflow = {
 };
 
 // ============================================================================
-// TASK COMPLETION WORKFLOW
+// TASK COMPLETED WORKFLOW
 // ============================================================================
-export const taskCompletionWorkflow = {
-  id: 'task-completion',
-  name: 'Task Completion',
+export const taskCompletedWorkflow = {
+  id: 'task-completed',
+  name: 'Task Completed',
   trigger: '/webhooks/tasks',
-  triggerName: 'task-completion',
+  triggerName: 'task-completed',
   root: {
     id: 'webhook',
     name: 'Webhook Received',
@@ -817,7 +817,7 @@ export const documentCreatedWorkflow = {
 export const workflowRegistry = {
   'matter-stage-change': matterStageChangeWorkflow,
   'matter-closed': matterClosedWorkflow,
-  'task-completion': taskCompletionWorkflow,
+  'task-completed': taskCompletedWorkflow,
   'task-deleted': taskDeletedWorkflow,
   'meeting-scheduled': meetingScheduledWorkflow,
   'calendar-entry-deleted': calendarEntryDeletedWorkflow,

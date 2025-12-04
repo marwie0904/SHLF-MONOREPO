@@ -329,3 +329,29 @@ export const updateStepMetadata = mutation({
     return step._id;
   },
 });
+
+/**
+ * Update trace trigger name
+ * Used when the actual trigger type is discovered during processing
+ * (e.g., task-completion becomes task-deleted when Clio returns 404)
+ */
+export const updateTraceTriggerName = mutation({
+  args: {
+    traceId: v.string(),
+    triggerName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const trace = await ctx.db
+      .query("clio_traces")
+      .withIndex("by_traceId", (q) => q.eq("traceId", args.traceId))
+      .first();
+
+    if (!trace) return null;
+
+    await ctx.db.patch(trace._id, {
+      triggerName: args.triggerName,
+    });
+
+    return trace._id;
+  },
+});

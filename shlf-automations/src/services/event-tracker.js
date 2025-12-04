@@ -282,6 +282,25 @@ export const EventTracker = {
   },
 
   /**
+   * Update the trigger name for a trace
+   * Used when the actual trigger type is discovered during processing
+   * (e.g., task-completion becomes task-deleted when Clio returns 404)
+   *
+   * @param {string} traceId
+   * @param {string} triggerName - New trigger name
+   */
+  async updateTriggerName(traceId, triggerName) {
+    if (!traceId) return;
+
+    await safeAsync(async () => {
+      await convex.mutation(convexApi.clio.tracking.updateTraceTriggerName, {
+        traceId,
+        triggerName,
+      });
+    }, `updateTriggerName(${traceId}, ${triggerName})`);
+  },
+
+  /**
    * Start a new step (Level 2)
    * Call at the beginning of each major operation
    *
