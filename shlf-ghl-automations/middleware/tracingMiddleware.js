@@ -49,6 +49,7 @@ function tracingMiddleware(req, res, next) {
   const triggerType = req.path.startsWith('/cron') ? 'cron' : 'webhook';
 
   // Start trace asynchronously
+  console.log(`[TRACING] Starting trace for ${req.method} ${req.path}`);
   startTrace({
     endpoint: req.path,
     httpMethod: req.method,
@@ -59,6 +60,7 @@ function tracingMiddleware(req, res, next) {
     triggerType,
   })
     .then(({ traceId, context }) => {
+      console.log(`[TRACING] Trace started: ${traceId}`);
       // Attach trace info to request for use in handlers
       req.traceId = traceId;
       req.traceContext = context;
@@ -101,6 +103,7 @@ function tracingMiddleware(req, res, next) {
 
       // Complete or fail trace when response finishes
       res.on('finish', () => {
+        console.log(`[TRACING] Response finished for ${traceId} with status ${res.statusCode}`);
         // Determine if the request succeeded or failed based on status code
         if (res.statusCode >= 400) {
           // Create error object from response
@@ -110,12 +113,14 @@ function tracingMiddleware(req, res, next) {
             raw: responseBody,
           };
 
+          console.log(`[TRACING] Failing trace ${traceId}`);
           failTrace(traceId, error, res.statusCode, responseBody).catch((err) => {
-            console.error('Error failing trace:', err.message);
+            console.error('[TRACING] Error failing trace:', err.message);
           });
         } else {
+          console.log(`[TRACING] Completing trace ${traceId}`);
           completeTrace(traceId, res.statusCode, responseBody).catch((err) => {
-            console.error('Error completing trace:', err.message);
+            console.error('[TRACING] Error completing trace:', err.message);
           });
         }
       });

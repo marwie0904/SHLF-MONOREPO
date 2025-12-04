@@ -237,6 +237,7 @@ async function startTrace(options) {
   }
 
   try {
+    console.log(`[TRACE] Creating trace ${traceId} for ${endpoint}`);
     await client.mutation(api.ghl.traces.createTrace, {
       traceId,
       triggerType,
@@ -249,13 +250,14 @@ async function startTrace(options) {
       ...contextIds,
       environment: process.env.NODE_ENV || 'development',
     });
+    console.log(`[TRACE] Trace ${traceId} created successfully`);
 
     const context = new TraceContext(traceId);
     activeContexts.set(traceId, context);
 
     return { traceId, context };
   } catch (err) {
-    console.error('Failed to start trace:', err.message);
+    console.error('[TRACE] Failed to start trace:', err.message, err.stack);
     // Return a no-op context to prevent breaking the request
     const context = new TraceContext(traceId);
     activeContexts.set(traceId, context);
