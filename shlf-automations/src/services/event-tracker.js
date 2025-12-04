@@ -229,6 +229,7 @@ export const EventTracker = {
    * @param {number} [params.matterId] - Clio matter ID
    * @param {string} [params.webhookId] - Original webhook ID
    * @param {string} [params.jobName] - For scheduled jobs
+   * @param {Object} [params.input] - Input data that triggered the trace
    * @param {Object} [params.metadata] - Additional context
    * @returns {Promise<string>} traceId
    */
@@ -244,6 +245,7 @@ export const EventTracker = {
         matterId: params.matterId ? Number(params.matterId) : undefined,
         webhookId: params.webhookId,
         jobName: params.jobName,
+        input: sanitize(params.input),
         metadata: sanitize(params.metadata),
       });
     }, `startTrace(${params.triggerName})`);
@@ -260,6 +262,7 @@ export const EventTracker = {
    * @param {string} params.status - "success", "error", or "skipped"
    * @param {string} [params.errorMessage]
    * @param {string} [params.resultAction] - e.g., "tasks_created"
+   * @param {Object} [params.output] - Output/result data from the trace
    * @param {Object} [params.metadata]
    */
   async endTrace(traceId, params) {
@@ -272,6 +275,7 @@ export const EventTracker = {
         status: params.status,
         errorMessage: params.errorMessage,
         resultAction: params.resultAction,
+        output: sanitize(params.output),
         metadata: sanitize(params.metadata),
       });
     }, `endTrace(${traceId})`);
@@ -285,6 +289,7 @@ export const EventTracker = {
    * @param {Object} params
    * @param {string} params.layerName - "webhook", "processing", "automation", "service"
    * @param {string} params.stepName - e.g., "fetch_matter", "generate_tasks"
+   * @param {Object} [params.input] - Input data for this step
    * @param {Object} [params.metadata]
    * @returns {Promise<string>} stepId
    */
@@ -299,6 +304,7 @@ export const EventTracker = {
         traceId,
         layerName: params.layerName,
         stepName: params.stepName,
+        input: sanitize(params.input),
         metadata: sanitize(params.metadata),
       });
     }, `startStep(${params.stepName})`);
@@ -314,6 +320,7 @@ export const EventTracker = {
    * @param {Object} params
    * @param {string} params.status - "success", "error", or "skipped"
    * @param {string} [params.errorMessage]
+   * @param {Object} [params.output] - Output/result data from this step
    * @param {Object} [params.metadata]
    */
   async endStep(stepId, params) {
@@ -324,6 +331,7 @@ export const EventTracker = {
         stepId,
         status: params.status,
         errorMessage: params.errorMessage,
+        output: sanitize(params.output),
         metadata: sanitize(params.metadata),
       });
     }, `endStep(${stepId})`);

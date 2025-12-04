@@ -25,6 +25,7 @@ export const createTrace = mutation({
     matterId: v.optional(v.number()),
     webhookId: v.optional(v.string()),
     jobName: v.optional(v.string()),
+    input: v.optional(v.any()),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
@@ -38,6 +39,7 @@ export const createTrace = mutation({
       jobName: args.jobName,
       dateStarted: Date.now(),
       status: "in_progress",
+      input: args.input,
       metadata: args.metadata,
     });
   },
@@ -57,6 +59,7 @@ export const endTrace = mutation({
     ),
     errorMessage: v.optional(v.string()),
     resultAction: v.optional(v.string()),
+    output: v.optional(v.any()),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
@@ -79,6 +82,7 @@ export const endTrace = mutation({
       durationMs,
       errorMessage: args.errorMessage,
       resultAction: args.resultAction,
+      output: args.output,
       metadata: args.metadata
         ? { ...trace.metadata, ...args.metadata }
         : trace.metadata,
@@ -103,6 +107,7 @@ export const createStep = mutation({
     layerName: v.string(),
     stepName: v.string(),
     stepOrder: v.optional(v.number()),
+    input: v.optional(v.any()),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
@@ -114,6 +119,7 @@ export const createStep = mutation({
       stepOrder: args.stepOrder,
       dateStarted: Date.now(),
       status: "in_progress",
+      input: args.input,
       metadata: args.metadata,
     });
   },
@@ -132,6 +138,7 @@ export const endStep = mutation({
       v.literal("skipped")
     ),
     errorMessage: v.optional(v.string()),
+    output: v.optional(v.any()),
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
@@ -153,6 +160,7 @@ export const endStep = mutation({
       dateFinished,
       durationMs,
       errorMessage: args.errorMessage,
+      output: args.output,
       metadata: args.metadata
         ? { ...step.metadata, ...args.metadata }
         : step.metadata,

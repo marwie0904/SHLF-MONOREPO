@@ -45,7 +45,15 @@ export class MatterStageChangeAutomation {
     const webhookStepId = await EventTracker.startStep(traceId, {
       layerName: 'webhook',
       stepName: 'webhook_received',
-      metadata: { matterId },
+      input: {
+        webhookId: webhookData.id,
+        eventType: webhookData.type,
+        matterId,
+        stageId: webhookStageId,
+        stageName: webhookStageName,
+        timestamp,
+        rawPayload: webhookData,
+      },
     });
     const webhookCtx = EventTracker.createContext(traceId, webhookStepId);
 
@@ -60,13 +68,25 @@ export class MatterStageChangeAutomation {
       rawPayload: webhookData,
     });
 
-    await EventTracker.endStep(webhookStepId, { status: 'success' });
+    await EventTracker.endStep(webhookStepId, {
+      status: 'success',
+      output: {
+        matterId,
+        stageId: webhookStageId,
+        stageName: webhookStageName,
+        webhookParsed: true,
+      },
+    });
 
     // Step: Validation - validate webhook payload
     const validationStepId = await EventTracker.startStep(traceId, {
       layerName: 'automation',
       stepName: 'validation',
-      metadata: { matterId },
+      input: {
+        matterId,
+        timestamp,
+        webhookId: webhookData.id,
+      },
     });
 
     const validationCtx = EventTracker.createContext(traceId, validationStepId);
@@ -91,28 +111,36 @@ export class MatterStageChangeAutomation {
       await EventTracker.endStep(validationStepId, {
         status: 'error',
         errorMessage: error,
+        output: { valid: false, reason: 'missing_timestamp' },
       });
 
       throw new Error(error);
     }
 
     validationCtx.logValidation('validate_timestamp', { matterId, timestamp }, { valid: true }, 'success');
-    await EventTracker.endStep(validationStepId, { status: 'success' });
-
-    // Step: Idempotency check
-    const idempotencyStepId = await EventTracker.startStep(traceId, {
-      layerName: 'processing',
-      stepName: 'idempotency_check',
-      metadata: { matterId },
+    await EventTracker.endStep(validationStepId, {
+      status: 'success',
+      output: { valid: true, timestampValid: true },
     });
 
-    const idempotencyCtx = EventTracker.createContext(traceId, idempotencyStepId);
-
+    // Step: Idempotency check
     const idempotencyKey = SupabaseService.generateIdempotencyKey(
       'matter.updated',
       matterId,
       timestamp
     );
+
+    const idempotencyStepId = await EventTracker.startStep(traceId, {
+      layerName: 'processing',
+      stepName: 'idempotency_check',
+      input: {
+        matterId,
+        timestamp,
+        idempotencyKey,
+      },
+    });
+
+    const idempotencyCtx = EventTracker.createContext(traceId, idempotencyStepId);
 
     const existing = await SupabaseService.checkWebhookProcessed(idempotencyKey, idempotencyCtx);
     if (existing) {
@@ -121,7 +149,11 @@ export class MatterStageChangeAutomation {
         console.log(`[MATTER] ${matterId} Still processing (concurrent request)`);
         await EventTracker.endStep(idempotencyStepId, {
           status: 'skipped',
-          metadata: { reason: 'still_processing' },
+          output: {
+            isDuplicate: true,
+            reason: 'still_processing',
+            existingRecord: existing,
+          },
         });
         return {
           success: null,
@@ -133,7 +165,11 @@ export class MatterStageChangeAutomation {
       console.log(`[MATTER] ${matterId} Already processed (idempotency) at ${existing.processed_at}`);
       await EventTracker.endStep(idempotencyStepId, {
         status: 'skipped',
-        metadata: { reason: 'already_processed', cached: true },
+        output: {
+          isDuplicate: true,
+          reason: 'already_processed',
+          existingRecord: existing,
+        },
       });
       return {
         success: existing.success,
@@ -143,14 +179,24 @@ export class MatterStageChangeAutomation {
       };
     }
 
-    await EventTracker.endStep(idempotencyStepId, { status: 'success' });
+    await EventTracker.endStep(idempotencyStepId, {
+      status: 'success',
+      output: {
+        isDuplicate: false,
+        isNewRequest: true,
+      },
+    });
 
     // Step: Test mode filter - only process specific matter ID when test mode is enabled
     if (config.testing.testMode) {
       const testModeStepId = await EventTracker.startStep(traceId, {
         layerName: 'processing',
         stepName: 'test_mode_filter',
-        metadata: { matterId },
+        input: {
+          testModeEnabled: true,
+          matterId,
+          testMatterId: config.testing.testMatterId,
+        },
       });
       const testModeCtx = EventTracker.createContext(traceId, testModeStepId);
 
@@ -162,7 +208,12 @@ export class MatterStageChangeAutomation {
 
         await EventTracker.endStep(testModeStepId, {
           status: 'skipped',
-          metadata: { reason: 'not_in_allowlist', testMatterId: config.testing.testMatterId },
+          output: {
+            allowed: false,
+            reason: 'not_in_allowlist',
+            matterId,
+            testMatterId: config.testing.testMatterId,
+          },
         });
 
         // Record as processed (skipped)
@@ -180,7 +231,13 @@ export class MatterStageChangeAutomation {
         return { success: true, action: 'skipped_test_mode' };
       }
 
-      await EventTracker.endStep(testModeStepId, { status: 'success' });
+      await EventTracker.endStep(testModeStepId, {
+        status: 'success',
+        output: {
+          allowed: true,
+          reason: 'in_allowlist',
+        },
+      });
     }
 
     // Step 0.5: Reserve webhook immediately (prevents duplicate processing)
@@ -206,7 +263,7 @@ export class MatterStageChangeAutomation {
       const fetchMatterStepId = await EventTracker.startStep(traceId, {
         layerName: 'automation',
         stepName: 'fetch_matter',
-        metadata: { matterId },
+        input: { matterId },
       });
       const fetchMatterCtx = EventTracker.createContext(traceId, fetchMatterStepId);
 
@@ -214,11 +271,18 @@ export class MatterStageChangeAutomation {
 
       await EventTracker.endStep(fetchMatterStepId, {
         status: 'success',
-        metadata: {
-          status: matterDetails.status,
+        output: {
+          matterId,
+          matterStatus: matterDetails.status,
           stageId: matterDetails.matter_stage?.id,
           stageName: matterDetails.matter_stage?.name,
-          practiceArea: matterDetails.practice_area?.name,
+          practiceAreaId: matterDetails.practice_area?.id,
+          practiceAreaName: matterDetails.practice_area?.name,
+          responsibleAttorneyId: matterDetails.responsible_attorney?.id,
+          responsibleAttorneyName: matterDetails.responsible_attorney?.name,
+          originatingAttorneyId: matterDetails.originating_attorney?.id,
+          originatingAttorneyName: matterDetails.originating_attorney?.name,
+          displayNumber: matterDetails.display_number,
         },
       });
 
@@ -243,13 +307,13 @@ export class MatterStageChangeAutomation {
       const stageChangeStepId = await EventTracker.startStep(traceId, {
         layerName: 'automation',
         stepName: 'detect_stage_change',
-        metadata: {
+        input: {
           matterId,
-          hasPreviousRecord,
           previousStageId: previousStage.id,
           previousStageName: hasPreviousRecord ? previousStage.name : '(No previous record)',
           newStageId: currentStage.id,
           newStageName: currentStage.name,
+          hasPreviousRecord,
         },
       });
       const stageChangeCtx = EventTracker.createContext(traceId, stageChangeStepId);
@@ -262,13 +326,14 @@ export class MatterStageChangeAutomation {
 
       await EventTracker.endStep(stageChangeStepId, {
         status: currentStage.id ? 'success' : 'skipped',
-        metadata: {
+        output: {
           stageChanged,
           hasPreviousRecord,
           previousStageId: previousStage.id,
           previousStageName: hasPreviousRecord ? previousStage.name : '(No previous record)',
           newStageId: currentStage.id,
           newStageName: currentStage.name,
+          action: !hasPreviousRecord ? 'first_stage_record' : (stageChanged ? 'stage_changed' : 'same_stage'),
         },
       });
 
@@ -521,7 +586,18 @@ export class MatterStageChangeAutomation {
       const generateTasksStepId = await EventTracker.startStep(traceId, {
         layerName: 'automation',
         stepName: 'generate_tasks',
-        metadata: { matterId, templateCount: taskTemplates.length },
+        input: {
+          matterId,
+          stageId: currentStageId,
+          stageName: currentStageName,
+          templateCount: taskTemplates.length,
+          existingTaskCount: existingTasks.length,
+          templates: taskTemplates.map(t => ({
+            taskNumber: t.task_number,
+            taskTitle: t.task_title,
+            assignee: t.assignee,
+          })),
+        },
       });
       const generateTasksCtx = EventTracker.createContext(traceId, generateTasksStepId);
 
@@ -564,10 +640,13 @@ export class MatterStageChangeAutomation {
 
       await EventTracker.endStep(generateTasksStepId, {
         status: result.tasksFailed > 0 ? 'error' : 'success',
-        metadata: {
+        output: {
           tasksCreated: result.tasksCreated,
           tasksUpdated: result.tasksUpdated,
           tasksFailed: result.tasksFailed,
+          failures: result.failures,
+          action: result.tasksFailed > 0 ? 'partial_failure' :
+                  (result.tasksUpdated > 0 ? 'updated_tasks' : 'created_tasks'),
         },
       });
 

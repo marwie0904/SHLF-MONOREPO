@@ -156,13 +156,21 @@ const withRetry = (handler, endpoint, maxAttempts = 3) => {
     const matterId = extractMatterId(webhookData);
     const triggerName = determineTriggerName(webhookData, endpoint);
 
-    // Start trace for this webhook
+    // Start trace for this webhook with full input payload
     const traceId = await EventTracker.startTrace({
       source: 'webhook',
       triggerName,
       endpoint: `/webhooks${endpoint}`,
       matterId,
       webhookId: webhookData.id,
+      input: {
+        webhookId: webhookData.id,
+        webhookType: webhookData.type,
+        resourceId: webhookData.data?.id,
+        matterId,
+        endpoint: `/webhooks${endpoint}`,
+        payload: webhookData,
+      },
       metadata: {
         webhookType: webhookData.type,
         resourceId: webhookData.data?.id,
@@ -174,7 +182,14 @@ const withRetry = (handler, endpoint, maxAttempts = 3) => {
       layerName: 'webhook',
       stepName: 'webhook_received',
       stepOrder: 0,
-      metadata: { endpoint, matterId },
+      input: {
+        webhookId: webhookData.id,
+        eventType: webhookData.type,
+        resourceId: webhookData.data?.id,
+        matterId,
+        endpoint: `/webhooks${endpoint}`,
+        rawPayload: webhookData,
+      },
     });
 
     const webhookCtx = EventTracker.createContext(traceId, webhookStepId);
@@ -187,7 +202,14 @@ const withRetry = (handler, endpoint, maxAttempts = 3) => {
       rawPayload: webhookData,
     });
 
-    await EventTracker.endStep(webhookStepId, { status: 'success' });
+    await EventTracker.endStep(webhookStepId, {
+      status: 'success',
+      output: {
+        webhookParsed: true,
+        matterId,
+        resourceId: webhookData.data?.id,
+      },
+    });
 
     // Enqueue the webhook processing for this matter
     // This ensures sequential processing per matter to avoid race conditions
@@ -211,10 +233,11 @@ const withRetry = (handler, endpoint, maxAttempts = 3) => {
         }
       }, traceId);
 
-      // End trace with success
+      // End trace with success and output
       await EventTracker.endTrace(traceId, {
         status: 'success',
         resultAction: result?.action || 'processed',
+        output: result,
         metadata: { result },
       });
 
@@ -223,10 +246,16 @@ const withRetry = (handler, endpoint, maxAttempts = 3) => {
         data: result,
       });
     } catch (error) {
-      // End trace with error - include structured error info
+      // End trace with error - include structured error info and output
       await EventTracker.endTrace(traceId, {
         status: 'error',
         errorMessage: error.message,
+        output: {
+          success: false,
+          error: error.message,
+          errorCode: error.code || error.response?.data?.error,
+          httpStatus: error.response?.status,
+        },
         metadata: {
           errorCode: error.code || error.response?.data?.error,
           httpStatus: error.response?.status,

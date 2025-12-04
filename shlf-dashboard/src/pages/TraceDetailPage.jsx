@@ -812,6 +812,16 @@ function WorkflowDetailPanel({ selectedItem, trace, steps, system, onClose, effe
               </div>
             </div>
           </div>
+
+          {/* Trace Input */}
+          {trace.input && renderJsonSection(trace.input, 'Input', 'traceInput', true)}
+
+          {/* Trace Output */}
+          {trace.output && renderJsonSection(trace.output, 'Output', 'traceOutput', true)}
+
+          {/* Trace Metadata */}
+          {trace.metadata && renderJsonSection(trace.metadata, 'Metadata', 'traceMetadata')}
+
           <div className="panel-hint">
             <span className="hint-icon">👆</span>
             <span>Click a node in the workflow to see its details</span>
@@ -905,8 +915,14 @@ function WorkflowDetailPanel({ selectedItem, trace, steps, system, onClose, effe
           </div>
         )}
 
+        {/* Step Input - show what was passed to this step */}
+        {hasStepData && stepData.input && renderJsonSection(stepData.input, 'Input', 'stepInput', true)}
+
+        {/* Step Output - show what this step produced */}
+        {hasStepData && stepData.output && renderJsonSection(stepData.output, 'Output', 'stepOutput', true)}
+
         {/* Step Metadata */}
-        {hasStepData && renderJsonSection(stepData.metadata, 'Step Metadata', 'stepMetadata')}
+        {hasStepData && stepData.metadata && renderJsonSection(stepData.metadata, 'Metadata', 'stepMetadata')}
 
         {/* Operations/Details - show each one with input/output */}
         {nodeDetails.length > 0 && (

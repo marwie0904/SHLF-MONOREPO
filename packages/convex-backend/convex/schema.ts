@@ -70,6 +70,12 @@ export default defineSchema({
     // e.g., "tasks_created", "skipped_test_mode", "skipped_already_processed"
     resultAction: v.optional(v.string()),
 
+    // Input data (what was received/triggered the trace)
+    input: v.optional(v.any()),
+
+    // Output data (what was produced/returned)
+    output: v.optional(v.any()),
+
     // Additional context data
     metadata: v.optional(v.any()),
   })
@@ -121,6 +127,12 @@ export default defineSchema({
 
     // Error message if status is "error"
     errorMessage: v.optional(v.string()),
+
+    // Input data (what was passed to this step)
+    input: v.optional(v.any()),
+
+    // Output data (what this step produced)
+    output: v.optional(v.any()),
 
     // Additional context data
     metadata: v.optional(v.any()),
