@@ -522,22 +522,43 @@ export class SupabaseService {
       if (error) {
         // PostgreSQL error code 23505 = unique_violation
         if (error.code === '23505' && error.message.includes('unique_task_per_stage')) {
-          // This is actually a success - duplicate prevented by constraint
-          console.log(`[SUPABASE] Task already exists: matter=${taskData.matter_id}, stage=${taskData.stage_id}, task#=${taskData.task_number}`);
+          // Task exists for this (matter, stage, task#) - UPDATE it with new task_id and calendar_entry_id
+          console.log(`[SUPABASE] Task already exists: matter=${taskData.matter_id}, stage=${taskData.stage_id}, task#=${taskData.task_number} - updating with new task_id and calendar_entry_id`);
 
-          // Return existing task instead of throwing
-          // Query by the unique key
-          const { data: existing, error: selectError } = await supabase
+          // Update the existing task with new task_id and calendar_entry_id
+          const updateData = {
+            task_id: taskData.task_id,
+            task_name: taskData.task_name,
+            task_desc: taskData.task_desc,
+            assigned_user_id: taskData.assigned_user_id,
+            assigned_user: taskData.assigned_user,
+            due_date: taskData.due_date,
+            status: taskData.status || 'pending',
+            task_date_generated: taskData.task_date_generated,
+            due_date_generated: taskData.due_date_generated,
+          };
+
+          // Only set calendar_entry_id if provided (don't overwrite with null)
+          if (taskData.calendar_entry_id) {
+            updateData.calendar_entry_id = taskData.calendar_entry_id;
+          }
+
+          const { data: updated, error: updateError } = await supabase
             .from('tasks')
-            .select('*')
+            .update(updateData)
             .eq('matter_id', taskData.matter_id)
             .eq('stage_id', taskData.stage_id)
             .eq('task_number', taskData.task_number)
+            .select()
             .single();
 
-          if (selectError) throw error; // Throw original error if we can't get existing
-          ctx?.logDbMutation('supabase_insertTask', { taskId: taskData.task_id }, { existed: true, id: existing?.id }, Date.now() - start, 'success');
-          return existing;
+          if (updateError) {
+            console.error(`[SUPABASE] Failed to update existing task: ${updateError.message}`);
+            throw error; // Throw original error
+          }
+
+          ctx?.logDbMutation('supabase_insertTask', { taskId: taskData.task_id }, { existed: true, updated: true, id: updated?.id }, Date.now() - start, 'success');
+          return updated;
         }
 
         throw error;
