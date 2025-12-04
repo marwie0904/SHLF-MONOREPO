@@ -37,9 +37,14 @@ export class MatterClosedAutomation {
 
     // Step: Validation
     const validationStepId = await EventTracker.startStep(traceId, {
-      layerName: 'automation',
+      layerName: 'processing',
       stepName: 'validation',
-      metadata: { matterId },
+      input: {
+        matterId,
+        timestamp,
+        webhookId: webhookData.id,
+        updatingUser: updatingUser?.name || updatingUser?.id,
+      },
     });
 
     // Validate timestamp exists (required for idempotency)
@@ -57,17 +62,28 @@ export class MatterClosedAutomation {
         }
       );
 
-      await EventTracker.endStep(validationStepId, { status: 'error', errorMessage: error });
+      await EventTracker.endStep(validationStepId, {
+        status: 'error',
+        errorMessage: error,
+        output: { valid: false, reason: 'missing_timestamp' },
+      });
       throw new Error(error);
     }
 
-    await EventTracker.endStep(validationStepId, { status: 'success' });
+    await EventTracker.endStep(validationStepId, {
+      status: 'success',
+      output: { valid: true, matterId, timestamp },
+    });
 
     // Step: Idempotency check
     const idempotencyStepId = await EventTracker.startStep(traceId, {
       layerName: 'processing',
       stepName: 'idempotency_check',
-      metadata: { matterId },
+      input: {
+        matterId,
+        timestamp,
+        eventType: 'matter.closed',
+      },
     });
     const idempotencyKey = SupabaseService.generateIdempotencyKey(
       'matter.closed',
@@ -80,7 +96,14 @@ export class MatterClosedAutomation {
       // Check if webhook is still processing
       if (existing.success === null) {
         console.log(`[MATTER-CLOSED] ${matterId} Still processing (concurrent request)`);
-        await EventTracker.endStep(idempotencyStepId, { status: 'skipped', metadata: { reason: 'still_processing' } });
+        await EventTracker.endStep(idempotencyStepId, {
+          status: 'skipped',
+          output: {
+            isDuplicate: true,
+            reason: 'still_processing',
+            processing_started_at: existing.created_at,
+          },
+        });
         return {
           success: null,
           action: 'still_processing',
@@ -89,7 +112,15 @@ export class MatterClosedAutomation {
       }
 
       console.log(`[MATTER-CLOSED] ${matterId} Already processed (idempotency) at ${existing.processed_at}`);
-      await EventTracker.endStep(idempotencyStepId, { status: 'skipped', metadata: { reason: 'already_processed' } });
+      await EventTracker.endStep(idempotencyStepId, {
+        status: 'skipped',
+        output: {
+          isDuplicate: true,
+          reason: 'already_processed',
+          processed_at: existing.processed_at,
+          cachedAction: existing.action,
+        },
+      });
       return {
         success: existing.success,
         action: existing.action,
@@ -98,7 +129,14 @@ export class MatterClosedAutomation {
       };
     }
 
-    await EventTracker.endStep(idempotencyStepId, { status: 'success' });
+    await EventTracker.endStep(idempotencyStepId, {
+      status: 'success',
+      output: {
+        isDuplicate: false,
+        isNewRequest: true,
+        idempotencyKey,
+      },
+    });
 
     // TEMPORARY: Test mode filter - only process specific matter ID
     if (config.testing.testMode && matterId !== config.testing.testMatterId) {
@@ -139,9 +177,12 @@ export class MatterClosedAutomation {
 
       // Step: Fetch matter details
       const fetchMatterStepId = await EventTracker.startStep(traceId, {
-        layerName: 'automation',
+        layerName: 'service',
         stepName: 'fetch_matter',
-        metadata: { matterId },
+        input: {
+          matterId,
+          operation: 'get_matter_details',
+        },
       });
       const fetchMatterCtx = EventTracker.createContext(traceId, fetchMatterStepId);
 
@@ -150,7 +191,15 @@ export class MatterClosedAutomation {
       // Double-check status is actually Closed
       if (matterDetails.status !== 'Closed') {
         console.log(`[MATTER-CLOSED] ${matterId} SKIPPED (status is not Closed: ${matterDetails.status})`);
-        await EventTracker.endStep(fetchMatterStepId, { status: 'skipped', metadata: { reason: 'not_closed', status: matterDetails.status } });
+        await EventTracker.endStep(fetchMatterStepId, {
+          status: 'skipped',
+          output: {
+            found: true,
+            status: matterDetails.status,
+            reason: 'not_closed',
+            matterName: matterDetails.display_number,
+          },
+        });
 
         await SupabaseService.updateWebhookProcessed(idempotencyKey, {
           processing_duration_ms: Date.now() - startTime,
@@ -161,18 +210,32 @@ export class MatterClosedAutomation {
         return { success: true, action: 'skipped_not_closed' };
       }
 
-      await EventTracker.endStep(fetchMatterStepId, { status: 'success' });
-
       const currentStageId = matterDetails.matter_stage?.id;
       const currentStageName = matterDetails.matter_stage?.name;
+
+      await EventTracker.endStep(fetchMatterStepId, {
+        status: 'success',
+        output: {
+          found: true,
+          matterId,
+          matterName: matterDetails.display_number,
+          status: matterDetails.status,
+          stageId: currentStageId,
+          stageName: currentStageName,
+          clientName: matterDetails.client?.name,
+        },
+      });
 
       console.log(`[MATTER-CLOSED] ${matterId} Checking for payments...`);
 
       // Step: Check payments
       const checkPaymentsStepId = await EventTracker.startStep(traceId, {
-        layerName: 'automation',
+        layerName: 'service',
         stepName: 'check_payments',
-        metadata: { matterId },
+        input: {
+          matterId,
+          operation: 'check_clio_bills_api',
+        },
       });
       const checkPaymentsCtx = EventTracker.createContext(traceId, checkPaymentsStepId);
 
@@ -182,7 +245,14 @@ export class MatterClosedAutomation {
       } catch (paymentError) {
         const error = `Failed to check payments for matter ${matterId}`;
         console.error(`[MATTER-CLOSED] ${error}:`, paymentError.message);
-        await EventTracker.endStep(checkPaymentsStepId, { status: 'error', errorMessage: paymentError.message });
+        await EventTracker.endStep(checkPaymentsStepId, {
+          status: 'error',
+          errorMessage: paymentError.message,
+          output: {
+            success: false,
+            error: paymentError.message,
+          },
+        });
 
         // Log the payment check error
         await SupabaseService.logError(
@@ -209,7 +279,13 @@ export class MatterClosedAutomation {
       // If payments exist, skip task creation
       if (hasPayments) {
         console.log(`[MATTER-CLOSED] ${matterId} SKIPPED (matter has payments)`);
-        await EventTracker.endStep(checkPaymentsStepId, { status: 'skipped', metadata: { reason: 'has_payments' } });
+        await EventTracker.endStep(checkPaymentsStepId, {
+          status: 'skipped',
+          output: {
+            hasPayments: true,
+            reason: 'client_made_payments',
+          },
+        });
 
         await SupabaseService.updateWebhookProcessed(idempotencyKey, {
           processing_duration_ms: Date.now() - startTime,
@@ -220,7 +296,13 @@ export class MatterClosedAutomation {
         return { success: true, action: 'skipped_has_payments' };
       }
 
-      await EventTracker.endStep(checkPaymentsStepId, { status: 'success', metadata: { hasPayments: false } });
+      await EventTracker.endStep(checkPaymentsStepId, {
+        status: 'success',
+        output: {
+          hasPayments: false,
+          reason: 'no_payments_found',
+        },
+      });
 
       console.log(`[MATTER-CLOSED] ${matterId} No payments found - creating task...`);
 
@@ -228,7 +310,14 @@ export class MatterClosedAutomation {
       const createTaskStepId = await EventTracker.startStep(traceId, {
         layerName: 'automation',
         stepName: 'create_task',
-        metadata: { matterId },
+        input: {
+          matterId,
+          matterName: matterDetails.display_number,
+          taskName: 'Client did not engage',
+          taskDescription: 'Purge Green Folder - Client did not engage',
+          assigneeRole: 'CSC',
+          stageName: currentStageName,
+        },
       });
       const createTaskCtx = EventTracker.createContext(traceId, createTaskStepId);
 
@@ -250,7 +339,16 @@ export class MatterClosedAutomation {
             'Client did not engage'
           );
 
-          await EventTracker.endStep(createTaskStepId, { status: 'error', errorMessage: assigneeError.message, metadata: { errorTaskId: errorTask.id } });
+          await EventTracker.endStep(createTaskStepId, {
+            status: 'error',
+            errorMessage: assigneeError.message,
+            output: {
+              success: false,
+              errorTaskCreated: true,
+              errorTaskId: errorTask.id,
+              error: assigneeError.message,
+            },
+          });
 
           // Update webhook as completed (error task created)
           await SupabaseService.updateWebhookProcessed(idempotencyKey, {
@@ -268,7 +366,11 @@ export class MatterClosedAutomation {
         }
 
         // Unknown error - rethrow
-        await EventTracker.endStep(createTaskStepId, { status: 'error', errorMessage: assigneeError.message });
+        await EventTracker.endStep(createTaskStepId, {
+          status: 'error',
+          errorMessage: assigneeError.message,
+          output: { success: false, error: assigneeError.message },
+        });
         throw assigneeError;
       }
 
@@ -297,7 +399,15 @@ export class MatterClosedAutomation {
       } catch (taskError) {
         const error = `Failed to create task for closed matter ${matterId}`;
         console.error(`[MATTER-CLOSED] ${error}:`, taskError.message);
-        await EventTracker.endStep(createTaskStepId, { status: 'error', errorMessage: taskError.message });
+        await EventTracker.endStep(createTaskStepId, {
+          status: 'error',
+          errorMessage: taskError.message,
+          output: {
+            success: false,
+            error: taskError.message,
+            assignee: assignee.name,
+          },
+        });
 
         // Log the task creation error
         await SupabaseService.logError(
@@ -343,7 +453,21 @@ export class MatterClosedAutomation {
       await SupabaseService.insertTask(taskRecord, createTaskCtx);
       console.log(`[MATTER-CLOSED] ${matterId} Task recorded in Supabase`);
 
-      await EventTracker.endStep(createTaskStepId, { status: 'success', metadata: { taskId: newTask.id } });
+      await EventTracker.endStep(createTaskStepId, {
+        status: 'success',
+        output: {
+          success: true,
+          taskId: newTask.id,
+          taskName: newTask.name,
+          taskDescription: newTask.description,
+          matterId,
+          assignee: assignee.name,
+          assigneeId: assignee.id,
+          dueDate: dueDateFormatted,
+          stageName: currentStageName,
+          recordedInSupabase: true,
+        },
+      });
 
       // Update webhook as successfully processed
       await SupabaseService.updateWebhookProcessed(idempotencyKey, {

@@ -564,7 +564,26 @@ export const matterClosedWorkflow = {
                           condition: 'Query Clio Bills API',
                           children: [
                             { label: 'Yes', value: true, node: { id: 'has_payments_outcome', name: 'Has Payments', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_has_payments', children: [] } },
-                            { label: 'No', value: false, node: { id: 'task_created', name: 'Task Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'task_created', children: [] } }
+                            {
+                              label: 'No',
+                              value: false,
+                              node: {
+                                id: 'create_task',
+                                name: 'Create Task',
+                                layer: 'automation',
+                                type: 'step',
+                                matchStep: 'create_task',
+                                children: [{
+                                  id: 'task_created',
+                                  name: 'Task Created',
+                                  layer: 'outcome',
+                                  type: 'outcome',
+                                  status: 'success',
+                                  matchAction: 'task_created',
+                                  children: []
+                                }]
+                              }
+                            }
                           ]
                         }]
                       }
