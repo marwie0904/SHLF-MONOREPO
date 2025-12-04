@@ -699,6 +699,7 @@ export class MatterStageChangeAutomation {
       console.log(`[MATTER] ${matterId} COMPLETED\n`);
       return {
         success: success,
+        action: action, // Include action for trace resultAction matching
         tasksCreated: result.tasksCreated,
         tasksFailed: result.tasksFailed,
         failures: result.failures,
