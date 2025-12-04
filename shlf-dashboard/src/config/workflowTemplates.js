@@ -770,11 +770,35 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
         );
       }
     } else if (node.type === 'decision') {
-      // Decisions are taken if any child branch leads to a taken node
-      taken = node.children.some(branch => {
+      // For decisions, mark children FIRST, then check if any are taken
+      // This prevents double-processing children
+    }
+
+    // For steps, check if it's current
+    if (node.type === 'step' && taken) {
+      if (node.id === lastMatchedStep) {
+        current = true;
+      }
+    }
+
+    // Mark children (do this first for all node types)
+    const markedChildren = node.children.map(child => {
+      if (child.node) {
+        return {
+          ...child,
+          node: markNode(child.node, depth + 1, taken),
+        };
+      } else if (child.id) {
+        return markNode(child, depth + 1, taken);
+      }
+      return child;
+    });
+
+    // For decisions, check if any marked child branch is taken
+    if (node.type === 'decision') {
+      taken = markedChildren.some(branch => {
         if (branch.node) {
-          const markedChild = markNode(branch.node, depth + 1, taken);
-          return markedChild.status === 'taken' || markedChild.status === 'current';
+          return branch.node.status === 'taken' || branch.node.status === 'current';
         }
         return false;
       });
@@ -788,26 +812,6 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
         }
       }
     }
-
-    // For steps, check if it's current
-    if (node.type === 'step' && taken) {
-      if (node.id === lastMatchedStep) {
-        current = true;
-      }
-    }
-
-    // Mark children
-    const markedChildren = node.children.map(child => {
-      if (child.node) {
-        return {
-          ...child,
-          node: markNode(child.node, depth + 1, taken),
-        };
-      } else if (child.id) {
-        return markNode(child, depth + 1, taken);
-      }
-      return child;
-    });
 
     return {
       ...node,

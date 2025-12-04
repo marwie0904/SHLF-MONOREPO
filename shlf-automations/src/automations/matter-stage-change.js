@@ -223,15 +223,18 @@ export class MatterStageChangeAutomation {
       });
 
       // Step: Detect stage change (before → after)
-      // The webhook contains the state BEFORE the update
-      // The API call returns the CURRENT state (after the update)
+      // Note: Clio webhook contains the NEW state (after change), not previous state
+      // We get the previous stage from our database records
       const currentStage = {
         id: matterDetails.matter_stage?.id,
         name: matterDetails.matter_stage?.name,
       };
+
+      // Get previous stage from Supabase (last recorded stage for this matter)
+      const matterHistory = await SupabaseService.getMatterHistory(matterId);
       const previousStage = {
-        id: webhookStageId,
-        name: webhookStageName,
+        id: matterHistory?.stage_id || null,
+        name: matterHistory?.stage_name || 'Unknown',
       };
 
       const stageChangeStepId = await EventTracker.startStep(traceId, {
@@ -247,15 +250,31 @@ export class MatterStageChangeAutomation {
       });
       const stageChangeCtx = EventTracker.createContext(traceId, stageChangeStepId);
 
+      // Determine if stage actually changed
+      const stageChanged = previousStage.id !== currentStage.id;
+
       // Log stage change details
-      if (currentStage.id) {
-        stageChangeCtx.logStageChange(matterId, previousStage, currentStage);
-      }
+      stageChangeCtx.logDetail({
+        operation: 'stage_change_detected',
+        operationType: 'decision',
+        input: {
+          matterId,
+          previousStageId: previousStage.id,
+          previousStageName: previousStage.name,
+          newStageId: currentStage.id,
+          newStageName: currentStage.name,
+        },
+        output: {
+          stageChanged,
+          action: stageChanged ? 'stage_changed' : 'same_stage',
+        },
+        status: 'success',
+      });
 
       await EventTracker.endStep(stageChangeStepId, {
         status: currentStage.id ? 'success' : 'skipped',
         metadata: {
-          stageChanged: currentStage.id !== previousStage.id,
+          stageChanged,
           previousStageId: previousStage.id,
           previousStageName: previousStage.name,
           newStageId: currentStage.id,
@@ -820,10 +839,18 @@ export class MatterStageChangeAutomation {
           taskData.assignee = { id: assignee.id, type: assignee.type };
         }
 
-        // Create task in Clio
+        // Create task in Clio - pass full task metadata for logging
         let clioTask;
         try {
-          clioTask = await ClioService.createTask(taskData, ctx);
+          clioTask = await ClioService.createTask(taskData, ctx, {
+            taskNumber: template.task_number,
+            assigneeName: assignee?.name,
+            assigneeType: assignee?.type,
+            assigneeSource: template.assignee_id ? 'template' : 'resolver',
+            dueDateSource: isRelationalToTask ? 'relational' : (isMeetingRelated ? 'meeting' : 'creation'),
+            stageId: stageId,
+            stageName: stageName,
+          });
         } catch (clioError) {
           console.error(`[MATTER] ${matterId} Clio API failed: ${clioError.message}`);
 
@@ -1055,7 +1082,14 @@ export class MatterStageChangeAutomation {
                 matter: { id: matterId },
                 assignee: { id: assignee.id, type: assignee.type },
                 due_at: dueDateFormatted,
-              }, ctx);
+              }, ctx, {
+                taskNumber: template.task_number,
+                assigneeName: assignee?.name,
+                assigneeType: assignee?.type,
+                dueDateSource: isRelationalToTask ? 'relational' : 'creation',
+                stageId: stageId,
+                stageName: stageName,
+              });
 
               // Insert new task in Supabase
               await SupabaseService.insertTask({
@@ -1090,7 +1124,14 @@ export class MatterStageChangeAutomation {
             matter: { id: matterId },
             assignee: { id: assignee.id, type: assignee.type },
             due_at: dueDateFormatted,
-          }, ctx);
+          }, ctx, {
+            taskNumber: template.task_number,
+            assigneeName: assignee?.name,
+            assigneeType: assignee?.type,
+            dueDateSource: isRelationalToTask ? 'relational' : 'creation',
+            stageId: stageId,
+            stageName: stageName,
+          });
 
           await SupabaseService.insertTask({
             task_id: clioTask.id,
