@@ -626,72 +626,121 @@ export const meetingScheduledWorkflow = {
         type: 'step',
         matchStep: 'idempotency_check',
         children: [{
-          id: 'has_date',
-          name: 'Has Meeting Date?',
-          layer: 'decision',
-          type: 'decision',
-          condition: 'Check start_at field',
-          children: [
-            { label: 'No', value: false, node: { id: 'no_date', name: 'Missing Meeting Date', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'missing_meeting_date', children: [] } },
-            {
-              label: 'Yes',
-              value: true,
-              node: {
-                id: 'test_mode',
-                name: 'Test Mode Filter',
-                layer: 'decision',
-                type: 'decision',
-                condition: 'Is matter in allowlist?',
-                children: [
-                  { label: 'Blocked', value: false, node: { id: 'test_blocked', name: 'Test Mode Blocked', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_test_mode', children: [] } },
-                  {
-                    label: 'Allowed',
-                    value: true,
-                    node: {
-                      id: 'has_event_type',
-                      name: 'Has Event Type?',
-                      layer: 'decision',
-                      type: 'decision',
-                      condition: 'Check calendar_entry_event_type',
-                      children: [
-                        { label: 'No', value: false, node: { id: 'no_event', name: 'No Event Type', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_no_event_type', children: [] } },
-                        {
-                          label: 'Yes',
-                          value: true,
-                          node: {
-                            id: 'is_mapped',
-                            name: 'Event Mapped?',
-                            layer: 'decision',
-                            type: 'decision',
-                            condition: 'Lookup in calendar_event mapping table',
-                            children: [
-                              { label: 'No', value: false, node: { id: 'not_mapped', name: 'Event Not Mapped', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'not_mapped', children: [] } },
-                              {
-                                label: 'Yes',
-                                value: true,
-                                node: {
-                                  id: 'existing_tasks',
-                                  name: 'Existing Tasks?',
-                                  layer: 'decision',
-                                  type: 'decision',
-                                  condition: 'Check for existing tasks',
-                                  children: [
-                                    { label: 'Calendar Tasks', value: 'calendar', node: { id: 'tasks_updated', name: 'Tasks Updated', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'tasks_updated', children: [] } },
-                                    { label: 'Stage Tasks', value: 'stage', node: { id: 'tasks_linked', name: 'Tasks Linked', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'tasks_linked_and_updated', children: [] } },
-                                    { label: 'None', value: 'none', node: { id: 'tasks_created', name: 'Tasks Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'tasks_created', children: [] } }
-                                  ]
-                                }
-                              }
-                            ]
+          id: 'fetch_calendar',
+          name: 'Fetch Calendar Entry',
+          layer: 'service',
+          type: 'step',
+          matchStep: 'fetch_calendar_entry',
+          children: [{
+            id: 'has_date',
+            name: 'Has Meeting Date?',
+            layer: 'decision',
+            type: 'decision',
+            condition: 'Check start_at field',
+            children: [
+              { label: 'No', value: false, node: { id: 'no_date', name: 'Missing Meeting Date', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'missing_meeting_date', children: [] } },
+              {
+                label: 'Yes',
+                value: true,
+                node: {
+                  id: 'test_mode',
+                  name: 'Test Mode Filter',
+                  layer: 'decision',
+                  type: 'decision',
+                  condition: 'Is matter in allowlist?',
+                  children: [
+                    { label: 'Blocked', value: false, node: { id: 'test_blocked', name: 'Test Mode Blocked', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_test_mode', children: [] } },
+                    {
+                      label: 'Allowed',
+                      value: true,
+                      node: {
+                        id: 'has_event_type',
+                        name: 'Has Event Type?',
+                        layer: 'decision',
+                        type: 'decision',
+                        condition: 'Check calendar_entry_event_type',
+                        children: [
+                          { label: 'No', value: false, node: { id: 'no_event', name: 'No Event Type', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_no_event_type', children: [] } },
+                          {
+                            label: 'Yes',
+                            value: true,
+                            node: {
+                              id: 'map_event',
+                              name: 'Map Event to Stage',
+                              layer: 'service',
+                              type: 'step',
+                              matchStep: 'map_event_to_stage',
+                              children: [{
+                                id: 'is_mapped',
+                                name: 'Event Mapped?',
+                                layer: 'decision',
+                                type: 'decision',
+                                condition: 'Lookup in calendar_event mapping table',
+                                children: [
+                                  { label: 'No', value: false, node: { id: 'not_mapped', name: 'Event Not Mapped', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'not_mapped', children: [] } },
+                                  {
+                                    label: 'Yes',
+                                    value: true,
+                                    node: {
+                                      id: 'fetch_matter',
+                                      name: 'Fetch Matter',
+                                      layer: 'service',
+                                      type: 'step',
+                                      matchStep: 'fetch_matter',
+                                      children: [{
+                                        id: 'matter_open',
+                                        name: 'Matter Open?',
+                                        layer: 'decision',
+                                        type: 'decision',
+                                        condition: 'Check if matter is not closed',
+                                        children: [
+                                          { label: 'Closed', value: false, node: { id: 'matter_closed', name: 'Matter Closed', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_closed_matter', children: [] } },
+                                          {
+                                            label: 'Open',
+                                            value: true,
+                                            node: {
+                                              id: 'check_existing',
+                                              name: 'Check Existing Tasks',
+                                              layer: 'service',
+                                              type: 'step',
+                                              matchStep: 'check_existing_tasks',
+                                              children: [{
+                                                id: 'generate_tasks',
+                                                name: 'Generate Tasks',
+                                                layer: 'automation',
+                                                type: 'step',
+                                                matchStep: 'generate_tasks',
+                                                children: [{
+                                                  id: 'existing_tasks',
+                                                  name: 'Task Action',
+                                                  layer: 'decision',
+                                                  type: 'decision',
+                                                  condition: 'Based on existing tasks',
+                                                  children: [
+                                                    { label: 'Updated', value: 'calendar', node: { id: 'tasks_updated', name: 'Tasks Updated', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'tasks_updated', children: [] } },
+                                                    { label: 'Linked', value: 'stage', node: { id: 'tasks_linked', name: 'Tasks Linked', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'tasks_linked_and_updated', children: [] } },
+                                                    { label: 'Created', value: 'none', node: { id: 'tasks_created', name: 'Tasks Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'tasks_created', children: [] } }
+                                                  ]
+                                                }]
+                                              }]
+                                            }
+                                          }
+                                        ]
+                                      }]
+                                    }
+                                  }
+                                ]
+                              }]
+                            }
                           }
-                        }
-                      ]
+                        ]
+                      }
                     }
-                  }
-                ]
+                  ]
+                }
               }
-            }
-          ]
+            ]
+          }]
         }]
       }]
     }]

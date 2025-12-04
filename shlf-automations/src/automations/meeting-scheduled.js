@@ -46,9 +46,15 @@ export class MeetingScheduledAutomation {
 
     // Step: Validation
     const validationStepId = await EventTracker.startStep(traceId, {
-      layerName: 'automation',
+      layerName: 'processing',
       stepName: 'validation',
-      metadata: { calendarEntryId, eventType },
+      input: {
+        calendarEntryId,
+        eventType,
+        isUpdate,
+        timestamp,
+        webhookId: webhookData.id,
+      },
     });
 
     // Validate timestamp exists (required for idempotency)
@@ -66,17 +72,28 @@ export class MeetingScheduledAutomation {
         }
       );
 
-      await EventTracker.endStep(validationStepId, { status: 'error', errorMessage: error });
+      await EventTracker.endStep(validationStepId, {
+        status: 'error',
+        errorMessage: error,
+        output: { valid: false, reason: 'missing_timestamp' },
+      });
       throw new Error(error);
     }
 
-    await EventTracker.endStep(validationStepId, { status: 'success' });
+    await EventTracker.endStep(validationStepId, {
+      status: 'success',
+      output: { valid: true, calendarEntryId, eventType, isUpdate },
+    });
 
     // Step: Idempotency check
     const idempotencyStepId = await EventTracker.startStep(traceId, {
       layerName: 'processing',
       stepName: 'idempotency_check',
-      metadata: { calendarEntryId },
+      input: {
+        calendarEntryId,
+        eventType,
+        timestamp,
+      },
     });
     const idempotencyKey = SupabaseService.generateIdempotencyKey(
       eventType,
@@ -89,7 +106,14 @@ export class MeetingScheduledAutomation {
       // Check if webhook is still processing
       if (existing.success === null) {
         console.log(`[CALENDAR] ${calendarEntryId} Still processing (concurrent request)`);
-        await EventTracker.endStep(idempotencyStepId, { status: 'skipped', metadata: { reason: 'still_processing' } });
+        await EventTracker.endStep(idempotencyStepId, {
+          status: 'skipped',
+          output: {
+            isDuplicate: true,
+            reason: 'still_processing',
+            processing_started_at: existing.created_at,
+          },
+        });
         return {
           success: null,
           action: 'still_processing',
@@ -98,7 +122,15 @@ export class MeetingScheduledAutomation {
       }
 
       console.log(`[CALENDAR] ${calendarEntryId} Already processed (idempotency) at ${existing.processed_at}`);
-      await EventTracker.endStep(idempotencyStepId, { status: 'skipped', metadata: { reason: 'already_processed' } });
+      await EventTracker.endStep(idempotencyStepId, {
+        status: 'skipped',
+        output: {
+          isDuplicate: true,
+          reason: 'already_processed',
+          processed_at: existing.processed_at,
+          cachedAction: existing.action,
+        },
+      });
       return {
         success: existing.success,
         action: existing.action,
@@ -107,7 +139,14 @@ export class MeetingScheduledAutomation {
       };
     }
 
-    await EventTracker.endStep(idempotencyStepId, { status: 'success' });
+    await EventTracker.endStep(idempotencyStepId, {
+      status: 'success',
+      output: {
+        isDuplicate: false,
+        isNewRequest: true,
+        idempotencyKey,
+      },
+    });
 
     // Step 0.5: Reserve webhook immediately (prevents duplicate processing)
     await SupabaseService.recordWebhookProcessed({
@@ -125,9 +164,19 @@ export class MeetingScheduledAutomation {
 
     try {
       // Step 1: Fetch calendar entry details
+      const fetchCalendarStepId = await EventTracker.startStep(traceId, {
+        layerName: 'service',
+        stepName: 'fetch_calendar_entry',
+        input: {
+          calendarEntryId,
+          operation: 'get_calendar_entry_details',
+        },
+      });
+
       const calendarEntry = await ClioService.getCalendarEntry(calendarEntryId);
 
       const calendarEventTypeId = calendarEntry.calendar_entry_event_type?.id;
+      const calendarEventTypeName = calendarEntry.calendar_entry_event_type?.name;
       const matterId = calendarEntry.matter?.id;
       const meetingLocation = calendarEntry.location;
       const meetingDate = calendarEntry.start_at;
@@ -136,6 +185,17 @@ export class MeetingScheduledAutomation {
       if (!meetingDate) {
         const error = `Calendar entry missing required start_at date`;
         console.error(`[CALENDAR] ${calendarEntryId} ${error}`);
+
+        await EventTracker.endStep(fetchCalendarStepId, {
+          status: 'error',
+          errorMessage: error,
+          output: {
+            found: true,
+            calendarEntryId,
+            hasMeetingDate: false,
+            reason: 'missing_start_at',
+          },
+        });
 
         await SupabaseService.logError(
           ERROR_CODES.VALIDATION_MISSING_REQUIRED_FIELD,
@@ -165,6 +225,16 @@ export class MeetingScheduledAutomation {
       if (config.testing.testMode && matterId !== config.testing.testMatterId) {
         console.log(`[CALENDAR] ${calendarEntryId} SKIPPED (test mode - matter ${matterId} !== ${config.testing.testMatterId})`);
 
+        await EventTracker.endStep(fetchCalendarStepId, {
+          status: 'skipped',
+          output: {
+            found: true,
+            calendarEntryId,
+            matterId,
+            reason: 'test_mode_blocked',
+          },
+        });
+
         // Update webhook to success (skipped)
         await SupabaseService.updateWebhookProcessed(idempotencyKey, {
           processing_duration_ms: Date.now() - startTime,
@@ -177,6 +247,16 @@ export class MeetingScheduledAutomation {
 
       if (!calendarEventTypeId) {
         console.log(`[CALENDAR] ${calendarEntryId} No event type, skipping`);
+
+        await EventTracker.endStep(fetchCalendarStepId, {
+          status: 'skipped',
+          output: {
+            found: true,
+            calendarEntryId,
+            hasEventType: false,
+            reason: 'no_event_type',
+          },
+        });
 
         // Update webhook to success (skipped)
         await SupabaseService.updateWebhookProcessed(idempotencyKey, {
@@ -191,6 +271,16 @@ export class MeetingScheduledAutomation {
       if (!matterId) {
         console.log(`[CALENDAR] ${calendarEntryId} No matter associated`);
 
+        await EventTracker.endStep(fetchCalendarStepId, {
+          status: 'skipped',
+          output: {
+            found: true,
+            calendarEntryId,
+            hasMatter: false,
+            reason: 'no_matter_associated',
+          },
+        });
+
         // Update webhook to success (skipped)
         await SupabaseService.updateWebhookProcessed(idempotencyKey, {
           processing_duration_ms: Date.now() - startTime,
@@ -201,10 +291,42 @@ export class MeetingScheduledAutomation {
         return { success: true, action: 'no_matter' };
       }
 
+      await EventTracker.endStep(fetchCalendarStepId, {
+        status: 'success',
+        output: {
+          found: true,
+          calendarEntryId,
+          matterId,
+          meetingDate,
+          meetingLocation,
+          calendarEventTypeId,
+          calendarEventTypeName,
+        },
+      });
+
       // Step 2: Map calendar event to stage (from database)
+      const mapEventStepId = await EventTracker.startStep(traceId, {
+        layerName: 'service',
+        stepName: 'map_event_to_stage',
+        input: {
+          calendarEventTypeId,
+          calendarEventTypeName,
+          operation: 'lookup_stage_mapping',
+        },
+      });
+
       const mapping = await SupabaseService.getCalendarEventMapping(calendarEventTypeId);
       if (!mapping) {
         console.log(`[CALENDAR] ${calendarEntryId} Event type not mapped`);
+
+        await EventTracker.endStep(mapEventStepId, {
+          status: 'skipped',
+          output: {
+            mapped: false,
+            calendarEventTypeId,
+            reason: 'event_type_not_mapped',
+          },
+        });
 
         // Update webhook to success (skipped)
         await SupabaseService.updateWebhookProcessed(idempotencyKey, {
@@ -215,6 +337,17 @@ export class MeetingScheduledAutomation {
 
         return { success: true, action: 'not_mapped' };
       }
+
+      await EventTracker.endStep(mapEventStepId, {
+        status: 'success',
+        output: {
+          mapped: true,
+          calendarEventTypeId,
+          stageId: mapping.stage_id,
+          stageName: mapping.stage_name,
+          usesMeetingLocation: mapping.uses_meeting_location,
+        },
+      });
 
       console.log(`[CALENDAR] ${calendarEntryId} Confirmed for matter ${matterId}`);
       console.log(`[CALENDAR] ${calendarEntryId} Meeting: ${mapping.stage_name} on ${meetingDate}`);
@@ -231,11 +364,30 @@ export class MeetingScheduledAutomation {
       });
 
       // Step 4: Fetch matter details
+      const fetchMatterStepId = await EventTracker.startStep(traceId, {
+        layerName: 'service',
+        stepName: 'fetch_matter',
+        input: {
+          matterId,
+          operation: 'get_matter_details',
+        },
+      });
+
       const matterDetails = await ClioService.getMatter(matterId);
 
       // Step 4.1: Filter out closed matters
       if (matterDetails.status === 'Closed') {
         console.log(`[CALENDAR] ${calendarEntryId} SKIPPED (matter is closed)`);
+
+        await EventTracker.endStep(fetchMatterStepId, {
+          status: 'skipped',
+          output: {
+            found: true,
+            matterId,
+            matterStatus: matterDetails.status,
+            reason: 'matter_is_closed',
+          },
+        });
 
         await SupabaseService.updateWebhookProcessed(idempotencyKey, {
           processing_duration_ms: Date.now() - startTime,
@@ -245,6 +397,19 @@ export class MeetingScheduledAutomation {
 
         return { success: true, action: 'skipped_closed_matter' };
       }
+
+      await EventTracker.endStep(fetchMatterStepId, {
+        status: 'success',
+        output: {
+          found: true,
+          matterId,
+          matterName: matterDetails.display_number,
+          matterStatus: matterDetails.status,
+          clientName: matterDetails.client?.name,
+          matterLocation: matterDetails.location,
+          practiceArea: matterDetails.practice_area?.name,
+        },
+      });
 
       // Step 5: Get task templates for this meeting type
       const taskTemplates = await SupabaseService.getTaskListMeeting(calendarEventTypeId);
@@ -293,6 +458,17 @@ export class MeetingScheduledAutomation {
       }
 
       // Step 6: Check for existing tasks - either from this calendar entry OR from stage automation
+      const checkExistingTasksStepId = await EventTracker.startStep(traceId, {
+        layerName: 'service',
+        stepName: 'check_existing_tasks',
+        input: {
+          calendarEntryId,
+          matterId,
+          stageId: mapping.stage_id,
+          stageName: mapping.stage_name,
+        },
+      });
+
       const existingTasksForCalendarEntry = await SupabaseService.getTasksByCalendarEntryId(calendarEntryId);
       const existingTasksForStage = await SupabaseService.getTasksByMatterAndStage(
         matterId,
@@ -302,6 +478,18 @@ export class MeetingScheduledAutomation {
 
       // Filter stage tasks to only those WITHOUT calendar_entry_id (stage-generated tasks)
       const stageGeneratedTasks = existingTasksForStage.filter(task => task.calendar_entry_id === null);
+
+      await EventTracker.endStep(checkExistingTasksStepId, {
+        status: 'success',
+        output: {
+          calendarEntryTasksCount: existingTasksForCalendarEntry.length,
+          stageGeneratedTasksCount: stageGeneratedTasks.length,
+          hasCalendarTasks: existingTasksForCalendarEntry.length > 0,
+          hasStageTasks: stageGeneratedTasks.length > 0,
+          scenario: existingTasksForCalendarEntry.length > 0 ? 'update_calendar_tasks' :
+                    stageGeneratedTasks.length > 0 ? 'link_stage_tasks' : 'create_new_tasks',
+        },
+      });
 
       console.log(`[CALENDAR] ${calendarEntryId} Found ${existingTasksForCalendarEntry.length} existing tasks for this calendar entry`);
       console.log(`[CALENDAR] ${calendarEntryId} Found ${stageGeneratedTasks.length} existing stage-generated tasks (without calendar_entry_id)`);
@@ -350,7 +538,27 @@ export class MeetingScheduledAutomation {
       let tasksCreated = 0;
       let tasksUpdated = 0;
       let tasksLinked = 0;
+      let tasksFailed = 0;
+      let failures = [];
       let action = 'no_changes';
+
+      // Step 7: Generate/Update Tasks
+      const generateTasksStepId = await EventTracker.startStep(traceId, {
+        layerName: 'automation',
+        stepName: 'generate_tasks',
+        input: {
+          calendarEntryId,
+          matterId,
+          stageName: mapping.stage_name,
+          meetingDate,
+          meetingLocation,
+          templateCount: taskTemplates.length,
+          existingCalendarTasksCount: existingTasksForCalendarEntry.length,
+          existingStageTasksCount: stageGeneratedTasks.length,
+          scenario: existingTasksForCalendarEntry.length > 0 ? 'update_calendar_tasks' :
+                    stageGeneratedTasks.length > 0 ? 'link_stage_tasks' : 'create_new_tasks',
+        },
+      });
 
       // Step 7: Handle three scenarios
       if (existingTasksForCalendarEntry.length > 0) {
@@ -416,6 +624,20 @@ export class MeetingScheduledAutomation {
         action = 'tasks_created';
         console.log(`[CALENDAR] ${calendarEntryId} Created ${tasksCreated} new tasks`);
       }
+
+      // End generate_tasks step with output
+      await EventTracker.endStep(generateTasksStepId, {
+        status: tasksFailed > 0 ? 'error' : 'success',
+        output: {
+          action,
+          tasksCreated,
+          tasksUpdated,
+          tasksLinked,
+          tasksFailed,
+          stageName: mapping.stage_name,
+          meetingDate,
+        },
+      });
 
       // Post-verification (verify all tasks were created)
       let verificationResult = null;
