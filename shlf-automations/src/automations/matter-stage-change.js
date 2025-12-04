@@ -417,18 +417,44 @@ export class MatterStageChangeAutomation {
         );
       }
 
-      // Step 3: Check for recent stage changes (3-minute rollback window)
+      // Step 3: Check for recent stage changes (rollback window)
+      const rollbackStepId = await EventTracker.startStep(traceId, {
+        layerName: 'processing',
+        stepName: 'check_rollback_window',
+        input: {
+          matterId,
+          currentStageId,
+          rollbackWindowMinutes: config.automation.rollbackWindowMinutes,
+        },
+      });
+      const rollbackCtx = EventTracker.createContext(traceId, rollbackStepId);
+
       const recentChange = await SupabaseService.checkRecentStageChange(
         matterId,
         currentStageId,
         config.automation.rollbackWindowMinutes
       );
 
+      const withinRollbackWindow = !!recentChange;
+      let tasksDeleted = 0;
+
       // Step 4: Delete tasks if stage changed within rollback window
       if (recentChange) {
         console.log(`[MATTER] ${matterId} Rollback detected - deleting previous tasks`);
-        await this.handleRollback(matterId, recentChange.stage_id);
+        tasksDeleted = await this.handleRollback(matterId, recentChange.stage_id);
       }
+
+      await EventTracker.endStep(rollbackStepId, {
+        status: 'success',
+        output: {
+          withinRollbackWindow,
+          previousStageId: recentChange?.stage_id || null,
+          previousStageName: recentChange?.stage_name || null,
+          previousChangeAt: recentChange?.date || null,
+          tasksDeleted,
+          action: withinRollbackWindow ? 'rollback_triggered' : 'no_rollback',
+        },
+      });
 
       // Step 5: Update matter-info (current state)
       await SupabaseService.upsertMatterInfo({
@@ -721,6 +747,7 @@ export class MatterStageChangeAutomation {
 
   /**
    * Handle rollback - delete tasks from previous stage change
+   * @returns {number} Number of tasks deleted
    */
   static async handleRollback(matterId, previousStageId) {
     // Get recently generated tasks
@@ -744,6 +771,8 @@ export class MatterStageChangeAutomation {
     // Delete from Supabase
     const taskIds = recentTasks.map(t => t.task_id);
     await SupabaseService.deleteTasks(taskIds);
+
+    return recentTasks.length;
   }
 
   /**

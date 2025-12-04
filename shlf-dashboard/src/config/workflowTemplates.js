@@ -102,30 +102,88 @@ export const matterStageChangeWorkflow = {
                                 type: 'step',
                                 matchStep: 'detect_stage_change',
                                 children: [{
-                                  id: 'generate_tasks',
-                                  name: 'Generate Tasks',
-                                  layer: 'automation',
+                                  id: 'rollback_check',
+                                  name: 'Check Rollback Window',
+                                  layer: 'processing',
                                   type: 'step',
-                                  matchStep: 'generate_tasks',
+                                  matchStep: 'check_rollback_window',
                                   children: [{
-                                    id: 'verify_tasks',
-                                    name: 'Verify Tasks',
-                                    layer: 'automation',
-                                    type: 'step',
-                                    matchStep: 'verify_tasks',
-                                    children: [{
-                                      id: 'task_result',
-                                      name: 'Task Creation Result',
-                                      layer: 'decision',
-                                      type: 'decision',
-                                      condition: 'Check task creation outcomes',
-                                      children: [
-                                        { label: 'All Success', value: 'success', node: { id: 'tasks_created', name: 'Tasks Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'created_tasks', children: [] } },
-                                        { label: 'Updated', value: 'updated', node: { id: 'tasks_updated', name: 'Tasks Updated', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'updated_tasks', children: [] } },
-                                        { label: 'Partial', value: 'partial', node: { id: 'partial', name: 'Partial Failure', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'partial_failure', children: [] } },
-                                        { label: 'Error', value: 'error', node: { id: 'error', name: 'Error', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'error', children: [] } }
-                                      ]
-                                    }]
+                                    id: 'rollback_decision',
+                                    name: 'Within Grace Period?',
+                                    layer: 'decision',
+                                    type: 'decision',
+                                    condition: 'Check if stage changed within rollback window',
+                                    children: [
+                                      {
+                                        label: 'Yes',
+                                        value: true,
+                                        node: {
+                                          id: 'delete_previous',
+                                          name: 'Delete Previous Tasks',
+                                          layer: 'automation',
+                                          type: 'step',
+                                          matchAction: 'rollback_triggered',
+                                          children: [{
+                                            id: 'generate_tasks_after_rollback',
+                                            name: 'Generate Tasks',
+                                            layer: 'automation',
+                                            type: 'step',
+                                            matchStep: 'generate_tasks',
+                                            children: [{
+                                              id: 'verify_tasks_after_rollback',
+                                              name: 'Verify Tasks',
+                                              layer: 'automation',
+                                              type: 'step',
+                                              matchStep: 'verify_tasks',
+                                              children: [{
+                                                id: 'task_result_after_rollback',
+                                                name: 'Task Creation Result',
+                                                layer: 'decision',
+                                                type: 'decision',
+                                                condition: 'Check task creation outcomes',
+                                                children: [
+                                                  { label: 'All Success', value: 'success', node: { id: 'tasks_created_rb', name: 'Tasks Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'created_tasks', children: [] } },
+                                                  { label: 'Updated', value: 'updated', node: { id: 'tasks_updated_rb', name: 'Tasks Updated', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'updated_tasks', children: [] } },
+                                                  { label: 'Partial', value: 'partial', node: { id: 'partial_rb', name: 'Partial Failure', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'partial_failure', children: [] } },
+                                                  { label: 'Error', value: 'error', node: { id: 'error_rb', name: 'Error', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'error', children: [] } }
+                                                ]
+                                              }]
+                                            }]
+                                          }]
+                                        }
+                                      },
+                                      {
+                                        label: 'No',
+                                        value: false,
+                                        node: {
+                                          id: 'generate_tasks',
+                                          name: 'Generate Tasks',
+                                          layer: 'automation',
+                                          type: 'step',
+                                          matchStep: 'generate_tasks',
+                                          children: [{
+                                            id: 'verify_tasks',
+                                            name: 'Verify Tasks',
+                                            layer: 'automation',
+                                            type: 'step',
+                                            matchStep: 'verify_tasks',
+                                            children: [{
+                                              id: 'task_result',
+                                              name: 'Task Creation Result',
+                                              layer: 'decision',
+                                              type: 'decision',
+                                              condition: 'Check task creation outcomes',
+                                              children: [
+                                                { label: 'All Success', value: 'success', node: { id: 'tasks_created', name: 'Tasks Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'created_tasks', children: [] } },
+                                                { label: 'Updated', value: 'updated', node: { id: 'tasks_updated', name: 'Tasks Updated', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'updated_tasks', children: [] } },
+                                                { label: 'Partial', value: 'partial', node: { id: 'partial', name: 'Partial Failure', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'partial_failure', children: [] } },
+                                                { label: 'Error', value: 'error', node: { id: 'error', name: 'Error', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'error', children: [] } }
+                                              ]
+                                            }]
+                                          }]
+                                        }
+                                      }
+                                    ]
                                   }]
                                 }]
                               }
