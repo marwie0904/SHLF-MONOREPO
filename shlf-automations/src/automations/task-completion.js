@@ -99,7 +99,14 @@ export class TaskCompletionAutomation {
       };
     }
 
-    await EventTracker.endStep(idempotencyStepId, { status: 'success' });
+    await EventTracker.endStep(idempotencyStepId, {
+      status: 'success',
+      output: {
+        isDuplicate: false,
+        isNewRequest: true,
+        idempotencyKey,
+      },
+    });
 
     // Step 0.5: Reserve webhook immediately (prevents duplicate processing)
     await SupabaseService.recordWebhookProcessed({
@@ -217,10 +224,27 @@ export class TaskCompletionAutomation {
       }
 
       // Step 2: Get task record from Supabase first
+      const checkSupabaseStepId = await EventTracker.startStep(traceId, {
+        layerName: 'service',
+        stepName: 'check_task_in_supabase',
+        input: {
+          taskId,
+          operation: 'lookup_task_in_supabase',
+        },
+      });
+
       const taskRecord = await SupabaseService.getTaskById(taskId);
 
       if (!taskRecord) {
         console.log(`[TASK] ${taskId} Not found in database`);
+
+        await EventTracker.endStep(checkSupabaseStepId, {
+          status: 'skipped',
+          output: {
+            found: false,
+            reason: 'task_not_in_database',
+          },
+        });
 
         // Update webhook to success (not found)
         await SupabaseService.updateWebhookProcessed(idempotencyKey, {
@@ -231,6 +255,20 @@ export class TaskCompletionAutomation {
 
         return { success: true, action: 'not_found' };
       }
+
+      // Task found in Supabase
+      await EventTracker.endStep(checkSupabaseStepId, {
+        status: 'success',
+        output: {
+          found: true,
+          taskId: taskRecord.task_id,
+          taskName: taskRecord.task_name,
+          matterId: taskRecord.matter_id,
+          stageName: taskRecord.stage_name,
+          taskNumber: taskRecord.task_number,
+          currentStatus: taskRecord.status,
+        },
+      });
 
       // Step 1.75: Check for Sheila Condomina assignee changes
       // Target IDs: 357896692, 358412483
@@ -311,10 +349,35 @@ export class TaskCompletionAutomation {
       console.log(`[TASK] ${taskId} COMPLETED: ${taskRecord.task_name}`);
 
       // Step 3: Update task status in Supabase
+      const updateSupabaseStepId = await EventTracker.startStep(traceId, {
+        layerName: 'service',
+        stepName: 'update_task_status_supabase',
+        input: {
+          taskId,
+          taskName: taskRecord.task_name,
+          matterId: taskRecord.matter_id,
+          stageName: taskRecord.stage_name,
+          previousStatus: taskRecord.status,
+          operation: 'mark_task_completed',
+        },
+      });
+
       await SupabaseService.updateTask(taskId, {
         completed: true,
         status: 'completed',
         last_updated: new Date().toISOString(),
+      });
+
+      await EventTracker.endStep(updateSupabaseStepId, {
+        status: 'success',
+        output: {
+          success: true,
+          taskId,
+          taskName: taskRecord.task_name,
+          previousStatus: taskRecord.status,
+          newStatus: 'completed',
+          completedAt: new Date().toISOString(),
+        },
       });
 
       // Step 4: Check for attempt sequences

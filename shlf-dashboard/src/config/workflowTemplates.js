@@ -250,13 +250,13 @@ export const taskCompletionWorkflow = {
               value: true,
               node: {
                 id: 'fetch_task',
-                name: 'Fetch Task',
+                name: 'Fetch Task from Clio',
                 layer: 'service',
                 type: 'step',
                 matchStep: 'fetch_task',
                 children: [{
                   id: 'task_exists',
-                  name: 'Task Exists?',
+                  name: 'Task Exists in Clio?',
                   layer: 'decision',
                   type: 'decision',
                   condition: 'Check if task exists in Clio',
@@ -266,44 +266,72 @@ export const taskCompletionWorkflow = {
                       label: 'Exists',
                       value: true,
                       node: {
-                        id: 'is_completed',
-                        name: 'Task Completed?',
-                        layer: 'decision',
-                        type: 'decision',
-                        condition: 'Check task status in Clio',
-                        children: [
-                          { label: 'Not Complete', value: false, node: { id: 'not_complete', name: 'Not Completed', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_not_completed', children: [] } },
-                          {
-                            label: 'Completed',
-                            value: true,
-                            node: {
-                              id: 'task_type',
-                              name: 'Task Type Check',
-                              layer: 'decision',
-                              type: 'decision',
-                              condition: 'Check for special task patterns',
-                              children: [
-                                { label: 'Attempt Seq', value: 'attempt', node: { id: 'attempt_created', name: 'Attempt Task Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'attempt_sequence', children: [] } },
-                                { label: 'Error Task', value: 'error', node: { id: 'regenerated', name: 'Tasks Regenerated', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'error_task_regenerated', children: [] } },
-                                {
-                                  label: 'Regular',
-                                  value: 'regular',
-                                  node: {
-                                    id: 'has_dependents',
-                                    name: 'Has Dependent Tasks?',
-                                    layer: 'decision',
-                                    type: 'decision',
-                                    condition: 'Check for "after task X" relations',
-                                    children: [
-                                      { label: 'No', value: false, node: { id: 'no_action', name: 'No Follow-up', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'none', children: [] } },
-                                      { label: 'Yes', value: true, node: { id: 'dependents_updated', name: 'Dependents Updated', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'dependent_tasks', children: [] } }
-                                    ]
+                        id: 'check_supabase',
+                        name: 'Check Task in Supabase',
+                        layer: 'service',
+                        type: 'step',
+                        matchStep: 'check_task_in_supabase',
+                        children: [{
+                          id: 'task_in_supabase',
+                          name: 'Task Found in Supabase?',
+                          layer: 'decision',
+                          type: 'decision',
+                          condition: 'Check if task exists in database',
+                          children: [
+                            { label: 'No', value: false, node: { id: 'not_found_supabase', name: 'Not Found in Supabase', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'not_found', children: [] } },
+                            {
+                              label: 'Yes',
+                              value: true,
+                              node: {
+                                id: 'is_completed',
+                                name: 'Task Completed?',
+                                layer: 'decision',
+                                type: 'decision',
+                                condition: 'Check task status in Clio',
+                                children: [
+                                  { label: 'Not Complete', value: false, node: { id: 'not_complete', name: 'Not Completed', layer: 'outcome', type: 'outcome', status: 'skipped', matchAction: 'skipped_not_completed', children: [] } },
+                                  {
+                                    label: 'Completed',
+                                    value: true,
+                                    node: {
+                                      id: 'update_supabase',
+                                      name: 'Update Status in Supabase',
+                                      layer: 'service',
+                                      type: 'step',
+                                      matchStep: 'update_task_status_supabase',
+                                      children: [{
+                                        id: 'task_type',
+                                        name: 'Task Type Check',
+                                        layer: 'decision',
+                                        type: 'decision',
+                                        condition: 'Check for special task patterns',
+                                        children: [
+                                          { label: 'Attempt Seq', value: 'attempt', node: { id: 'attempt_created', name: 'Attempt Task Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'attempt_sequence', children: [] } },
+                                          { label: 'Error Task', value: 'error', node: { id: 'regenerated', name: 'Tasks Regenerated', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'error_task_regenerated', children: [] } },
+                                          {
+                                            label: 'Regular',
+                                            value: 'regular',
+                                            node: {
+                                              id: 'has_dependents',
+                                              name: 'Has Dependent Tasks?',
+                                              layer: 'decision',
+                                              type: 'decision',
+                                              condition: 'Check for "after task X" relations',
+                                              children: [
+                                                { label: 'No', value: false, node: { id: 'no_action', name: 'Completed in Supabase', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'none', children: [] } },
+                                                { label: 'Yes', value: true, node: { id: 'dependents_updated', name: 'Dependents Updated', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'dependent_tasks', children: [] } }
+                                              ]
+                                            }
+                                          }
+                                        ]
+                                      }]
+                                    }
                                   }
-                                }
-                              ]
+                                ]
+                              }
                             }
-                          }
-                        ]
+                          ]
+                        }]
                       }
                     }
                   ]
@@ -989,7 +1017,8 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
     if (node.type === 'decision') {
       taken = markedChildren.some(branch => {
         if (branch.node) {
-          return branch.node.status === 'taken' || branch.node.status === 'current';
+          const ms = branch.node.matchStatus;
+          return ms === 'taken' || ms === 'current';
         }
         return false;
       });
@@ -1015,7 +1044,10 @@ export function matchTraceToWorkflow(workflow, trace, steps) {
 
     return {
       ...node,
-      status: current ? 'current' : (taken ? 'taken' : 'not-taken'),
+      matchStatus: current ? 'current' : (taken ? 'taken' : 'not-taken'),
+      // Preserve original template status for outcome nodes (success, error, skipped)
+      // but update it for taken outcomes to reflect actual result
+      status: node.type === 'outcome' && taken ? (node.status || 'success') : node.status,
       stepData,
       details: nodeDetails,
       children: markedChildren,

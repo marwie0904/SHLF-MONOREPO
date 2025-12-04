@@ -894,8 +894,8 @@ function WorkflowDetailPanel({ selectedItem, trace, steps, system, onClose, effe
           <div className="panel-section">
             <div className="panel-stat">
               <span className="panel-stat-label">Outcome</span>
-              <span className={`wf-outcome-badge ${node.status === 'current' ? 'success' : node.status}`}>
-                {trace?.resultAction || node.status}
+              <span className={`wf-outcome-badge ${node.status || 'success'}`}>
+                {trace?.resultAction || node.name || node.status}
               </span>
             </div>
           </div>

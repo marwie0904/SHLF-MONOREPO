@@ -25,13 +25,13 @@ function getNodeIcon(node) {
 /**
  * Single Node Card Component
  */
-function NodeCard({ node, nodeStatus, isSelected, onClick }) {
-  const isTaken = nodeStatus === 'taken' || nodeStatus === 'current'
+function NodeCard({ node, matchStatus, isSelected, onClick }) {
+  const isTaken = matchStatus === 'taken' || matchStatus === 'current'
   const icon = getNodeIcon(node)
 
   return (
     <div
-      className={`wf-node ${node.type} ${nodeStatus} ${isSelected ? 'selected' : ''}`}
+      className={`wf-node ${node.type} ${matchStatus} ${isSelected ? 'selected' : ''}`}
       onClick={(e) => {
         e.stopPropagation()
         onClick?.(node)
@@ -76,15 +76,16 @@ function BranchLabel({ label, taken }) {
  * Recursive Tree Node Renderer
  */
 function TreeNode({ node, selectedNodeId, onNodeClick }) {
-  const nodeStatus = node.status || 'not-taken'
-  const isTaken = nodeStatus === 'taken' || nodeStatus === 'current'
+  // Use matchStatus for path highlighting, status for outcome display
+  const matchStatus = node.matchStatus || node.status || 'not-taken'
+  const isTaken = matchStatus === 'taken' || matchStatus === 'current'
   const isSelected = selectedNodeId === node.id
 
   // For decision nodes, render branches side by side
   if (node.type === 'decision' && node.children && node.children.length > 0) {
     return (
       <div className="wf-tree-node">
-        <NodeCard node={node} nodeStatus={nodeStatus} isSelected={isSelected} onClick={onNodeClick} />
+        <NodeCard node={node} matchStatus={matchStatus} isSelected={isSelected} onClick={onNodeClick} />
         <Connector taken={isTaken} />
 
         {/* Horizontal line spanning all branches */}
@@ -93,7 +94,8 @@ function TreeNode({ node, selectedNodeId, onNodeClick }) {
 
           <div className="wf-branches">
             {node.children.map((branch, idx) => {
-              const branchTaken = branch.node.status === 'taken' || branch.node.status === 'current'
+              const branchMatchStatus = branch.node.matchStatus || branch.node.status || 'not-taken'
+              const branchTaken = branchMatchStatus === 'taken' || branchMatchStatus === 'current'
               return (
                 <div key={idx} className={`wf-branch ${branchTaken ? 'taken' : 'not-taken'}`}>
                   <div className={`wf-branch-connector ${branchTaken ? 'taken' : ''}`} />
@@ -117,13 +119,14 @@ function TreeNode({ node, selectedNodeId, onNodeClick }) {
       // Step with branch children (rare, but handle it)
       return (
         <div className="wf-tree-node">
-          <NodeCard node={node} nodeStatus={nodeStatus} isSelected={isSelected} onClick={onNodeClick} />
+          <NodeCard node={node} matchStatus={matchStatus} isSelected={isSelected} onClick={onNodeClick} />
           <Connector taken={isTaken} />
           <div className="wf-branch-container">
             <div className={`wf-branch-line ${isTaken ? 'taken' : ''}`} />
             <div className="wf-branches">
               {node.children.map((branch, idx) => {
-                const branchTaken = branch.node.status === 'taken' || branch.node.status === 'current'
+                const branchMatchStatus = branch.node.matchStatus || branch.node.status || 'not-taken'
+                const branchTaken = branchMatchStatus === 'taken' || branchMatchStatus === 'current'
                 return (
                   <div key={idx} className={`wf-branch ${branchTaken ? 'taken' : 'not-taken'}`}>
                     <div className={`wf-branch-connector ${branchTaken ? 'taken' : ''}`} />
@@ -141,13 +144,16 @@ function TreeNode({ node, selectedNodeId, onNodeClick }) {
     // Step with direct children (linear flow)
     return (
       <div className="wf-tree-node">
-        <NodeCard node={node} nodeStatus={nodeStatus} isSelected={isSelected} onClick={onNodeClick} />
-        {node.children.map((child, idx) => (
-          <div key={idx} className="wf-linear-child">
-            <Connector taken={isTaken && (child.status === 'taken' || child.status === 'current')} />
-            <TreeNode node={child} selectedNodeId={selectedNodeId} onNodeClick={onNodeClick} />
-          </div>
-        ))}
+        <NodeCard node={node} matchStatus={matchStatus} isSelected={isSelected} onClick={onNodeClick} />
+        {node.children.map((child, idx) => {
+          const childMatchStatus = child.matchStatus || child.status || 'not-taken'
+          return (
+            <div key={idx} className="wf-linear-child">
+              <Connector taken={isTaken && (childMatchStatus === 'taken' || childMatchStatus === 'current')} />
+              <TreeNode node={child} selectedNodeId={selectedNodeId} onNodeClick={onNodeClick} />
+            </div>
+          )
+        })}
       </div>
     )
   }
@@ -155,7 +161,7 @@ function TreeNode({ node, selectedNodeId, onNodeClick }) {
   // Leaf node (outcome or step without children)
   return (
     <div className="wf-tree-node">
-      <NodeCard node={node} nodeStatus={nodeStatus} isSelected={isSelected} onClick={onNodeClick} />
+      <NodeCard node={node} matchStatus={matchStatus} isSelected={isSelected} onClick={onNodeClick} />
     </div>
   )
 }
