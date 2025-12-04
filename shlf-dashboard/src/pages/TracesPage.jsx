@@ -70,7 +70,7 @@ function getSkipReason(resultAction) {
 
 export default function TracesPage() {
   const navigate = useNavigate()
-  const [system, setSystem] = useState('all')
+  const [system, setSystem] = useState('clio') // Default to 'clio' until Convex is deployed with 'all' support
   const [statusFilter, setStatusFilter] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [searchType, setSearchType] = useState('matterId')
