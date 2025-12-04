@@ -127,7 +127,7 @@ function formatError(error) {
  * - Limits array sizes
  * - Limits object depth
  */
-function sanitize(data, maxDepth = 3) {
+function sanitize(data, maxDepth = 5) {
   if (!data || maxDepth <= 0) {
     return maxDepth <= 0 ? "[truncated]" : data;
   }
@@ -141,8 +141,8 @@ function sanitize(data, maxDepth = 3) {
   }
 
   if (Array.isArray(data)) {
-    // Limit array size
-    return data.slice(0, 10).map((item) => sanitize(item, maxDepth - 1));
+    // Limit array size (20 items for task lists)
+    return data.slice(0, 20).map((item) => sanitize(item, maxDepth - 1));
   }
 
   // Object handling
