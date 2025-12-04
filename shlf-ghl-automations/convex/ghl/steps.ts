@@ -69,8 +69,9 @@ export const failStep = mutation({
     stepId: v.string(),
     error: v.object({
       message: v.string(),
-      stack: v.optional(v.string()),
-      code: v.optional(v.string()),
+      stack: v.optional(v.union(v.string(), v.null())),
+      code: v.optional(v.union(v.string(), v.null())),
+      httpStatus: v.optional(v.union(v.number(), v.null())),
       raw: v.optional(v.any()),
     }),
     detailCount: v.optional(v.number()),

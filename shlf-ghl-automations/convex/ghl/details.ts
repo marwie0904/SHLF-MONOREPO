@@ -86,9 +86,9 @@ export const failDetail = mutation({
     detailId: v.string(),
     error: v.object({
       message: v.string(),
-      stack: v.optional(v.string()),
-      code: v.optional(v.string()),
-      httpStatus: v.optional(v.number()),
+      stack: v.optional(v.union(v.string(), v.null())),
+      code: v.optional(v.union(v.string(), v.null())),
+      httpStatus: v.optional(v.union(v.number(), v.null())),
       raw: v.optional(v.any()),
     }),
   },
@@ -210,9 +210,9 @@ export const createFailedDetail = mutation({
     // Error and timing
     error: v.object({
       message: v.string(),
-      stack: v.optional(v.string()),
-      code: v.optional(v.string()),
-      httpStatus: v.optional(v.number()),
+      stack: v.optional(v.union(v.string(), v.null())),
+      code: v.optional(v.union(v.string(), v.null())),
+      httpStatus: v.optional(v.union(v.number(), v.null())),
       raw: v.optional(v.any()),
     }),
     durationMs: v.number(),

@@ -11,6 +11,7 @@
 import type * as clio_cleanup from "../clio/cleanup.js";
 import type * as clio_queries from "../clio/queries.js";
 import type * as clio_tracking from "../clio/tracking.js";
+import type * as dashboard_traces from "../dashboard/traces.js";
 import type * as ghl_details from "../ghl/details.js";
 import type * as ghl_queries from "../ghl/queries.js";
 import type * as ghl_steps from "../ghl/steps.js";
@@ -26,6 +27,7 @@ declare const fullApi: ApiFromModules<{
   "clio/cleanup": typeof clio_cleanup;
   "clio/queries": typeof clio_queries;
   "clio/tracking": typeof clio_tracking;
+  "dashboard/traces": typeof dashboard_traces;
   "ghl/details": typeof ghl_details;
   "ghl/queries": typeof ghl_queries;
   "ghl/steps": typeof ghl_steps;
