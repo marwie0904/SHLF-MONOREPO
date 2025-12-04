@@ -1,6 +1,7 @@
 const axios = require('axios');
 const FormData = require('form-data');
 const { createClient } = require('@supabase/supabase-js');
+const traceContext = require('../utils/traceContext');
 
 /**
  * Parses raw Jotform webhook data for workshop event
@@ -391,36 +392,142 @@ async function createWorkshopGHL(workshopData, files = []) {
 /**
  * Main function to handle workshop event creation
  * @param {string} rawData - Raw webhook data from Jotform
+ * @param {Object} reqContext - Request context for tracing (optional)
  * @returns {Promise<Object>} Result object
  */
-async function main(rawData) {
+async function main(rawData, reqContext = {}) {
+    // Start trace
+    const { traceId, context } = await traceContext.startTrace({
+        endpoint: '/create-workshop-event',
+        httpMethod: 'POST',
+        headers: reqContext.headers || {},
+        body: typeof rawData === 'string' ? { rawData: rawData.substring(0, 500) } : rawData,
+        triggerType: 'webhook'
+    });
+
+    let parsedData = null;
+    let files = [];
+    let ghlResponse = null;
+    let supabaseResponse = null;
+
     try {
         console.log('Starting workshop event creation process...');
 
-        // Parse the raw data
-        const parsedData = await parseRawData(rawData);
-        console.log('Workshop data parsed successfully');
+        // Step 1: Parse raw data
+        const { stepId: parseStepId } = await traceContext.startStep(
+            traceId,
+            'create-workshop-event',
+            'parseRawData',
+            { rawDataLength: typeof rawData === 'string' ? rawData.length : JSON.stringify(rawData).length }
+        );
 
-        // Download files if any
-        const files = await downloadFiles(parsedData.relevantFiles);
-        console.log(`Downloaded ${files.length} file(s)`);
+        try {
+            parsedData = await parseRawData(rawData);
+            await traceContext.completeStep(parseStepId, {
+                workshopName: parsedData.workshopName,
+                workshopDate: parsedData.workshopDate,
+                workshopTime: parsedData.workshopTime,
+                workshopType: parsedData.workshopType,
+                fileCount: parsedData.relevantFiles?.length || 0
+            });
+            console.log('Workshop data parsed successfully');
+        } catch (error) {
+            await traceContext.failStep(parseStepId, error, traceId);
+            throw error;
+        }
 
-        // Create workshop in GHL custom object
-        const ghlResponse = await createWorkshopGHL(parsedData, files);
+        // Step 2: Download files
+        const { stepId: downloadStepId } = await traceContext.startStep(
+            traceId,
+            'create-workshop-event',
+            'downloadFiles',
+            { fileUrls: parsedData.relevantFiles }
+        );
 
-        // Save workshop to Supabase
-        const supabaseResponse = await saveWorkshopToSupabase(ghlResponse.id, parsedData);
+        try {
+            files = await downloadFiles(parsedData.relevantFiles);
+            await traceContext.completeStep(downloadStepId, {
+                filesDownloaded: files.length,
+                filenames: files.map(f => f.filename)
+            });
+            console.log(`Downloaded ${files.length} file(s)`);
+        } catch (error) {
+            await traceContext.failStep(downloadStepId, error, traceId);
+            throw error;
+        }
 
-        console.log('Workshop event creation completed successfully');
-        return {
+        // Step 3: Create workshop in GHL
+        const { stepId: ghlStepId } = await traceContext.startStep(
+            traceId,
+            'create-workshop-event',
+            'createWorkshopGHL',
+            {
+                workshopName: parsedData.workshopName,
+                workshopDate: parsedData.workshopDate,
+                workshopTime: parsedData.workshopTime,
+                workshopType: parsedData.workshopType,
+                fileCount: files.length
+            }
+        );
+
+        try {
+            ghlResponse = await createWorkshopGHL(parsedData, files);
+            await traceContext.completeStep(ghlStepId, {
+                recordId: ghlResponse.id,
+                success: true
+            });
+        } catch (error) {
+            await traceContext.failStep(ghlStepId, error, traceId);
+            throw error;
+        }
+
+        // Step 4: Save to Supabase
+        const { stepId: supabaseStepId } = await traceContext.startStep(
+            traceId,
+            'create-workshop-event',
+            'saveWorkshopToSupabase',
+            {
+                ghlWorkshopId: ghlResponse.id,
+                workshopName: parsedData.workshopName
+            }
+        );
+
+        try {
+            supabaseResponse = await saveWorkshopToSupabase(ghlResponse.id, parsedData);
+            await traceContext.completeStep(supabaseStepId, {
+                supabaseId: supabaseResponse.id,
+                success: true
+            });
+        } catch (error) {
+            await traceContext.failStep(supabaseStepId, error, traceId);
+            throw error;
+        }
+
+        const result = {
             success: true,
+            traceId: traceId,
             workshopData: parsedData,
             filesDownloaded: files.length,
             ghlResponse: ghlResponse,
             supabaseResponse: supabaseResponse
         };
+
+        // Complete trace
+        await traceContext.completeTrace(traceId, 200, result);
+
+        console.log('Workshop event creation completed successfully');
+        return result;
     } catch (error) {
         console.error('Error in workshop event creation:', error.message);
+
+        // Fail trace
+        await traceContext.failTrace(traceId, error, 500, {
+            success: false,
+            error: error.message,
+            workshopData: parsedData,
+            filesDownloaded: files.length
+        });
+
         throw error;
     }
 }

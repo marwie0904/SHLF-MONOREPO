@@ -1896,73 +1896,108 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     console.log('✅ Invoice custom object detected');
     console.log('Invoice Record ID:', objectData.recordId);
 
-    // Retry logic: Wait and check for opportunity association (up to 6 attempts)
-    // Note: We only wait for the association - fields will come via RecordUpdate webhook
+    // Step 1: Wait for opportunity association with retry logic
+    let retryStepId = null;
+    if (traceId) {
+      const step = await startStep(traceId, 'custom-object-created', 'waitForOpportunityAssociation', {
+        recordId: objectData.recordId,
+        maxAttempts: 6,
+        delayMs: 10000
+      });
+      retryStepId = step.stepId;
+    }
+
     let invoiceRecord = null;
     let relationsResponse = null;
     let attemptCount = 0;
     const maxAttempts = 6;
     const delayMs = 10000; // 10 seconds
 
-    while (attemptCount < maxAttempts) {
-      attemptCount++;
-      console.log(`\n⏳ Attempt ${attemptCount}/${maxAttempts} - Checking for opportunity association...`);
+    try {
+      while (attemptCount < maxAttempts) {
+        attemptCount++;
+        console.log(`\n⏳ Attempt ${attemptCount}/${maxAttempts} - Checking for opportunity association...`);
 
-      if (attemptCount > 1) {
-        console.log(`Waiting ${delayMs / 1000} seconds before retry...`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+        if (attemptCount > 1) {
+          console.log(`Waiting ${delayMs / 1000} seconds before retry...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+
+        // Get custom object details
+        const customObjectResponse = await ghlService.getCustomObject(objectData.objectKey, objectData.recordId);
+        invoiceRecord = customObjectResponse.record;
+        console.log('Invoice Record:', JSON.stringify(invoiceRecord, null, 2));
+
+        // Get relations
+        relationsResponse = await ghlService.getRelations(objectData.recordId, objectData.locationId);
+        const hasRelations = relationsResponse.relations && relationsResponse.relations.length > 0;
+        console.log('Has Relations:', hasRelations);
+
+        // Find opportunity relation
+        const opportunityRelation = hasRelations
+          ? relationsResponse.relations.find(rel => rel.secondObjectKey === 'opportunity' || rel.firstObjectKey === 'opportunity')
+          : null;
+        const hasOpportunity = !!opportunityRelation;
+        console.log('Has Opportunity:', hasOpportunity);
+
+        // Check if we have the opportunity association
+        if (hasOpportunity) {
+          console.log(`✅ Opportunity association found on attempt ${attemptCount}`);
+          if (retryStepId) await completeStep(retryStepId, { found: true, attempts: attemptCount });
+          break;
+        }
+
+        console.log(`⚠️ Missing opportunity association on attempt ${attemptCount}`);
+
+        if (attemptCount === maxAttempts) {
+          console.log('❌ Max attempts reached - no opportunity association found');
+          if (retryStepId) await completeStep(retryStepId, { found: false, attempts: attemptCount });
+          return res.json({
+            success: false,
+            message: 'Invoice missing opportunity association after 6 attempts',
+            invoiceId: objectData.recordId,
+            hasOpportunity: hasOpportunity,
+            attempts: attemptCount
+          });
+        }
       }
-
-      // Get custom object details
-      const customObjectResponse = await ghlService.getCustomObject(objectData.objectKey, objectData.recordId);
-      invoiceRecord = customObjectResponse.record;
-      console.log('Invoice Record:', JSON.stringify(invoiceRecord, null, 2));
-
-      // Get relations
-      relationsResponse = await ghlService.getRelations(objectData.recordId, objectData.locationId);
-      const hasRelations = relationsResponse.relations && relationsResponse.relations.length > 0;
-      console.log('Has Relations:', hasRelations);
-
-      // Find opportunity relation
-      const opportunityRelation = hasRelations
-        ? relationsResponse.relations.find(rel => rel.secondObjectKey === 'opportunity' || rel.firstObjectKey === 'opportunity')
-        : null;
-      const hasOpportunity = !!opportunityRelation;
-      console.log('Has Opportunity:', hasOpportunity);
-
-      // Check if we have the opportunity association
-      if (hasOpportunity) {
-        console.log(`✅ Opportunity association found on attempt ${attemptCount}`);
-        break;
-      }
-
-      console.log(`⚠️ Missing opportunity association on attempt ${attemptCount}`);
-
-      if (attemptCount === maxAttempts) {
-        console.log('❌ Max attempts reached - no opportunity association found');
-        return res.json({
-          success: false,
-          message: 'Invoice missing opportunity association after 6 attempts',
-          invoiceId: objectData.recordId,
-          hasOpportunity: hasOpportunity,
-          attempts: attemptCount
-        });
-      }
+    } catch (retryError) {
+      if (retryStepId) await failStep(retryStepId, retryError, traceId);
+      throw retryError;
     }
 
-    // Extract service items from properties
+    // Step 2: Calculate invoice total from service items
+    let calcStepId = null;
+    if (traceId) {
+      const step = await startStep(traceId, 'invoiceService', 'calculateInvoiceTotal', {
+        serviceItems: invoiceRecord.properties.serviceproduct || []
+      });
+      calcStepId = step.stepId;
+    }
+
     const serviceItems = invoiceRecord.properties.serviceproduct || [];
     console.log('Service Items:', serviceItems);
 
-    // Calculate total from service items
-    const calculationResult = await invoiceService.calculateInvoiceTotal(serviceItems);
-    if (!calculationResult.success) {
-      console.error('Failed to calculate invoice total:', calculationResult.error);
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to calculate invoice total',
-        error: calculationResult.error
+    let calculationResult;
+    try {
+      calculationResult = await invoiceService.calculateInvoiceTotal(serviceItems);
+      if (!calculationResult.success) {
+        if (calcStepId) await failStep(calcStepId, { message: calculationResult.error }, traceId);
+        console.error('Failed to calculate invoice total:', calculationResult.error);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to calculate invoice total',
+          error: calculationResult.error
+        });
+      }
+      if (calcStepId) await completeStep(calcStepId, {
+        total: calculationResult.total,
+        lineItemsCount: calculationResult.lineItems.length,
+        missingItems: calculationResult.missingItems
       });
+    } catch (calcError) {
+      if (calcStepId) await failStep(calcStepId, calcError, traceId);
+      throw calcError;
     }
 
     const { total, lineItems, missingItems } = calculationResult;
@@ -1971,81 +2006,125 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       console.warn('Missing service items:', missingItems.join(', '));
     }
 
-    // Find opportunity relation (we already verified it exists)
+    // Step 3: Get opportunity details
+    let getOppStepId = null;
     const opportunityRelation = relationsResponse.relations.find(
       rel => rel.secondObjectKey === 'opportunity' || rel.firstObjectKey === 'opportunity'
     );
-
     const opportunityId = opportunityRelation.secondObjectKey === 'opportunity'
       ? opportunityRelation.secondRecordId
       : opportunityRelation.firstRecordId;
 
+    if (traceId) {
+      const step = await startStep(traceId, 'ghlService', 'getOpportunity', { opportunityId });
+      getOppStepId = step.stepId;
+      await updateTraceContextIds(traceId, { opportunityId });
+    }
+
     console.log('✅ Found opportunity:', opportunityId);
 
-    // Get opportunity details
-    const opportunityResponse = await ghlService.getOpportunity(opportunityId);
-    const opportunity = opportunityResponse.opportunity;
-    console.log('Opportunity Details:', JSON.stringify(opportunity, null, 2));
+    let opportunity;
+    try {
+      const opportunityResponse = await ghlService.getOpportunity(opportunityId);
+      opportunity = opportunityResponse.opportunity;
+      if (getOppStepId) await completeStep(getOppStepId, {
+        opportunityName: opportunity.name,
+        contactId: opportunity.contactId,
+        contactEmail: opportunity.contact?.email
+      });
+      console.log('Opportunity Details:', JSON.stringify(opportunity, null, 2));
+    } catch (oppError) {
+      if (getOppStepId) await failStep(getOppStepId, oppError, traceId);
+      throw oppError;
+    }
 
-    // Create invoice in Confido
+    // Step 4: Create invoice in Confido
+    let confidoStepId = null;
+    if (traceId) {
+      const step = await startStep(traceId, 'confidoService', 'createInvoice', {
+        ghlInvoiceId: objectData.recordId,
+        opportunityId: opportunity.id,
+        amountDue: total
+      });
+      confidoStepId = step.stepId;
+    }
+
     console.log('Creating invoice in Confido...');
-    const confidoResult = await confidoService.createInvoice({
-      ghlInvoiceId: objectData.recordId,
-      opportunityId: opportunity.id,
-      opportunityName: opportunity.name,
-      contactId: opportunity.contactId,
-      contactName: opportunity.contact?.name || '',
-      contactEmail: opportunity.contact?.email || '',
-      contactPhone: opportunity.contact?.phone || '',
-      invoiceNumber: invoiceRecord.properties.invoice || objectData.recordId,
-      amountDue: total,
-      dueDate: invoiceRecord.properties.due_date || null,
-      memo: `Invoice for ${lineItems.map(item => item.name).join(', ')}`,
-      lineItems: lineItems
-    });
+    let confidoResult;
+    try {
+      confidoResult = await confidoService.createInvoice({
+        ghlInvoiceId: objectData.recordId,
+        opportunityId: opportunity.id,
+        opportunityName: opportunity.name,
+        contactId: opportunity.contactId,
+        contactName: opportunity.contact?.name || '',
+        contactEmail: opportunity.contact?.email || '',
+        contactPhone: opportunity.contact?.phone || '',
+        invoiceNumber: invoiceRecord.properties.invoice || objectData.recordId,
+        amountDue: total,
+        dueDate: invoiceRecord.properties.due_date || null,
+        memo: `Invoice for ${lineItems.map(item => item.name).join(', ')}`,
+        lineItems: lineItems
+      });
 
-    if (!confidoResult.success) {
-      // Check if this is a duplicate PaymentLink error
-      if (confidoResult.error === 'DUPLICATE_PAYMENTLINK') {
-        console.log('⚠️ PaymentLink already exists in Confido');
-        console.log('Checking Supabase for existing invoice record...');
+      if (!confidoResult.success) {
+        // Check if this is a duplicate PaymentLink error
+        if (confidoResult.error === 'DUPLICATE_PAYMENTLINK') {
+          console.log('⚠️ PaymentLink already exists in Confido');
+          console.log('Checking Supabase for existing invoice record...');
 
-        // Get existing invoice from Supabase
-        const existingInvoice = await invoiceService.getInvoiceByGHLId(objectData.recordId);
+          // Get existing invoice from Supabase
+          const existingInvoice = await invoiceService.getInvoiceByGHLId(objectData.recordId);
 
-        if (existingInvoice.success && existingInvoice.data) {
-          console.log('✅ Found existing invoice in Supabase');
-          console.log('Payment URL:', existingInvoice.data.payment_url);
+          if (existingInvoice.success && existingInvoice.data) {
+            console.log('✅ Found existing invoice in Supabase');
+            console.log('Payment URL:', existingInvoice.data.payment_url);
 
-          // Use the existing invoice data instead
-          return res.json({
-            success: true,
-            message: 'Invoice already exists (duplicate webhook)',
-            invoiceId: objectData.recordId,
-            opportunityId: opportunity.id,
-            paymentUrl: existingInvoice.data.payment_url,
-            isDuplicate: true
-          });
-        } else {
-          console.error('⚠️ PaymentLink exists in Confido but not in Supabase');
-          return res.json({
-            success: false,
-            message: 'Data inconsistency - PaymentLink exists in Confido but not in Supabase',
-            invoiceId: objectData.recordId,
-            confidoError: confidoResult.error
-          });
+            if (confidoStepId) await completeStep(confidoStepId, {
+              isDuplicate: true,
+              paymentUrl: existingInvoice.data.payment_url
+            });
+
+            return res.json({
+              success: true,
+              message: 'Invoice already exists (duplicate webhook)',
+              invoiceId: objectData.recordId,
+              opportunityId: opportunity.id,
+              paymentUrl: existingInvoice.data.payment_url,
+              isDuplicate: true
+            });
+          } else {
+            console.error('⚠️ PaymentLink exists in Confido but not in Supabase');
+            if (confidoStepId) await failStep(confidoStepId, { message: 'Data inconsistency - PaymentLink exists in Confido but not in Supabase' }, traceId);
+            return res.json({
+              success: false,
+              message: 'Data inconsistency - PaymentLink exists in Confido but not in Supabase',
+              invoiceId: objectData.recordId,
+              confidoError: confidoResult.error
+            });
+          }
         }
+
+        // Other errors
+        console.error('Failed to create invoice in Confido:', confidoResult.error);
+        if (confidoStepId) await failStep(confidoStepId, { message: confidoResult.error }, traceId);
+        return res.json({
+          success: true,
+          message: 'Invoice processed but Confido creation failed',
+          invoiceId: objectData.recordId,
+          opportunityId: opportunity.id,
+          confidoError: confidoResult.error
+        });
       }
 
-      // Other errors
-      console.error('Failed to create invoice in Confido:', confidoResult.error);
-      return res.json({
-        success: true,
-        message: 'Invoice processed but Confido creation failed',
-        invoiceId: objectData.recordId,
-        opportunityId: opportunity.id,
-        confidoError: confidoResult.error
+      if (confidoStepId) await completeStep(confidoStepId, {
+        confidoInvoiceId: confidoResult.confidoInvoiceId,
+        paymentUrl: confidoResult.paymentUrl,
+        status: confidoResult.status
       });
+    } catch (confidoError) {
+      if (confidoStepId) await failStep(confidoStepId, confidoError, traceId);
+      throw confidoError;
     }
 
     console.log('✅ Invoice created in Confido');
@@ -2057,35 +2136,58 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
     const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
     const invoiceNumber = `INV-${dateStr}-${randomStr}`;
-
     console.log('Generated Invoice Number:', invoiceNumber);
 
-    // Save to Supabase
+    // Step 5: Save to Supabase
+    let saveStepId = null;
+    if (traceId) {
+      const step = await startStep(traceId, 'invoiceService', 'saveInvoiceToSupabase', {
+        ghlInvoiceId: objectData.recordId,
+        invoiceNumber,
+        amountDue: total
+      });
+      saveStepId = step.stepId;
+    }
+
     console.log('Saving to Supabase...');
-    await invoiceService.saveInvoiceToSupabase({
-      ghlInvoiceId: objectData.recordId,
-      opportunityId: opportunity.id,
-      contactId: opportunity.contactId,
-      opportunityName: opportunity.name,
-      primaryContactName: opportunity.contact?.name,
-      confidoInvoiceId: confidoResult.confidoInvoiceId,
-      confidoClientId: confidoResult.confidoClientId,
-      confidoMatterId: confidoResult.confidoMatterId,
-      paymentUrl: confidoResult.paymentUrl,
-      serviceItems: lineItems,
-      invoiceNumber: invoiceNumber,
-      amountDue: total,
-      status: 'unpaid',
-      invoiceDate: new Date().toISOString(),
-      dueDate: invoiceRecord.properties.due_date || null
-    });
+    try {
+      await invoiceService.saveInvoiceToSupabase({
+        ghlInvoiceId: objectData.recordId,
+        opportunityId: opportunity.id,
+        contactId: opportunity.contactId,
+        opportunityName: opportunity.name,
+        primaryContactName: opportunity.contact?.name,
+        confidoInvoiceId: confidoResult.confidoInvoiceId,
+        confidoClientId: confidoResult.confidoClientId,
+        confidoMatterId: confidoResult.confidoMatterId,
+        paymentUrl: confidoResult.paymentUrl,
+        serviceItems: lineItems,
+        invoiceNumber: invoiceNumber,
+        amountDue: total,
+        status: 'unpaid',
+        invoiceDate: new Date().toISOString(),
+        dueDate: invoiceRecord.properties.due_date || null
+      });
+      if (saveStepId) await completeStep(saveStepId, { success: true, invoiceNumber });
+      console.log('✅ Invoice saved to Supabase');
+    } catch (saveError) {
+      if (saveStepId) await failStep(saveStepId, saveError, traceId);
+      throw saveError;
+    }
 
-    console.log('✅ Invoice saved to Supabase');
-
-    // Calculate subtotal (same as total for now, can be adjusted if taxes/fees added later)
+    // Calculate subtotal (same as total for now)
     const subtotal = total;
 
-    // Update GHL custom object with payment link, invoice number, subtotal, and total
+    // Step 6: Update GHL custom object with payment link
+    let updateGhlStepId = null;
+    if (traceId) {
+      const step = await startStep(traceId, 'ghlService', 'updateCustomObject', {
+        recordId: objectData.recordId,
+        fields: ['payment_link', 'invoice_number', 'subtotal', 'total']
+      });
+      updateGhlStepId = step.stepId;
+    }
+
     try {
       console.log('Updating GHL custom object with payment link and invoice details...');
 
@@ -2095,9 +2197,6 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
 
       if (verifyResponse && verifyResponse.record) {
         console.log('✅ Custom object verified, proceeding with update');
-        // Use short field names and pass properties as an object
-        // locationId is required as query parameter for PUT requests
-        // MONETORY fields require format: { value: number, currency: 'default' }
         await ghlService.updateCustomObject(
           objectData.objectKey,
           objectData.recordId,
@@ -2109,23 +2208,35 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
             total: { value: total, currency: 'default' }
           }
         );
+        if (updateGhlStepId) await completeStep(updateGhlStepId, { success: true, updated: true });
         console.log('✅ GHL custom object updated with payment link, invoice number, subtotal, and total');
       } else {
+        if (updateGhlStepId) await completeStep(updateGhlStepId, { success: true, updated: false, reason: 'object_not_found' });
         console.warn('⚠️ Custom object no longer exists in GHL, skipping update');
       }
     } catch (updateError) {
+      if (updateGhlStepId) await failStep(updateGhlStepId, updateError, traceId);
       console.error('Failed to update GHL custom object (non-blocking):', updateError.message);
       if (updateError.response?.data) {
         console.error('GHL Error Details:', JSON.stringify(updateError.response.data, null, 2));
       }
       console.error('This is OK - invoice still created in Confido and Supabase');
-      console.error('Payment link can be retrieved from Supabase if needed');
     }
 
-    // Send invoice email to client
+    // Step 7: Send invoice email to client
+    let emailStepId = null;
     let emailSent = false;
     const contactEmail = opportunity.contact?.email;
+
     if (contactEmail) {
+      if (traceId) {
+        const step = await startStep(traceId, 'invoiceEmailService', 'sendInvoiceEmail', {
+          contactEmail,
+          invoiceNumber
+        });
+        emailStepId = step.stepId;
+      }
+
       try {
         console.log('Sending invoice email to:', contactEmail);
         const { sendInvoiceEmail } = require('./services/invoiceEmailService');
@@ -2148,9 +2259,11 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
         };
 
         await sendInvoiceEmail(invoiceEmailData, contactEmail);
+        if (emailStepId) await completeStep(emailStepId, { success: true, emailSent: true });
         console.log('✅ Invoice email sent successfully');
         emailSent = true;
       } catch (emailError) {
+        if (emailStepId) await failStep(emailStepId, emailError, traceId);
         console.error('Failed to send invoice email (non-blocking):', emailError.message);
       }
     } else {
@@ -2224,10 +2337,29 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     console.log('✅ Invoice update detected');
     console.log('Invoice Record ID:', objectData.recordId);
 
-    // Get updated custom object details from GHL
-    const customObjectResponse = await ghlService.getCustomObject(objectData.objectKey, objectData.recordId);
-    const invoiceRecord = customObjectResponse.record;
-    console.log('Updated Invoice Record:', JSON.stringify(invoiceRecord, null, 2));
+    // Step 1: Get updated custom object details from GHL
+    let getRecordStepId = null;
+    if (traceId) {
+      const step = await startStep(traceId, 'ghlService', 'getCustomObject', {
+        objectKey: objectData.objectKey,
+        recordId: objectData.recordId
+      });
+      getRecordStepId = step.stepId;
+    }
+
+    let invoiceRecord;
+    try {
+      const customObjectResponse = await ghlService.getCustomObject(objectData.objectKey, objectData.recordId);
+      invoiceRecord = customObjectResponse.record;
+      if (getRecordStepId) await completeStep(getRecordStepId, {
+        hasPaymentLink: !!invoiceRecord.properties.payment_link,
+        serviceItemsCount: (invoiceRecord.properties.serviceproduct || []).length
+      });
+      console.log('Updated Invoice Record:', JSON.stringify(invoiceRecord, null, 2));
+    } catch (getError) {
+      if (getRecordStepId) await failStep(getRecordStepId, getError, traceId);
+      throw getError;
+    }
 
     // Check if payment_link already exists on this invoice
     const existingPaymentLink = invoiceRecord.properties.payment_link || null;
@@ -2248,36 +2380,76 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
       });
     }
 
-    const calculationResult = await invoiceService.calculateInvoiceTotal(serviceItems);
-
-    if (!calculationResult.success) {
-      console.error('Failed to calculate invoice total:', calculationResult.error);
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to calculate invoice total',
-        error: calculationResult.error
+    // Step 2: Calculate invoice total
+    let calcStepId = null;
+    if (traceId) {
+      const step = await startStep(traceId, 'invoiceService', 'calculateInvoiceTotal', {
+        serviceItemsCount: serviceItems.length
       });
+      calcStepId = step.stepId;
+    }
+
+    let calculationResult;
+    try {
+      calculationResult = await invoiceService.calculateInvoiceTotal(serviceItems);
+      if (!calculationResult.success) {
+        if (calcStepId) await failStep(calcStepId, { message: calculationResult.error }, traceId);
+        console.error('Failed to calculate invoice total:', calculationResult.error);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to calculate invoice total',
+          error: calculationResult.error
+        });
+      }
+      if (calcStepId) await completeStep(calcStepId, {
+        total: calculationResult.total,
+        lineItemsCount: calculationResult.lineItems.length,
+        missingItems: calculationResult.missingItems
+      });
+    } catch (calcError) {
+      if (calcStepId) await failStep(calcStepId, calcError, traceId);
+      throw calcError;
     }
 
     const { total, lineItems, missingItems } = calculationResult;
     console.log(`Calculated Total: $${total}`);
 
-    // Get relations to find the associated opportunity
-    const relationsResponse = await ghlService.getRelations(objectData.recordId, objectData.locationId);
-    const hasRelations = relationsResponse.relations && relationsResponse.relations.length > 0;
-
-    const opportunityRelation = hasRelations
-      ? relationsResponse.relations.find(rel => rel.secondObjectKey === 'opportunity' || rel.firstObjectKey === 'opportunity')
-      : null;
-
-    if (!opportunityRelation) {
-      console.log('⚠️ No opportunity association yet, waiting for association...');
-      return res.json({
-        success: true,
-        message: 'Invoice update received, waiting for opportunity association',
-        invoiceId: objectData.recordId,
-        hasPaymentLink: !!existingPaymentLink
+    // Step 3: Get relations to find opportunity
+    let getRelationsStepId = null;
+    if (traceId) {
+      const step = await startStep(traceId, 'ghlService', 'getRelations', {
+        recordId: objectData.recordId
       });
+      getRelationsStepId = step.stepId;
+    }
+
+    let relationsResponse;
+    let opportunityRelation;
+    try {
+      relationsResponse = await ghlService.getRelations(objectData.recordId, objectData.locationId);
+      const hasRelations = relationsResponse.relations && relationsResponse.relations.length > 0;
+
+      opportunityRelation = hasRelations
+        ? relationsResponse.relations.find(rel => rel.secondObjectKey === 'opportunity' || rel.firstObjectKey === 'opportunity')
+        : null;
+
+      if (getRelationsStepId) await completeStep(getRelationsStepId, {
+        hasRelations,
+        hasOpportunity: !!opportunityRelation
+      });
+
+      if (!opportunityRelation) {
+        console.log('⚠️ No opportunity association yet, waiting for association...');
+        return res.json({
+          success: true,
+          message: 'Invoice update received, waiting for opportunity association',
+          invoiceId: objectData.recordId,
+          hasPaymentLink: !!existingPaymentLink
+        });
+      }
+    } catch (relError) {
+      if (getRelationsStepId) await failStep(getRelationsStepId, relError, traceId);
+      throw relError;
     }
 
     const opportunityId = opportunityRelation.secondObjectKey === 'opportunity'
@@ -2286,59 +2458,128 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
 
     console.log('Found Opportunity ID:', opportunityId);
 
-    // Get opportunity details
-    const opportunityResponse = await ghlService.getOpportunity(opportunityId);
-    const opportunity = opportunityResponse.opportunity;
-    console.log('Opportunity Details:', JSON.stringify(opportunity, null, 2));
+    // Update trace with opportunity ID
+    if (traceId) {
+      await updateTraceContextIds(traceId, { opportunityId });
+    }
 
-    // Get existing invoice from Supabase (if any)
-    const existingInvoice = await invoiceService.getInvoiceByGHLId(objectData.recordId);
-    const hasExistingRecord = existingInvoice.success && existingInvoice.data;
+    // Step 4: Get opportunity details
+    let getOppStepId = null;
+    if (traceId) {
+      const step = await startStep(traceId, 'ghlService', 'getOpportunity', { opportunityId });
+      getOppStepId = step.stepId;
+    }
 
-    // Check if payment link exists
+    let opportunity;
+    try {
+      const opportunityResponse = await ghlService.getOpportunity(opportunityId);
+      opportunity = opportunityResponse.opportunity;
+      if (getOppStepId) await completeStep(getOppStepId, {
+        opportunityName: opportunity.name,
+        contactId: opportunity.contactId,
+        contactEmail: opportunity.contact?.email
+      });
+      console.log('Opportunity Details:', JSON.stringify(opportunity, null, 2));
+    } catch (oppError) {
+      if (getOppStepId) await failStep(getOppStepId, oppError, traceId);
+      throw oppError;
+    }
+
+    // Step 5: Get existing invoice from Supabase
+    let getExistingStepId = null;
+    if (traceId) {
+      const step = await startStep(traceId, 'invoiceService', 'getInvoiceByGHLId', {
+        ghlInvoiceId: objectData.recordId
+      });
+      getExistingStepId = step.stepId;
+    }
+
+    let existingInvoice;
+    let hasExistingRecord;
+    try {
+      existingInvoice = await invoiceService.getInvoiceByGHLId(objectData.recordId);
+      hasExistingRecord = existingInvoice.success && existingInvoice.data;
+      if (getExistingStepId) await completeStep(getExistingStepId, {
+        found: hasExistingRecord,
+        paymentUrl: existingInvoice.data?.payment_url
+      });
+    } catch (getExError) {
+      if (getExistingStepId) await failStep(getExistingStepId, getExError, traceId);
+      throw getExError;
+    }
+
+    // Check if payment link exists - branch logic
     if (!existingPaymentLink) {
       // NO PAYMENT LINK - Create in Confido
       console.log('📝 No payment link exists - Creating invoice in Confido...');
 
-      const confidoResult = await confidoService.createInvoice({
-        ghlInvoiceId: objectData.recordId,
-        opportunityId: opportunity.id,
-        opportunityName: opportunity.name,
-        contactId: opportunity.contactId,
-        contactName: opportunity.contact?.name || '',
-        contactEmail: opportunity.contact?.email || '',
-        contactPhone: opportunity.contact?.phone || '',
-        invoiceNumber: invoiceRecord.properties.invoice || objectData.recordId,
-        amountDue: total,
-        dueDate: invoiceRecord.properties.due_date || null,
-        memo: `Invoice for ${lineItems.map(item => item.name).join(', ')}`,
-        lineItems: lineItems
-      });
+      // Step 6a: Create invoice in Confido
+      let confidoStepId = null;
+      if (traceId) {
+        const step = await startStep(traceId, 'confidoService', 'createInvoice', {
+          ghlInvoiceId: objectData.recordId,
+          opportunityId: opportunity.id,
+          amountDue: total
+        });
+        confidoStepId = step.stepId;
+      }
 
-      if (!confidoResult.success) {
-        // Check if this is a duplicate PaymentLink error
-        if (confidoResult.error === 'DUPLICATE_PAYMENTLINK') {
-          console.log('⚠️ PaymentLink already exists in Confido');
+      let confidoResult;
+      try {
+        confidoResult = await confidoService.createInvoice({
+          ghlInvoiceId: objectData.recordId,
+          opportunityId: opportunity.id,
+          opportunityName: opportunity.name,
+          contactId: opportunity.contactId,
+          contactName: opportunity.contact?.name || '',
+          contactEmail: opportunity.contact?.email || '',
+          contactPhone: opportunity.contact?.phone || '',
+          invoiceNumber: invoiceRecord.properties.invoice || objectData.recordId,
+          amountDue: total,
+          dueDate: invoiceRecord.properties.due_date || null,
+          memo: `Invoice for ${lineItems.map(item => item.name).join(', ')}`,
+          lineItems: lineItems
+        });
 
-          if (hasExistingRecord && existingInvoice.data.payment_url) {
-            console.log('✅ Found existing invoice in Supabase with payment URL');
-            return res.json({
-              success: true,
-              message: 'Invoice already exists (duplicate)',
-              invoiceId: objectData.recordId,
-              paymentUrl: existingInvoice.data.payment_url,
-              isDuplicate: true
-            });
+        if (!confidoResult.success) {
+          // Check if this is a duplicate PaymentLink error
+          if (confidoResult.error === 'DUPLICATE_PAYMENTLINK') {
+            console.log('⚠️ PaymentLink already exists in Confido');
+
+            if (hasExistingRecord && existingInvoice.data.payment_url) {
+              console.log('✅ Found existing invoice in Supabase with payment URL');
+              if (confidoStepId) await completeStep(confidoStepId, {
+                isDuplicate: true,
+                paymentUrl: existingInvoice.data.payment_url
+              });
+              return res.json({
+                success: true,
+                message: 'Invoice already exists (duplicate)',
+                invoiceId: objectData.recordId,
+                paymentUrl: existingInvoice.data.payment_url,
+                isDuplicate: true
+              });
+            }
           }
+
+          console.error('Failed to create invoice in Confido:', confidoResult.error);
+          if (confidoStepId) await failStep(confidoStepId, { message: confidoResult.error }, traceId);
+          return res.json({
+            success: false,
+            message: 'Failed to create invoice in Confido',
+            invoiceId: objectData.recordId,
+            confidoError: confidoResult.error
+          });
         }
 
-        console.error('Failed to create invoice in Confido:', confidoResult.error);
-        return res.json({
-          success: false,
-          message: 'Failed to create invoice in Confido',
-          invoiceId: objectData.recordId,
-          confidoError: confidoResult.error
+        if (confidoStepId) await completeStep(confidoStepId, {
+          confidoInvoiceId: confidoResult.confidoInvoiceId,
+          paymentUrl: confidoResult.paymentUrl,
+          status: confidoResult.status
         });
+      } catch (confidoError) {
+        if (confidoStepId) await failStep(confidoStepId, confidoError, traceId);
+        throw confidoError;
       }
 
       console.log('✅ Invoice created in Confido');
@@ -2352,28 +2593,53 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
       const invoiceNumber = `INV-${dateStr}-${randomStr}`;
       console.log('Generated Invoice Number:', invoiceNumber);
 
-      // Save/Update Supabase
-      console.log('Saving to Supabase...');
-      await invoiceService.saveInvoiceToSupabase({
-        ghlInvoiceId: objectData.recordId,
-        opportunityId: opportunity.id,
-        contactId: opportunity.contactId,
-        opportunityName: opportunity.name,
-        primaryContactName: opportunity.contact?.name,
-        confidoInvoiceId: confidoResult.confidoInvoiceId,
-        confidoClientId: confidoResult.confidoClientId,
-        confidoMatterId: confidoResult.confidoMatterId,
-        paymentUrl: confidoResult.paymentUrl,
-        serviceItems: lineItems,
-        invoiceNumber: invoiceNumber,
-        amountDue: total,
-        status: 'unpaid',
-        invoiceDate: new Date().toISOString(),
-        dueDate: invoiceRecord.properties.due_date || null
-      });
-      console.log('✅ Invoice saved to Supabase');
+      // Step 7a: Save to Supabase
+      let saveStepId = null;
+      if (traceId) {
+        const step = await startStep(traceId, 'invoiceService', 'saveInvoiceToSupabase', {
+          ghlInvoiceId: objectData.recordId,
+          invoiceNumber,
+          amountDue: total
+        });
+        saveStepId = step.stepId;
+      }
 
-      // Update GHL custom object with payment link, invoice number, subtotal, total, and status
+      try {
+        console.log('Saving to Supabase...');
+        await invoiceService.saveInvoiceToSupabase({
+          ghlInvoiceId: objectData.recordId,
+          opportunityId: opportunity.id,
+          contactId: opportunity.contactId,
+          opportunityName: opportunity.name,
+          primaryContactName: opportunity.contact?.name,
+          confidoInvoiceId: confidoResult.confidoInvoiceId,
+          confidoClientId: confidoResult.confidoClientId,
+          confidoMatterId: confidoResult.confidoMatterId,
+          paymentUrl: confidoResult.paymentUrl,
+          serviceItems: lineItems,
+          invoiceNumber: invoiceNumber,
+          amountDue: total,
+          status: 'unpaid',
+          invoiceDate: new Date().toISOString(),
+          dueDate: invoiceRecord.properties.due_date || null
+        });
+        if (saveStepId) await completeStep(saveStepId, { success: true, invoiceNumber });
+        console.log('✅ Invoice saved to Supabase');
+      } catch (saveError) {
+        if (saveStepId) await failStep(saveStepId, saveError, traceId);
+        throw saveError;
+      }
+
+      // Step 8a: Update GHL custom object
+      let updateGhlStepId = null;
+      if (traceId) {
+        const step = await startStep(traceId, 'ghlService', 'updateCustomObject', {
+          recordId: objectData.recordId,
+          fields: ['payment_link', 'invoice_number', 'subtotal', 'total', 'status']
+        });
+        updateGhlStepId = step.stepId;
+      }
+
       const subtotal = total;
       try {
         console.log('Updating GHL custom object with payment link and invoice details...');
@@ -2389,14 +2655,27 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
             status: 'unpaid'
           }
         );
+        if (updateGhlStepId) await completeStep(updateGhlStepId, { success: true, updated: true });
         console.log('✅ GHL custom object updated with payment link, invoice number, subtotal, total, and status');
       } catch (updateError) {
+        if (updateGhlStepId) await failStep(updateGhlStepId, updateError, traceId);
         console.error('Failed to update GHL custom object (non-blocking):', updateError.message);
       }
 
-      // Send invoice email to client
+      // Step 9a: Send invoice email
+      let emailStepId = null;
+      let emailSent = false;
       const contactEmail = opportunity.contact?.email;
+
       if (contactEmail) {
+        if (traceId) {
+          const step = await startStep(traceId, 'invoiceEmailService', 'sendInvoiceEmail', {
+            contactEmail,
+            invoiceNumber
+          });
+          emailStepId = step.stepId;
+        }
+
         try {
           console.log('Sending invoice email to:', contactEmail);
           const { sendInvoiceEmail } = require('./services/invoiceEmailService');
@@ -2419,8 +2698,11 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
           };
 
           await sendInvoiceEmail(invoiceEmailData, contactEmail);
+          if (emailStepId) await completeStep(emailStepId, { success: true, emailSent: true });
           console.log('✅ Invoice email sent successfully');
+          emailSent = true;
         } catch (emailError) {
+          if (emailStepId) await failStep(emailStepId, emailError, traceId);
           console.error('Failed to send invoice email (non-blocking):', emailError.message);
         }
       } else {
@@ -2434,7 +2716,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
         opportunityId: opportunity.id,
         total: total,
         lineItems: lineItems,
-        emailSent: !!contactEmail,
+        emailSent: emailSent,
         confido: {
           invoiceId: confidoResult.confidoInvoiceId,
           paymentUrl: confidoResult.paymentUrl,
@@ -2471,16 +2753,40 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
         });
       }
 
-      // Update Supabase with new values
-      await invoiceService.updateInvoiceInSupabase(objectData.recordId, {
-        amount_due: total,
-        service_items: lineItems,
-        invoice_number: invoiceRecord.properties.invoice || objectData.recordId,
-        due_date: invoiceRecord.properties.due_date || null
-      });
-      console.log('✅ Invoice updated in Supabase');
+      // Step 6b: Update Supabase with new values
+      let updateSupabaseStepId = null;
+      if (traceId) {
+        const step = await startStep(traceId, 'invoiceService', 'updateInvoiceInSupabase', {
+          ghlInvoiceId: objectData.recordId,
+          amountDue: total
+        });
+        updateSupabaseStepId = step.stepId;
+      }
 
-      // Update GHL custom object with new totals
+      try {
+        await invoiceService.updateInvoiceInSupabase(objectData.recordId, {
+          amount_due: total,
+          service_items: lineItems,
+          invoice_number: invoiceRecord.properties.invoice || objectData.recordId,
+          due_date: invoiceRecord.properties.due_date || null
+        });
+        if (updateSupabaseStepId) await completeStep(updateSupabaseStepId, { success: true, amountDue: total });
+        console.log('✅ Invoice updated in Supabase');
+      } catch (updateSupaError) {
+        if (updateSupabaseStepId) await failStep(updateSupabaseStepId, updateSupaError, traceId);
+        throw updateSupaError;
+      }
+
+      // Step 7b: Update GHL custom object with new totals
+      let updateGhlStepId = null;
+      if (traceId) {
+        const step = await startStep(traceId, 'ghlService', 'updateCustomObject', {
+          recordId: objectData.recordId,
+          fields: ['subtotal', 'total']
+        });
+        updateGhlStepId = step.stepId;
+      }
+
       try {
         console.log('Updating GHL custom object with new totals...');
         await ghlService.updateCustomObject(
@@ -2492,8 +2798,10 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
             total: { value: total, currency: 'default' }
           }
         );
+        if (updateGhlStepId) await completeStep(updateGhlStepId, { success: true, subtotal, total });
         console.log('✅ GHL custom object updated with new totals');
       } catch (updateError) {
+        if (updateGhlStepId) await failStep(updateGhlStepId, updateError, traceId);
         console.error('Failed to update GHL custom object (non-blocking):', updateError.message);
       }
 
@@ -2565,45 +2873,99 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
     console.log('✅ Invoice deletion detected');
     console.log('Invoice Record ID:', objectData.recordId);
 
-    // Get existing invoice from Supabase
-    const existingInvoice = await invoiceService.getInvoiceByGHLId(objectData.recordId);
-
-    if (!existingInvoice.success || !existingInvoice.data) {
-      console.log('ℹ️ Invoice not found in Supabase - already deleted or never created');
-      console.log('Nothing to do, returning success');
-      return res.json({
-        success: true,
-        message: 'Invoice not found (already deleted or never created) - no action needed',
-        invoiceId: objectData.recordId
+    // Step 1: Get existing invoice from Supabase
+    let getInvoiceStepId = null;
+    if (traceId) {
+      const step = await startStep(traceId, 'invoiceService', 'getInvoiceByGHLId', {
+        ghlInvoiceId: objectData.recordId
       });
+      getInvoiceStepId = step.stepId;
+    }
+
+    let existingInvoice;
+    try {
+      existingInvoice = await invoiceService.getInvoiceByGHLId(objectData.recordId);
+
+      if (!existingInvoice.success || !existingInvoice.data) {
+        if (getInvoiceStepId) await completeStep(getInvoiceStepId, { found: false });
+        console.log('ℹ️ Invoice not found in Supabase - already deleted or never created');
+        console.log('Nothing to do, returning success');
+        return res.json({
+          success: true,
+          message: 'Invoice not found (already deleted or never created) - no action needed',
+          invoiceId: objectData.recordId
+        });
+      }
+
+      if (getInvoiceStepId) await completeStep(getInvoiceStepId, {
+        found: true,
+        confidoInvoiceId: existingInvoice.data.confido_invoice_id,
+        status: existingInvoice.data.status
+      });
+    } catch (getError) {
+      if (getInvoiceStepId) await failStep(getInvoiceStepId, getError, traceId);
+      throw getError;
     }
 
     const confidoInvoiceId = existingInvoice.data.confido_invoice_id;
 
-    // Delete PaymentLink from Confido if it exists
+    // Step 2: Delete PaymentLink from Confido if it exists
     let confidoDeleteResult = null;
     if (confidoInvoiceId) {
-      console.log('Deleting PaymentLink from Confido...');
-      console.log('Confido PaymentLink ID:', confidoInvoiceId);
+      let deleteConfidoStepId = null;
+      if (traceId) {
+        const step = await startStep(traceId, 'confidoService', 'deletePaymentLink', {
+          confidoInvoiceId
+        });
+        deleteConfidoStepId = step.stepId;
+      }
 
-      confidoDeleteResult = await confidoService.deletePaymentLink(confidoInvoiceId);
+      try {
+        console.log('Deleting PaymentLink from Confido...');
+        console.log('Confido PaymentLink ID:', confidoInvoiceId);
 
-      if (confidoDeleteResult.success) {
-        console.log('✅ PaymentLink deleted from Confido');
-      } else {
-        console.error('⚠️ Failed to delete PaymentLink from Confido:', confidoDeleteResult.error);
+        confidoDeleteResult = await confidoService.deletePaymentLink(confidoInvoiceId);
+
+        if (confidoDeleteResult.success) {
+          if (deleteConfidoStepId) await completeStep(deleteConfidoStepId, { success: true, deleted: true });
+          console.log('✅ PaymentLink deleted from Confido');
+        } else {
+          if (deleteConfidoStepId) await completeStep(deleteConfidoStepId, {
+            success: false,
+            error: confidoDeleteResult.error
+          });
+          console.error('⚠️ Failed to delete PaymentLink from Confido:', confidoDeleteResult.error);
+          // Continue anyway - still mark as deleted in Supabase
+        }
+      } catch (deleteError) {
+        if (deleteConfidoStepId) await failStep(deleteConfidoStepId, deleteError, traceId);
+        console.error('⚠️ Error deleting PaymentLink from Confido:', deleteError.message);
         // Continue anyway - still mark as deleted in Supabase
       }
     } else {
       console.log('ℹ️ No Confido PaymentLink ID found - skipping Confido deletion');
     }
 
-    // Update status to deleted in Supabase (keep record for audit trail)
-    await invoiceService.updateInvoiceInSupabase(objectData.recordId, {
-      status: 'deleted'
-    });
+    // Step 3: Update status to deleted in Supabase
+    let updateSupabaseStepId = null;
+    if (traceId) {
+      const step = await startStep(traceId, 'invoiceService', 'updateInvoiceInSupabase', {
+        ghlInvoiceId: objectData.recordId,
+        status: 'deleted'
+      });
+      updateSupabaseStepId = step.stepId;
+    }
 
-    console.log('✅ Invoice marked as deleted in Supabase');
+    try {
+      await invoiceService.updateInvoiceInSupabase(objectData.recordId, {
+        status: 'deleted'
+      });
+      if (updateSupabaseStepId) await completeStep(updateSupabaseStepId, { success: true, status: 'deleted' });
+      console.log('✅ Invoice marked as deleted in Supabase');
+    } catch (updateError) {
+      if (updateSupabaseStepId) await failStep(updateSupabaseStepId, updateError, traceId);
+      throw updateError;
+    }
 
     res.json({
       success: true,

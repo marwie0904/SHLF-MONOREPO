@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
+const traceContext = require('../utils/traceContext');
 
 /**
  * Finds workshop ID from Supabase by matching event details
@@ -113,66 +114,149 @@ async function createContactWorkshopRelation(contactId, workshopRecordId, associ
  * @param {string} params.eventDate - Event date (format: MM/DD/YYYY)
  * @param {string} params.eventTime - Event time
  * @param {string} params.eventType - Workshop type (Seminar/Webinar/Office)
+ * @param {Object} reqContext - Request context for tracing (optional)
  * @returns {Promise<Object>} Result object
  */
-async function main({ contactId, eventTitle, eventDate, eventTime, eventType }) {
+async function main({ contactId, eventTitle, eventDate, eventTime, eventType }, reqContext = {}) {
+    // Start trace
+    const { traceId, context } = await traceContext.startTrace({
+        endpoint: '/associate-contact-to-workshop',
+        httpMethod: 'POST',
+        headers: reqContext.headers || {},
+        body: { contactId, eventTitle, eventDate, eventTime, eventType },
+        triggerType: 'webhook'
+    });
+
+    // Update trace with contact ID context
+    await traceContext.updateTraceContextIds(traceId, { contactId });
+
+    let workshopRecordId = null;
+    let relationResponse = null;
+
     try {
         console.log('Starting contact-workshop association process...');
 
-        // Validate required parameters
-        if (!contactId) {
-            throw new Error('contactId is required');
-        }
-        if (!eventTitle) {
-            throw new Error('eventTitle is required');
-        }
-        if (!eventDate) {
-            throw new Error('eventDate is required');
-        }
-        if (!eventTime) {
-            throw new Error('eventTime is required');
-        }
-        if (!eventType) {
-            throw new Error('eventType is required');
-        }
-
-        // Validate eventType
-        const validTypes = ['Seminar', 'Webinar', 'Office'];
-        if (!validTypes.includes(eventType)) {
-            throw new Error(`eventType must be one of: ${validTypes.join(', ')}`);
-        }
-
-        // Find workshop ID from Supabase
-        const workshopRecordId = await findWorkshopId({
-            title: eventTitle,
-            date: eventDate,
-            time: eventTime,
-            type: eventType
-        });
-
-        if (!workshopRecordId) {
-            throw new Error('Workshop not found. Please ensure the workshop exists in the system.');
-        }
-
-        // Get association ID from environment
-        const associationId = process.env.GHL_ASSOCIATION_ID;
-
-        // Create relation in GHL
-        const relationResponse = await createContactWorkshopRelation(
-            contactId,
-            workshopRecordId,
-            associationId
+        // Step 1: Validate inputs
+        const { stepId: validationStepId } = await traceContext.startStep(
+            traceId,
+            'associate-contact-to-workshop',
+            'validateInputs',
+            { contactId, eventTitle, eventDate, eventTime, eventType }
         );
 
-        console.log('Contact-workshop association completed successfully');
-        return {
+        try {
+            // Validate required parameters
+            if (!contactId) {
+                throw new Error('contactId is required');
+            }
+            if (!eventTitle) {
+                throw new Error('eventTitle is required');
+            }
+            if (!eventDate) {
+                throw new Error('eventDate is required');
+            }
+            if (!eventTime) {
+                throw new Error('eventTime is required');
+            }
+            if (!eventType) {
+                throw new Error('eventType is required');
+            }
+
+            // Validate eventType
+            const validTypes = ['Seminar', 'Webinar', 'Office'];
+            if (!validTypes.includes(eventType)) {
+                throw new Error(`eventType must be one of: ${validTypes.join(', ')}`);
+            }
+
+            await traceContext.completeStep(validationStepId, {
+                valid: true,
+                contactId,
+                eventTitle,
+                eventType
+            });
+        } catch (error) {
+            await traceContext.failStep(validationStepId, error, traceId);
+            throw error;
+        }
+
+        // Step 2: Find workshop ID from Supabase
+        const { stepId: findWorkshopStepId } = await traceContext.startStep(
+            traceId,
+            'associate-contact-to-workshop',
+            'findWorkshopId',
+            { title: eventTitle, date: eventDate, time: eventTime, type: eventType }
+        );
+
+        try {
+            workshopRecordId = await findWorkshopId({
+                title: eventTitle,
+                date: eventDate,
+                time: eventTime,
+                type: eventType
+            });
+
+            if (!workshopRecordId) {
+                throw new Error('Workshop not found. Please ensure the workshop exists in the system.');
+            }
+
+            await traceContext.completeStep(findWorkshopStepId, {
+                found: true,
+                workshopRecordId
+            });
+        } catch (error) {
+            await traceContext.failStep(findWorkshopStepId, error, traceId);
+            throw error;
+        }
+
+        // Step 3: Create relation in GHL
+        const associationId = process.env.GHL_ASSOCIATION_ID;
+        const { stepId: createRelationStepId } = await traceContext.startStep(
+            traceId,
+            'associate-contact-to-workshop',
+            'createContactWorkshopRelation',
+            { contactId, workshopRecordId, associationId }
+        );
+
+        try {
+            relationResponse = await createContactWorkshopRelation(
+                contactId,
+                workshopRecordId,
+                associationId
+            );
+
+            await traceContext.completeStep(createRelationStepId, {
+                success: true,
+                relationId: relationResponse?.id || relationResponse?.relationId
+            });
+        } catch (error) {
+            await traceContext.failStep(createRelationStepId, error, traceId);
+            throw error;
+        }
+
+        const result = {
             success: true,
+            traceId: traceId,
             contactId: contactId,
             workshopRecordId: workshopRecordId,
             relationResponse: relationResponse
         };
+
+        // Complete trace
+        await traceContext.completeTrace(traceId, 200, result);
+
+        console.log('Contact-workshop association completed successfully');
+        return result;
     } catch (error) {
         console.error('Error in contact-workshop association:', error.message);
+
+        // Fail trace
+        await traceContext.failTrace(traceId, error, 500, {
+            success: false,
+            error: error.message,
+            contactId,
+            workshopRecordId
+        });
+
         throw error;
     }
 }

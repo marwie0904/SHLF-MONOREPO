@@ -1,4 +1,5 @@
 const axios = require('axios');
+const traceContext = require('../utils/traceContext');
 
 /**
  * Gets workshop data from GHL custom object
@@ -133,31 +134,156 @@ async function incrementParticipants(workshopRecordId) {
 /**
  * Main function to handle workshop participant increment from webhook
  * @param {Object} webhookData - Webhook data from GHL
+ * @param {Object} reqContext - Request context for tracing (optional)
  * @returns {Promise<Object>} Result object
  */
-async function main(webhookData) {
+async function main(webhookData, reqContext = {}) {
+    // Start trace
+    const { traceId, context } = await traceContext.startTrace({
+        endpoint: '/increment-workshop-participants',
+        httpMethod: 'POST',
+        headers: reqContext.headers || {},
+        body: webhookData,
+        triggerType: 'webhook'
+    });
+
+    let workshopRecordId = null;
+    let workshopData = null;
+
     try {
         console.log('Processing workshop participant increment webhook...');
         console.log('Webhook data:', JSON.stringify(webhookData, null, 2));
 
-        // Extract workshop record ID from webhook data
-        // This may vary depending on how GHL sends the webhook
-        // Common patterns: workshopId, recordId, workshop_id, etc.
-        const workshopRecordId = webhookData.workshopRecordId
-            || webhookData.recordId
-            || webhookData.workshop_id
-            || webhookData.workshopId;
+        // Step 1: Extract workshop record ID
+        const { stepId: extractStepId } = await traceContext.startStep(
+            traceId,
+            'increment-workshop-participants',
+            'extractWorkshopRecordId',
+            { webhookData }
+        );
 
-        if (!workshopRecordId) {
-            throw new Error('Workshop record ID not found in webhook data');
+        try {
+            // Extract workshop record ID from webhook data
+            workshopRecordId = webhookData.workshopRecordId
+                || webhookData.recordId
+                || webhookData.workshop_id
+                || webhookData.workshopId;
+
+            if (!workshopRecordId) {
+                throw new Error('Workshop record ID not found in webhook data');
+            }
+
+            await traceContext.completeStep(extractStepId, {
+                workshopRecordId,
+                sourceField: webhookData.workshopRecordId ? 'workshopRecordId' :
+                             webhookData.recordId ? 'recordId' :
+                             webhookData.workshop_id ? 'workshop_id' : 'workshopId'
+            });
+        } catch (error) {
+            await traceContext.failStep(extractStepId, error, traceId);
+            throw error;
         }
 
-        // Increment participants
-        const result = await incrementParticipants(workshopRecordId);
+        // Step 2: Get current workshop data
+        const { stepId: getDataStepId } = await traceContext.startStep(
+            traceId,
+            'increment-workshop-participants',
+            'getWorkshopData',
+            { workshopRecordId }
+        );
 
-        return result;
+        try {
+            workshopData = await getWorkshopData(workshopRecordId);
+            await traceContext.completeStep(getDataStepId, {
+                currentParticipants: workshopData.currentParticipants,
+                maxCapacity: workshopData.maxCapacity,
+                workshopName: workshopData.workshopName
+            });
+        } catch (error) {
+            await traceContext.failStep(getDataStepId, error, traceId);
+            throw error;
+        }
+
+        // Step 3: Check capacity and increment
+        const { stepId: incrementStepId } = await traceContext.startStep(
+            traceId,
+            'increment-workshop-participants',
+            'incrementParticipants',
+            {
+                workshopRecordId,
+                currentParticipants: workshopData.currentParticipants,
+                maxCapacity: workshopData.maxCapacity
+            }
+        );
+
+        try {
+            // Check if workshop is at capacity
+            if (workshopData.currentParticipants >= workshopData.maxCapacity) {
+                const capacityResult = {
+                    success: false,
+                    atCapacity: true,
+                    currentParticipants: workshopData.currentParticipants,
+                    maxCapacity: workshopData.maxCapacity,
+                    message: 'Workshop is at maximum capacity'
+                };
+
+                await traceContext.completeStep(incrementStepId, {
+                    skipped: true,
+                    reason: 'at_capacity',
+                    ...capacityResult
+                });
+
+                // Complete trace with capacity result
+                await traceContext.completeTrace(traceId, 200, {
+                    ...capacityResult,
+                    traceId
+                });
+
+                console.log('Workshop is at max capacity. Not incrementing participants.');
+                return { ...capacityResult, traceId };
+            }
+
+            // Increment participant count
+            const newCount = workshopData.currentParticipants + 1;
+            const updateResponse = await updateParticipantCount(workshopRecordId, newCount);
+
+            await traceContext.completeStep(incrementStepId, {
+                success: true,
+                previousCount: workshopData.currentParticipants,
+                newCount: newCount,
+                maxCapacity: workshopData.maxCapacity
+            });
+
+            const result = {
+                success: true,
+                traceId: traceId,
+                atCapacity: false,
+                previousCount: workshopData.currentParticipants,
+                newCount: newCount,
+                maxCapacity: workshopData.maxCapacity,
+                updateResponse: updateResponse
+            };
+
+            // Complete trace
+            await traceContext.completeTrace(traceId, 200, result);
+
+            console.log('Participant increment completed successfully');
+            return result;
+        } catch (error) {
+            await traceContext.failStep(incrementStepId, error, traceId);
+            throw error;
+        }
     } catch (error) {
         console.error('Error in main:', error.message);
+
+        // Fail trace
+        await traceContext.failTrace(traceId, error, 500, {
+            success: false,
+            error: error.message,
+            workshopRecordId,
+            workshopData
+        });
+
         throw error;
     }
 }
