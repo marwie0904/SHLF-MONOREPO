@@ -159,9 +159,10 @@ export const opportunityStageChangedWorkflow = {
                                               layer: 'decision',
                                               type: 'decision',
                                               condition: 'Final outcome',
+                                              matchTraceStatus: true, // Match based on trace status
                                               children: [
-                                                { label: 'Success', value: 'success', node: { id: 'tasks_created_after_delete', name: 'Tasks Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'tasks_created', children: [] } },
-                                                { label: 'Error', value: 'error', node: { id: 'error_after_delete', name: 'Error', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'error', children: [] } }
+                                                { label: 'Success', value: 'success', matchValue: 'tasks_created', node: { id: 'tasks_created_after_delete', name: 'Tasks Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'tasks_created', children: [] } },
+                                                { label: 'Error', value: 'error', matchValue: 'error', node: { id: 'error_after_delete', name: 'Error', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'error', children: [] } }
                                               ]
                                             }]
                                           }]
@@ -232,9 +233,10 @@ export const opportunityStageChangedWorkflow = {
                                             layer: 'decision',
                                             type: 'decision',
                                             condition: 'Final outcome',
+                                            matchTraceStatus: true, // Match based on trace status
                                             children: [
-                                              { label: 'Success', value: 'success', node: { id: 'tasks_created', name: 'Tasks Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'tasks_created', children: [] } },
-                                              { label: 'Error', value: 'error', node: { id: 'error', name: 'Error', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'error', children: [] } }
+                                              { label: 'Success', value: 'success', matchValue: 'tasks_created', node: { id: 'tasks_created', name: 'Tasks Created', layer: 'outcome', type: 'outcome', status: 'success', matchAction: 'tasks_created', children: [] } },
+                                              { label: 'Error', value: 'error', matchValue: 'error', node: { id: 'error', name: 'Error', layer: 'outcome', type: 'outcome', status: 'error', matchAction: 'error', children: [] } }
                                             ]
                                           }]
                                         }]
@@ -469,9 +471,27 @@ export function matchGHLTraceToWorkflow(workflow, trace, steps) {
   console.log('[GHL WorkflowMatch] All step keys:', stepNames);
 
   // Get result action for outcome matching
-  const resultAction = trace?.resultAction?.toLowerCase() || '';
+  // GHL traces don't have resultAction, so derive it from status and responseBody
   const traceStatus = trace?.status?.toLowerCase() || '';
-  console.log('[GHL WorkflowMatch] Result action:', resultAction, 'Status:', traceStatus);
+  const responseBody = trace?.responseBody || {};
+
+  // Derive resultAction from trace data
+  let resultAction = '';
+  if (traceStatus === 'completed' && responseBody.success) {
+    if (responseBody.tasksCreated > 0) {
+      resultAction = 'tasks_created';
+    } else if (responseBody.tasksCreated === 0) {
+      resultAction = 'no_tasks';
+    } else {
+      resultAction = 'success';
+    }
+  } else if (traceStatus === 'failed' || responseBody.success === false) {
+    resultAction = 'error';
+  } else if (traceStatus === 'partial') {
+    resultAction = 'partial';
+  }
+
+  console.log('[GHL WorkflowMatch] Derived resultAction:', resultAction, 'Status:', traceStatus, 'ResponseBody:', responseBody);
 
   // Build a map of all details
   const allDetails = [];
@@ -582,12 +602,18 @@ export function matchGHLTraceToWorkflow(workflow, trace, steps) {
         }
       }
 
+      // For decisions that match on trace status (final outcome decisions)
+      if (node.matchTraceStatus) {
+        activeBranchValue = resultAction;
+        console.log(`[GHL WorkflowMatch] Decision ${node.id}: matchTraceStatus=true, resultAction=${resultAction}`);
+      }
+
       markedNode.children = node.children.map(branch => {
         const markedBranch = { ...branch };
 
         // Determine if this branch is active
         let isBranchActive = branchActive;
-        if (node.matchStepOutput && branch.matchValue !== undefined) {
+        if ((node.matchStepOutput || node.matchTraceStatus) && branch.matchValue !== undefined) {
           isBranchActive = branchActive && (branch.matchValue === activeBranchValue);
         }
 
