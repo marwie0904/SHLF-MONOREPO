@@ -2531,6 +2531,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       if (selfUpdateStepId) {
         try {
           await completeStep(selfUpdateStepId, {
+            isLikelySelfUpdate: true,  // For workflow matching
             skipped: true,
             reason: 'Self-triggered by our integration update (detected our fields in properties)',
             indicators: selfUpdateIndicators,
@@ -2552,6 +2553,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     if (selfUpdateStepId) {
       try {
         await completeStep(selfUpdateStepId, {
+          isLikelySelfUpdate: false,  // For workflow matching
           skipped: false,
           reason: 'External update, processing webhook',
           indicators: selfUpdateIndicators,
@@ -3263,6 +3265,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
       if (selfUpdateStepId) {
         try {
           await completeStep(selfUpdateStepId, {
+            isLikelyOurUpdate: true,  // For workflow matching
             skipped: true,
             reason: 'Self-triggered by our integration update (detected our fields in properties)',
             indicators: updateSelfIndicators,
@@ -3284,6 +3287,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     if (selfUpdateStepId) {
       try {
         await completeStep(selfUpdateStepId, {
+          isLikelyOurUpdate: false,  // For workflow matching
           skipped: false,
           reason: isForwardedRequest ? 'Forwarded request, processing' : 'External update, processing webhook',
           indicators: updateSelfIndicators,
