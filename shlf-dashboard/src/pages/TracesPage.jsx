@@ -66,17 +66,31 @@ function getEffectiveStatus(trace) {
 /**
  * Get display trigger name for GHL traces
  * Maps generic custom-object endpoints to specific invoice triggers when applicable
+ *
+ * The key insight: GHL sends ALL custom object events to the same webhook URL,
+ * but the `type` field in the request body tells us the actual event type:
+ * - "RecordCreate" -> created
+ * - "RecordUpdate" -> updated
+ * - "RecordDelete" -> deleted
  */
 function getGHLTriggerDisplayName(trace) {
   const endpoint = trace?.endpoint || ''
   let endpointName = endpoint.split('/').pop() || endpoint
+
+  // PRIMARY: Check the `type` field in requestBody - this is the most reliable indicator
+  const eventType = trace?.requestBody?.type || ''
+  if (eventType === 'RecordUpdate') {
+    endpointName = 'custom-object-updated'
+  } else if (eventType === 'RecordDelete') {
+    endpointName = 'custom-object-deleted'
+  } else if (eventType === 'RecordCreate') {
+    endpointName = 'custom-object-created'
+  }
+
+  // FALLBACK: Check resultAction/responseBody for forwarded requests (legacy)
   const resultAction = trace?.resultAction?.toLowerCase() || ''
   const responseAction = trace?.responseBody?.action?.toLowerCase() || ''
-
-  // Check if this trace was forwarded to a different endpoint
-  // The resultAction or responseBody.action contains the actual action taken
   if (endpointName === 'custom-object-created') {
-    // Check if it was actually forwarded to update or delete handler
     if (resultAction.includes('invoice_updated') || responseAction.includes('invoice_updated') ||
         resultAction === 'forwarded' || resultAction.includes('update')) {
       endpointName = 'custom-object-updated'

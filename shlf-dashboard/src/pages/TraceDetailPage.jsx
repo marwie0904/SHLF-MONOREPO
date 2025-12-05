@@ -47,12 +47,29 @@ function getStatusColor(status) {
 /**
  * Get display trigger name for GHL traces
  * Maps generic custom-object endpoints to specific invoice triggers when applicable
+ *
+ * The key insight: GHL sends ALL custom object events to the same webhook URL,
+ * but the `type` field in the request body tells us the actual event type:
+ * - "RecordCreate" -> created
+ * - "RecordUpdate" -> updated
+ * - "RecordDelete" -> deleted
+ *
  * @param {object} trace - The trace object
  * @param {array} steps - Optional array of steps to check for objectKey in first step's output
  */
 function getGHLTriggerDisplayName(trace, steps = []) {
   const endpoint = trace?.endpoint || ''
-  const endpointName = endpoint.split('/').pop() || endpoint
+  let endpointName = endpoint.split('/').pop() || endpoint
+
+  // PRIMARY: Check the `type` field in requestBody - this is the most reliable indicator
+  const eventType = trace?.requestBody?.type || ''
+  if (eventType === 'RecordUpdate') {
+    endpointName = 'custom-object-updated'
+  } else if (eventType === 'RecordDelete') {
+    endpointName = 'custom-object-deleted'
+  } else if (eventType === 'RecordCreate') {
+    endpointName = 'custom-object-created'
+  }
 
   // Check if this is an invoice-related trace by looking at objectKey
   // First check trace's requestBody, then fall back to first step's output
