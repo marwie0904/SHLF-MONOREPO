@@ -16,7 +16,7 @@ const { processInboundSms } = require('./services/smsConfirmationService');
 
 // Tracing imports
 const { tracingMiddleware, tracingErrorMiddleware } = require('./middleware/tracingMiddleware');
-const { startStep, completeStep, failStep, updateTraceContextIds } = require('./utils/traceContext');
+const { initializeGHLEventTracker, GHLEventTracker } = require('./services/ghlEventTracker');
 
 // In-memory cache for recently processed invoices to prevent duplicate processing
 // When we process an invoice, we add it here. If we see it again within TTL, we skip it.
@@ -71,35 +71,35 @@ app.post('/webhook/jotform', upload.none(), async (req, res) => {
     // Step 1: Parse the webhook data from the rawRequest field
     let parseStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'jotformParser', 'parseJotFormWebhook', { hasRawRequest: !!req.body.rawRequest });
+      const step = await GHLEventTracker.startStep(traceId, 'jotformParser', 'parseJotFormWebhook', { hasRawRequest: !!req.body.rawRequest });
       parseStepId = step.stepId;
     }
     const parsedData = parseJotFormWebhook(req.body.rawRequest);
-    if (parseStepId) await completeStep(parseStepId, { parsedFields: Object.keys(parsedData) });
+    if (parseStepId) await GHLEventTracker.completeStep(parseStepId, { parsedFields: Object.keys(parsedData) });
     console.log('Parsed data:', JSON.stringify(parsedData, null, 2));
 
     // Step 2: Map to GHL format
     let mapStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'dataMapper', 'mapJotFormToGHL', parsedData);
+      const step = await GHLEventTracker.startStep(traceId, 'dataMapper', 'mapJotFormToGHL', parsedData);
       mapStepId = step.stepId;
     }
     const ghlContactData = mapJotFormToGHL(parsedData);
-    if (mapStepId) await completeStep(mapStepId, ghlContactData);
+    if (mapStepId) await GHLEventTracker.completeStep(mapStepId, ghlContactData);
     console.log('Mapped GHL contact data:', JSON.stringify(ghlContactData, null, 2));
 
     // Step 3: Create or update contact in GHL
     let createContactStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'ghlService', 'createGHLContact', ghlContactData);
+      const step = await GHLEventTracker.startStep(traceId, 'ghlService', 'createGHLContact', ghlContactData);
       createContactStepId = step.stepId;
     }
     let ghlResponse;
     try {
       ghlResponse = await createGHLContact(ghlContactData, traceId, createContactStepId);
-      if (createContactStepId) await completeStep(createContactStepId, ghlResponse);
+      if (createContactStepId) await GHLEventTracker.completeStep(createContactStepId, ghlResponse);
     } catch (error) {
-      if (createContactStepId) await failStep(createContactStepId, error, traceId);
+      if (createContactStepId) await GHLEventTracker.failStep(createContactStepId, error, traceId);
       throw error;
     }
     console.log('GHL response:', ghlResponse);
@@ -110,7 +110,7 @@ app.post('/webhook/jotform', upload.none(), async (req, res) => {
 
     // Update trace with contact ID for easier lookup
     if (traceId && ghlContactId) {
-      await updateTraceContextIds(traceId, { contactId: ghlContactId });
+      await GHLEventTracker.updateTraceContextIds(traceId, { contactId: ghlContactId });
     }
 
     // Step 4: Create or update opportunity in "Pending Contact" stage
@@ -121,7 +121,7 @@ app.post('/webhook/jotform', upload.none(), async (req, res) => {
 
     let upsertOpportunityStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'ghlService', 'upsertGHLOpportunity', { ghlContactId, pipelineId, pendingContactStageId, contactName });
+      const step = await GHLEventTracker.startStep(traceId, 'ghlService', 'upsertGHLOpportunity', { ghlContactId, pipelineId, pendingContactStageId, contactName });
       upsertOpportunityStepId = step.stepId;
     }
     try {
@@ -134,16 +134,16 @@ app.post('/webhook/jotform', upload.none(), async (req, res) => {
         traceId,
         upsertOpportunityStepId
       );
-      if (upsertOpportunityStepId) await completeStep(upsertOpportunityStepId, opportunityResult);
+      if (upsertOpportunityStepId) await GHLEventTracker.completeStep(upsertOpportunityStepId, opportunityResult);
       console.log(opportunityResult.isNew ? 'Opportunity created:' : 'Opportunity updated:', opportunityResult);
 
       // Update trace with opportunity ID
       const oppId = opportunityResult?.opportunity?.id || opportunityResult?.id;
       if (traceId && oppId) {
-        await updateTraceContextIds(traceId, { opportunityId: oppId });
+        await GHLEventTracker.updateTraceContextIds(traceId, { opportunityId: oppId });
       }
     } catch (opportunityError) {
-      if (upsertOpportunityStepId) await failStep(upsertOpportunityStepId, opportunityError, traceId);
+      if (upsertOpportunityStepId) await GHLEventTracker.failStep(upsertOpportunityStepId, opportunityError, traceId);
       console.error('Error upserting opportunity:', opportunityError.message);
       // Don't fail the whole request if opportunity upsert fails
       opportunityResult = { success: false, error: opportunityError.message };
@@ -158,7 +158,7 @@ app.post('/webhook/jotform', upload.none(), async (req, res) => {
 
       let pdfStepId = null;
       if (traceId) {
-        const step = await startStep(traceId, 'pdfService', 'handlePdfUpload', { shouldSavePdf: true });
+        const step = await GHLEventTracker.startStep(traceId, 'pdfService', 'handlePdfUpload', { shouldSavePdf: true });
         pdfStepId = step.stepId;
       }
       try {
@@ -170,10 +170,10 @@ app.post('/webhook/jotform', upload.none(), async (req, res) => {
         console.log(`Downloading and uploading PDF - Submission: ${submissionId}, Form: ${formId}, Contact: ${ghlContactId}`);
 
         pdfUploadResult = await handlePdfUpload(submissionId, formId, ghlContactId, pdfContactName, traceId, pdfStepId);
-        if (pdfStepId) await completeStep(pdfStepId, pdfUploadResult);
+        if (pdfStepId) await GHLEventTracker.completeStep(pdfStepId, pdfUploadResult);
         console.log('PDF upload completed:', pdfUploadResult);
       } catch (pdfError) {
-        if (pdfStepId) await failStep(pdfStepId, pdfError, traceId);
+        if (pdfStepId) await GHLEventTracker.failStep(pdfStepId, pdfError, traceId);
         console.error('Error uploading PDF:', pdfError.message);
         // Don't fail the whole request if PDF upload fails
         pdfUploadResult = { success: false, error: pdfError.message };
@@ -222,7 +222,7 @@ app.post('/webhooks/ghl/opportunity-stage-changed', async (req, res) => {
     let webhookStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'webhook_received', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'webhook_received', {
           endpoint: '/webhooks/ghl/opportunity-stage-changed',
           method: 'POST',
           contentType: req.headers['content-type'],
@@ -242,7 +242,7 @@ app.post('/webhooks/ghl/opportunity-stage-changed', async (req, res) => {
     // Complete webhook received step
     if (webhookStepId) {
       try {
-        await completeStep(webhookStepId, {
+        await GHLEventTracker.completeStep(webhookStepId, {
           hasCustomData: !!req.body.customData,
           bodyKeys: Object.keys(req.body)
         });
@@ -255,7 +255,7 @@ app.post('/webhooks/ghl/opportunity-stage-changed', async (req, res) => {
     let rateLimitStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'rate_limit_check', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'rate_limit_check', {
           endpoint: '/webhooks/ghl/opportunity-stage-changed'
         });
         rateLimitStepId = step.stepId;
@@ -267,7 +267,7 @@ app.post('/webhooks/ghl/opportunity-stage-changed', async (req, res) => {
     // Rate limiting is handled by middleware, so we just log that we passed
     if (rateLimitStepId) {
       try {
-        await completeStep(rateLimitStepId, {
+        await GHLEventTracker.completeStep(rateLimitStepId, {
           passed: true,
           message: 'Rate limit check passed'
         });
@@ -280,7 +280,7 @@ app.post('/webhooks/ghl/opportunity-stage-changed', async (req, res) => {
     let validateStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'validate_timestamp', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'validate_timestamp', {
           currentTime: new Date().toISOString()
         });
         validateStepId = step.stepId;
@@ -295,7 +295,7 @@ app.post('/webhooks/ghl/opportunity-stage-changed', async (req, res) => {
 
     if (validateStepId) {
       try {
-        await completeStep(validateStepId, {
+        await GHLEventTracker.completeStep(validateStepId, {
           webhookTimestamp,
           isValid: isTimestampValid
         });
@@ -308,7 +308,7 @@ app.post('/webhooks/ghl/opportunity-stage-changed', async (req, res) => {
     let idempotencyStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'idempotency_check', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'idempotency_check', {
           opportunityId: req.body['opportunity-id'] || req.body.opportunityId,
           stageName: req.body['opportunity-stage-name'] || req.body.stageName
         });
@@ -321,7 +321,7 @@ app.post('/webhooks/ghl/opportunity-stage-changed', async (req, res) => {
     // Idempotency is handled by the grace period logic in the service
     if (idempotencyStepId) {
       try {
-        await completeStep(idempotencyStepId, {
+        await GHLEventTracker.completeStep(idempotencyStepId, {
           passed: true,
           message: 'Idempotency delegated to grace period logic'
         });
@@ -349,7 +349,7 @@ app.post('/webhooks/ghl/opportunity-stage-changed', async (req, res) => {
 
     // Update trace with context IDs
     if (traceId) {
-      await updateTraceContextIds(traceId, {
+      await GHLEventTracker.updateTraceContextIds(traceId, {
         opportunityId: webhookData.opportunityId,
         contactId: webhookData.contactId
       });
@@ -359,7 +359,7 @@ app.post('/webhooks/ghl/opportunity-stage-changed', async (req, res) => {
     let testModeStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'test_mode_filter', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'test_mode_filter', {
           opportunityId: webhookData.opportunityId,
           contactId: webhookData.contactId
         });
@@ -374,7 +374,7 @@ app.post('/webhooks/ghl/opportunity-stage-changed', async (req, res) => {
 
     if (testModeStepId) {
       try {
-        await completeStep(testModeStepId, {
+        await GHLEventTracker.completeStep(testModeStepId, {
           isInAllowlist,
           action: isInAllowlist ? 'allowed' : 'blocked'
         });
@@ -401,13 +401,13 @@ app.post('/webhooks/ghl/opportunity-stage-changed', async (req, res) => {
     // Step: Process the opportunity stage change and create tasks
     let processStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'ghlOpportunityService', 'processOpportunityStageChange', webhookData);
+      const step = await GHLEventTracker.startStep(traceId, 'ghlOpportunityService', 'processOpportunityStageChange', webhookData);
       processStepId = step.stepId;
     }
 
     try {
       const result = await processOpportunityStageChange(webhookData, traceId, processStepId);
-      if (processStepId) await completeStep(processStepId, result);
+      if (processStepId) await GHLEventTracker.completeStep(processStepId, result);
 
       res.json({
         success: true,
@@ -416,7 +416,7 @@ app.post('/webhooks/ghl/opportunity-stage-changed', async (req, res) => {
         details: result
       });
     } catch (processError) {
-      if (processStepId) await failStep(processStepId, processError, traceId);
+      if (processStepId) await GHLEventTracker.failStep(processStepId, processError, traceId);
       throw processError;
     }
 
@@ -444,7 +444,7 @@ app.post('/webhooks/ghl/task-created', async (req, res) => {
     let webhookStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'webhook_received', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'webhook_received', {
           endpoint: '/webhooks/ghl/task-created',
           method: 'POST',
           contentType: req.headers['content-type'],
@@ -459,7 +459,7 @@ app.post('/webhooks/ghl/task-created', async (req, res) => {
     // Complete webhook received step
     if (webhookStepId) {
       try {
-        await completeStep(webhookStepId, {
+        await GHLEventTracker.completeStep(webhookStepId, {
           bodyKeys: Object.keys(req.body)
         });
       } catch (e) {
@@ -471,7 +471,7 @@ app.post('/webhooks/ghl/task-created', async (req, res) => {
     let rateLimitStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'rate_limit_check', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'rate_limit_check', {
           endpoint: '/webhooks/ghl/task-created'
         });
         rateLimitStepId = step.stepId;
@@ -483,7 +483,7 @@ app.post('/webhooks/ghl/task-created', async (req, res) => {
     // Rate limiting is handled by middleware
     if (rateLimitStepId) {
       try {
-        await completeStep(rateLimitStepId, {
+        await GHLEventTracker.completeStep(rateLimitStepId, {
           passed: true,
           message: 'Rate limit check passed'
         });
@@ -496,7 +496,7 @@ app.post('/webhooks/ghl/task-created', async (req, res) => {
     let extractStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'extract_task_data', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'extract_task_data', {
           rawBodyKeys: Object.keys(req.body)
         });
         extractStepId = step.stepId;
@@ -512,7 +512,7 @@ app.post('/webhooks/ghl/task-created', async (req, res) => {
 
     if (extractStepId) {
       try {
-        await completeStep(extractStepId, {
+        await GHLEventTracker.completeStep(extractStepId, {
           taskId,
           contactId,
           taskTitle,
@@ -525,14 +525,14 @@ app.post('/webhooks/ghl/task-created', async (req, res) => {
 
     // Update trace with context IDs
     if (traceId && contactId) {
-      await updateTraceContextIds(traceId, { contactId });
+      await GHLEventTracker.updateTraceContextIds(traceId, { contactId });
     }
 
     // ===== STEP 4: Validate Required Fields =====
     let validateStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'validate_required_fields', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'validate_required_fields', {
           taskId,
           taskTitle
         });
@@ -548,7 +548,7 @@ app.post('/webhooks/ghl/task-created', async (req, res) => {
 
     if (validateStepId) {
       try {
-        await completeStep(validateStepId, {
+        await GHLEventTracker.completeStep(validateStepId, {
           isValid: validationErrors.length === 0,
           errors: validationErrors
         });
@@ -560,13 +560,13 @@ app.post('/webhooks/ghl/task-created', async (req, res) => {
     // Step: Process the task creation and sync to Supabase
     let processStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'ghlTaskService', 'processTaskCreation', { taskId, contactId, taskTitle });
+      const step = await GHLEventTracker.startStep(traceId, 'ghlTaskService', 'processTaskCreation', { taskId, contactId, taskTitle });
       processStepId = step.stepId;
     }
 
     try {
       const result = await processTaskCreation(req.body, traceId, processStepId);
-      if (processStepId) await completeStep(processStepId, result);
+      if (processStepId) await GHLEventTracker.completeStep(processStepId, result);
 
       res.json({
         success: true,
@@ -575,7 +575,7 @@ app.post('/webhooks/ghl/task-created', async (req, res) => {
         action: 'task_synced'
       });
     } catch (processError) {
-      if (processStepId) await failStep(processStepId, processError, traceId);
+      if (processStepId) await GHLEventTracker.failStep(processStepId, processError, traceId);
       throw processError;
     }
 
@@ -603,7 +603,7 @@ app.post('/webhooks/ghl/task-completed', async (req, res) => {
     let webhookStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'webhook_received', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'webhook_received', {
           endpoint: '/webhooks/ghl/task-completed',
           method: 'POST',
           contentType: req.headers['content-type'],
@@ -618,7 +618,7 @@ app.post('/webhooks/ghl/task-completed', async (req, res) => {
     // Complete webhook received step
     if (webhookStepId) {
       try {
-        await completeStep(webhookStepId, {
+        await GHLEventTracker.completeStep(webhookStepId, {
           bodyKeys: Object.keys(req.body)
         });
       } catch (e) {
@@ -630,7 +630,7 @@ app.post('/webhooks/ghl/task-completed', async (req, res) => {
     let rateLimitStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'rate_limit_check', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'rate_limit_check', {
           endpoint: '/webhooks/ghl/task-completed'
         });
         rateLimitStepId = step.stepId;
@@ -642,7 +642,7 @@ app.post('/webhooks/ghl/task-completed', async (req, res) => {
     // Rate limiting is handled by middleware
     if (rateLimitStepId) {
       try {
-        await completeStep(rateLimitStepId, {
+        await GHLEventTracker.completeStep(rateLimitStepId, {
           passed: true,
           message: 'Rate limit check passed'
         });
@@ -655,7 +655,7 @@ app.post('/webhooks/ghl/task-completed', async (req, res) => {
     let extractStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'extract_task_data', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'extract_task_data', {
           rawBodyKeys: Object.keys(req.body)
         });
         extractStepId = step.stepId;
@@ -685,7 +685,7 @@ app.post('/webhooks/ghl/task-completed', async (req, res) => {
 
     if (extractStepId) {
       try {
-        await completeStep(extractStepId, {
+        await GHLEventTracker.completeStep(extractStepId, {
           taskId: taskData.taskId,
           contactId: taskData.contactId,
           opportunityId: taskData.opportunityId,
@@ -699,7 +699,7 @@ app.post('/webhooks/ghl/task-completed', async (req, res) => {
 
     // Update trace with context IDs
     if (traceId) {
-      await updateTraceContextIds(traceId, {
+      await GHLEventTracker.updateTraceContextIds(traceId, {
         contactId: taskData.contactId,
         opportunityId: taskData.opportunityId
       });
@@ -709,7 +709,7 @@ app.post('/webhooks/ghl/task-completed', async (req, res) => {
     let validateStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'validate_required_fields', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'validate_required_fields', {
           contactId: taskData.contactId,
           title: taskData.title
         });
@@ -726,9 +726,9 @@ app.post('/webhooks/ghl/task-completed', async (req, res) => {
     if (validateStepId) {
       try {
         if (validationErrors.length > 0) {
-          await failStep(validateStepId, new Error(validationErrors.join(', ')), traceId);
+          await GHLEventTracker.failStep(validateStepId, new Error(validationErrors.join(', ')), traceId);
         } else {
-          await completeStep(validateStepId, {
+          await GHLEventTracker.completeStep(validateStepId, {
             isValid: true,
             errors: []
           });
@@ -757,7 +757,7 @@ app.post('/webhooks/ghl/task-completed', async (req, res) => {
     let completionCheckStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'check_completion_status', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'check_completion_status', {
           completed: taskData.completed
         });
         completionCheckStepId = step.stepId;
@@ -770,7 +770,7 @@ app.post('/webhooks/ghl/task-completed', async (req, res) => {
     if (!taskData.completed) {
       if (completionCheckStepId) {
         try {
-          await completeStep(completionCheckStepId, {
+          await GHLEventTracker.completeStep(completionCheckStepId, {
             isCompleted: false,
             action: 'skipped'
           });
@@ -787,7 +787,7 @@ app.post('/webhooks/ghl/task-completed', async (req, res) => {
 
     if (completionCheckStepId) {
       try {
-        await completeStep(completionCheckStepId, {
+        await GHLEventTracker.completeStep(completionCheckStepId, {
           isCompleted: true,
           action: 'proceed'
         });
@@ -799,13 +799,13 @@ app.post('/webhooks/ghl/task-completed', async (req, res) => {
     // Step: Process the task completion
     let processStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'ghlOpportunityService', 'processTaskCompletion', taskData);
+      const step = await GHLEventTracker.startStep(traceId, 'ghlOpportunityService', 'processTaskCompletion', taskData);
       processStepId = step.stepId;
     }
 
     try {
       const result = await processTaskCompletion(taskData, traceId, processStepId);
-      if (processStepId) await completeStep(processStepId, result);
+      if (processStepId) await GHLEventTracker.completeStep(processStepId, result);
 
       res.json({
         success: true,
@@ -814,7 +814,7 @@ app.post('/webhooks/ghl/task-completed', async (req, res) => {
         action: result.action || 'processed'
       });
     } catch (processError) {
-      if (processStepId) await failStep(processStepId, processError, traceId);
+      if (processStepId) await GHLEventTracker.failStep(processStepId, processError, traceId);
       throw processError;
     }
 
@@ -843,7 +843,7 @@ app.post('/webhooks/ghl/appointment-created', async (req, res) => {
     let webhookStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'webhook_received', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'webhook_received', {
           endpoint: '/webhooks/ghl/appointment-created',
           method: 'POST',
           contentType: req.headers['content-type'],
@@ -863,7 +863,7 @@ app.post('/webhooks/ghl/appointment-created', async (req, res) => {
     // Complete webhook received step
     if (webhookStepId) {
       try {
-        await completeStep(webhookStepId, {
+        await GHLEventTracker.completeStep(webhookStepId, {
           hasCustomData: !!req.body.customData,
           hasCalendarData: !!req.body.calendar,
           bodyKeys: Object.keys(req.body)
@@ -877,7 +877,7 @@ app.post('/webhooks/ghl/appointment-created', async (req, res) => {
     let rateLimitStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'rate_limit_check', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'rate_limit_check', {
           endpoint: '/webhooks/ghl/appointment-created'
         });
         rateLimitStepId = step.stepId;
@@ -889,7 +889,7 @@ app.post('/webhooks/ghl/appointment-created', async (req, res) => {
     // Rate limiting is handled by middleware, so we just log that we passed
     if (rateLimitStepId) {
       try {
-        await completeStep(rateLimitStepId, {
+        await GHLEventTracker.completeStep(rateLimitStepId, {
           passed: true,
           message: 'Rate limit check passed'
         });
@@ -902,7 +902,7 @@ app.post('/webhooks/ghl/appointment-created', async (req, res) => {
     let extractStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'extract_appointment_data', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'extract_appointment_data', {
           rawBodyKeys: Object.keys(req.body),
           hasCalendarNested: !!req.body.calendar,
           hasCustomData: !!req.body.customData
@@ -963,7 +963,7 @@ app.post('/webhooks/ghl/appointment-created', async (req, res) => {
     // Complete extract step
     if (extractStepId) {
       try {
-        await completeStep(extractStepId, {
+        await GHLEventTracker.completeStep(extractStepId, {
           appointmentId: webhookData.appointmentId,
           contactId: webhookData.contactId,
           calendarId: webhookData.calendarId,
@@ -978,7 +978,7 @@ app.post('/webhooks/ghl/appointment-created', async (req, res) => {
 
     // Update trace with context IDs
     if (traceId) {
-      await updateTraceContextIds(traceId, {
+      await GHLEventTracker.updateTraceContextIds(traceId, {
         appointmentId: webhookData.appointmentId,
         contactId: webhookData.contactId,
         opportunityId: webhookData.opportunityId
@@ -989,7 +989,7 @@ app.post('/webhooks/ghl/appointment-created', async (req, res) => {
     let validateStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'validate_required_fields', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'validate_required_fields', {
           appointmentId: webhookData.appointmentId,
           hasAppointmentId: !!webhookData.appointmentId
         });
@@ -1005,7 +1005,7 @@ app.post('/webhooks/ghl/appointment-created', async (req, res) => {
 
       if (validateStepId) {
         try {
-          await completeStep(validateStepId, {
+          await GHLEventTracker.completeStep(validateStepId, {
             isValid: false,
             missingFields: ['appointmentId'],
             receivedFields: Object.keys(req.body)
@@ -1026,7 +1026,7 @@ app.post('/webhooks/ghl/appointment-created', async (req, res) => {
     // Validation passed
     if (validateStepId) {
       try {
-        await completeStep(validateStepId, {
+        await GHLEventTracker.completeStep(validateStepId, {
           isValid: true,
           appointmentId: webhookData.appointmentId
         });
@@ -1038,13 +1038,13 @@ app.post('/webhooks/ghl/appointment-created', async (req, res) => {
     // Step: Process the appointment and update title
     let processStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'appointmentService', 'processAppointmentCreated', webhookData);
+      const step = await GHLEventTracker.startStep(traceId, 'appointmentService', 'processAppointmentCreated', webhookData);
       processStepId = step.stepId;
     }
 
     try {
       const result = await processAppointmentCreated(webhookData, traceId, processStepId);
-      if (processStepId) await completeStep(processStepId, result);
+      if (processStepId) await GHLEventTracker.completeStep(processStepId, result);
 
       res.json({
         success: true,
@@ -1059,7 +1059,7 @@ app.post('/webhooks/ghl/appointment-created', async (req, res) => {
         smsSent: result.smsSent
       });
     } catch (processError) {
-      if (processStepId) await failStep(processStepId, processError, traceId);
+      if (processStepId) await GHLEventTracker.failStep(processStepId, processError, traceId);
       throw processError;
     }
 
@@ -1092,7 +1092,7 @@ app.post('/webhooks/intakeSurvey', async (req, res) => {
 
     // Update trace with contact ID
     if (traceId && contactId) {
-      await updateTraceContextIds(traceId, { contactId });
+      await GHLEventTracker.updateTraceContextIds(traceId, { contactId });
     }
 
     // Validate required field
@@ -1113,16 +1113,16 @@ app.post('/webhooks/intakeSurvey', async (req, res) => {
 
     let searchStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'ghlOpportunityService', 'searchOpportunitiesByContact', { contactId, locationId });
+      const step = await GHLEventTracker.startStep(traceId, 'ghlOpportunityService', 'searchOpportunitiesByContact', { contactId, locationId });
       searchStepId = step.stepId;
     }
 
     let opportunities;
     try {
       opportunities = await searchOpportunitiesByContact(contactId, locationId, traceId, searchStepId);
-      if (searchStepId) await completeStep(searchStepId, { count: opportunities?.length || 0 });
+      if (searchStepId) await GHLEventTracker.completeStep(searchStepId, { count: opportunities?.length || 0 });
     } catch (searchError) {
-      if (searchStepId) await failStep(searchStepId, searchError, traceId);
+      if (searchStepId) await GHLEventTracker.failStep(searchStepId, searchError, traceId);
       throw searchError;
     }
 
@@ -1142,7 +1142,7 @@ app.post('/webhooks/intakeSurvey', async (req, res) => {
 
     // Update trace with opportunity ID
     if (traceId && opportunityId) {
-      await updateTraceContextIds(traceId, { opportunityId });
+      await GHLEventTracker.updateTraceContextIds(traceId, { opportunityId });
     }
 
     console.log(`✅ Found opportunity: ${opportunityId} (status: ${opportunity.status || 'unknown'})`);
@@ -1158,16 +1158,16 @@ app.post('/webhooks/intakeSurvey', async (req, res) => {
     // Step 2: Check if opportunity has moved from the original stage with retry logic
     let checkStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'ghlOpportunityService', 'checkOpportunityStageWithRetry', { opportunityId, expectedPipelineId: EXPECTED_PIPELINE_ID, expectedStageId: EXPECTED_STAGE_ID });
+      const step = await GHLEventTracker.startStep(traceId, 'ghlOpportunityService', 'checkOpportunityStageWithRetry', { opportunityId, expectedPipelineId: EXPECTED_PIPELINE_ID, expectedStageId: EXPECTED_STAGE_ID });
       checkStepId = step.stepId;
     }
 
     let hasMoved;
     try {
       hasMoved = await checkOpportunityStageWithRetry(opportunityId, EXPECTED_PIPELINE_ID, EXPECTED_STAGE_ID, traceId, checkStepId);
-      if (checkStepId) await completeStep(checkStepId, { hasMoved });
+      if (checkStepId) await GHLEventTracker.completeStep(checkStepId, { hasMoved });
     } catch (checkError) {
-      if (checkStepId) await failStep(checkStepId, checkError, traceId);
+      if (checkStepId) await GHLEventTracker.failStep(checkStepId, checkError, traceId);
       throw checkError;
     }
 
@@ -1202,15 +1202,15 @@ app.post('/webhooks/intakeSurvey', async (req, res) => {
       // Step 3: Update opportunity stage
       let updateStepId = null;
       if (traceId) {
-        const step = await startStep(traceId, 'ghlOpportunityService', 'updateOpportunityStage', { opportunityId, pipelineId, targetStageId, stageName });
+        const step = await GHLEventTracker.startStep(traceId, 'ghlOpportunityService', 'updateOpportunityStage', { opportunityId, pipelineId, targetStageId, stageName });
         updateStepId = step.stepId;
       }
 
       try {
         await updateOpportunityStage(opportunityId, pipelineId, targetStageId, traceId, updateStepId);
-        if (updateStepId) await completeStep(updateStepId, { success: true, stageName });
+        if (updateStepId) await GHLEventTracker.completeStep(updateStepId, { success: true, stageName });
       } catch (updateError) {
-        if (updateStepId) await failStep(updateStepId, updateError, traceId);
+        if (updateStepId) await GHLEventTracker.failStep(updateStepId, updateError, traceId);
         throw updateError;
       }
 
@@ -1252,7 +1252,7 @@ app.post('/workshop', upload.none(), async (req, res) => {
     let webhookStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'webhook_received', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'webhook_received', {
           endpoint: '/workshop',
           method: 'POST',
           contentType: req.headers['content-type'],
@@ -1272,7 +1272,7 @@ app.post('/workshop', upload.none(), async (req, res) => {
     // Complete webhook received step with initial data
     if (webhookStepId) {
       try {
-        await completeStep(webhookStepId, {
+        await GHLEventTracker.completeStep(webhookStepId, {
           hasRawData: !!rawData,
           rawDataLength: rawData ? rawData.length : 0,
           action: rawData ? 'process_webhook' : 'missing_data'
@@ -1286,7 +1286,7 @@ app.post('/workshop', upload.none(), async (req, res) => {
     let validateStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'processing', 'validate_input', {
+        const step = await GHLEventTracker.startStep(traceId, 'processing', 'validate_input', {
           hasRawData: !!rawData,
           rawDataType: typeof rawData
         });
@@ -1299,7 +1299,7 @@ app.post('/workshop', upload.none(), async (req, res) => {
     if (!rawData) {
       if (validateStepId) {
         try {
-          await completeStep(validateStepId, {
+          await GHLEventTracker.completeStep(validateStepId, {
             valid: false,
             reason: 'Missing rawRequest data',
             action: 'rejected'
@@ -1318,7 +1318,7 @@ app.post('/workshop', upload.none(), async (req, res) => {
     // Validation passed
     if (validateStepId) {
       try {
-        await completeStep(validateStepId, {
+        await GHLEventTracker.completeStep(validateStepId, {
           valid: true,
           rawDataLength: rawData.length,
           action: 'validated'
@@ -1336,7 +1336,7 @@ app.post('/workshop', upload.none(), async (req, res) => {
     let responseStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'processing', 'build_response', {
+        const step = await GHLEventTracker.startStep(traceId, 'processing', 'build_response', {
           success: result.success,
           ghlRecordId: result.ghlResponse?.id,
           supabaseId: result.supabaseResponse?.id
@@ -1363,7 +1363,7 @@ app.post('/workshop', upload.none(), async (req, res) => {
 
     if (responseStepId) {
       try {
-        await completeStep(responseStepId, response);
+        await GHLEventTracker.completeStep(responseStepId, response);
       } catch (e) {
         console.error('Error completing build_response step:', e.message);
       }
@@ -1378,12 +1378,12 @@ app.post('/workshop', upload.none(), async (req, res) => {
     let errorStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'error', 'handle_error', {
+        const step = await GHLEventTracker.startStep(traceId, 'error', 'handle_error', {
           errorMessage: error.message,
           errorStack: error.stack?.substring(0, 500)
         });
         errorStepId = step.stepId;
-        await failStep(errorStepId, error, traceId);
+        await GHLEventTracker.failStep(errorStepId, error, traceId);
       } catch (e) {
         console.error('Error tracking error step:', e.message);
       }
@@ -1413,35 +1413,35 @@ app.post('/webhook/jotform-intake', upload.none(), async (req, res) => {
     // Step 1: Parse the intake webhook data from the rawRequest field
     let parseStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'jotformIntakeParser', 'parseJotFormIntakeWebhook', { hasRawRequest: !!req.body.rawRequest });
+      const step = await GHLEventTracker.startStep(traceId, 'jotformIntakeParser', 'parseJotFormIntakeWebhook', { hasRawRequest: !!req.body.rawRequest });
       parseStepId = step.stepId;
     }
     const parsedData = parseJotFormIntakeWebhook(req.body.rawRequest);
-    if (parseStepId) await completeStep(parseStepId, { parsedFields: Object.keys(parsedData) });
+    if (parseStepId) await GHLEventTracker.completeStep(parseStepId, { parsedFields: Object.keys(parsedData) });
     console.log('Parsed intake data:', JSON.stringify(parsedData, null, 2));
 
     // Step 2: Map to GHL format
     let mapStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'intakeDataMapper', 'mapIntakeToGHL', parsedData);
+      const step = await GHLEventTracker.startStep(traceId, 'intakeDataMapper', 'mapIntakeToGHL', parsedData);
       mapStepId = step.stepId;
     }
     const ghlContactData = mapIntakeToGHL(parsedData);
-    if (mapStepId) await completeStep(mapStepId, ghlContactData);
+    if (mapStepId) await GHLEventTracker.completeStep(mapStepId, ghlContactData);
     console.log('Mapped GHL contact data:', JSON.stringify(ghlContactData, null, 2));
 
     // Step 3: Create or update contact in GHL
     let createContactStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'ghlService', 'createGHLContact', ghlContactData);
+      const step = await GHLEventTracker.startStep(traceId, 'ghlService', 'createGHLContact', ghlContactData);
       createContactStepId = step.stepId;
     }
     let ghlResponse;
     try {
       ghlResponse = await createGHLContact(ghlContactData, traceId, createContactStepId);
-      if (createContactStepId) await completeStep(createContactStepId, ghlResponse);
+      if (createContactStepId) await GHLEventTracker.completeStep(createContactStepId, ghlResponse);
     } catch (contactError) {
-      if (createContactStepId) await failStep(createContactStepId, contactError, traceId);
+      if (createContactStepId) await GHLEventTracker.failStep(createContactStepId, contactError, traceId);
       throw contactError;
     }
     console.log('GHL response:', ghlResponse);
@@ -1452,7 +1452,7 @@ app.post('/webhook/jotform-intake', upload.none(), async (req, res) => {
 
     // Update trace with contact ID
     if (traceId && ghlContactId) {
-      await updateTraceContextIds(traceId, { contactId: ghlContactId });
+      await GHLEventTracker.updateTraceContextIds(traceId, { contactId: ghlContactId });
     }
 
     // Step 4: Create opportunity in "Pending Contact" stage
@@ -1463,7 +1463,7 @@ app.post('/webhook/jotform-intake', upload.none(), async (req, res) => {
 
     let createOpportunityStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'ghlService', 'createGHLOpportunity', { ghlContactId, pipelineId, pendingContactStageId, contactName });
+      const step = await GHLEventTracker.startStep(traceId, 'ghlService', 'createGHLOpportunity', { ghlContactId, pipelineId, pendingContactStageId, contactName });
       createOpportunityStepId = step.stepId;
     }
     try {
@@ -1476,15 +1476,15 @@ app.post('/webhook/jotform-intake', upload.none(), async (req, res) => {
         traceId,
         createOpportunityStepId
       );
-      if (createOpportunityStepId) await completeStep(createOpportunityStepId, opportunityResult);
+      if (createOpportunityStepId) await GHLEventTracker.completeStep(createOpportunityStepId, opportunityResult);
       console.log('Opportunity created:', opportunityResult);
 
       // Update trace with opportunity ID
       if (traceId && opportunityResult?.id) {
-        await updateTraceContextIds(traceId, { opportunityId: opportunityResult.id });
+        await GHLEventTracker.updateTraceContextIds(traceId, { opportunityId: opportunityResult.id });
       }
     } catch (opportunityError) {
-      if (createOpportunityStepId) await failStep(createOpportunityStepId, opportunityError, traceId);
+      if (createOpportunityStepId) await GHLEventTracker.failStep(createOpportunityStepId, opportunityError, traceId);
       console.error('Error creating opportunity:', opportunityError.message);
       // Don't fail the whole request if opportunity creation fails
       opportunityResult = { success: false, error: opportunityError.message };
@@ -1499,7 +1499,7 @@ app.post('/webhook/jotform-intake', upload.none(), async (req, res) => {
 
       let pdfStepId = null;
       if (traceId) {
-        const step = await startStep(traceId, 'pdfService', 'handlePdfUpload', { shouldSavePdf: true });
+        const step = await GHLEventTracker.startStep(traceId, 'pdfService', 'handlePdfUpload', { shouldSavePdf: true });
         pdfStepId = step.stepId;
       }
       try {
@@ -1510,10 +1510,10 @@ app.post('/webhook/jotform-intake', upload.none(), async (req, res) => {
         console.log(`Downloading and uploading PDF - Submission: ${submissionId}, Form: ${formId}, Contact: ${ghlContactId}`);
 
         pdfUploadResult = await handlePdfUpload(submissionId, formId, ghlContactId, contactName, traceId, pdfStepId);
-        if (pdfStepId) await completeStep(pdfStepId, pdfUploadResult);
+        if (pdfStepId) await GHLEventTracker.completeStep(pdfStepId, pdfUploadResult);
         console.log('PDF upload completed:', pdfUploadResult);
       } catch (pdfError) {
-        if (pdfStepId) await failStep(pdfStepId, pdfError, traceId);
+        if (pdfStepId) await GHLEventTracker.failStep(pdfStepId, pdfError, traceId);
         console.error('Error uploading PDF:', pdfError.message);
         // Don't fail the whole request if PDF upload fails
         pdfUploadResult = { success: false, error: pdfError.message };
@@ -1558,7 +1558,7 @@ app.post('/associate-contact-workshop', async (req, res) => {
 
     // Update trace with contact ID
     if (traceId && contactId) {
-      await updateTraceContextIds(traceId, { contactId });
+      await GHLEventTracker.updateTraceContextIds(traceId, { contactId });
     }
 
     // Validate required fields
@@ -1574,7 +1574,7 @@ app.post('/associate-contact-workshop', async (req, res) => {
     // Step: Process the association
     let processStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'associateContactToWorkshop', 'main', { contactId, eventTitle, eventDate, eventTime, eventType });
+      const step = await GHLEventTracker.startStep(traceId, 'associateContactToWorkshop', 'main', { contactId, eventTitle, eventDate, eventTime, eventType });
       processStepId = step.stepId;
     }
 
@@ -1586,7 +1586,7 @@ app.post('/associate-contact-workshop', async (req, res) => {
         eventTime,
         eventType
       }, traceId, processStepId);
-      if (processStepId) await completeStep(processStepId, result);
+      if (processStepId) await GHLEventTracker.completeStep(processStepId, result);
 
       res.json({
         success: true,
@@ -1596,7 +1596,7 @@ app.post('/associate-contact-workshop', async (req, res) => {
         details: result
       });
     } catch (processError) {
-      if (processStepId) await failStep(processStepId, processError, traceId);
+      if (processStepId) await GHLEventTracker.failStep(processStepId, processError, traceId);
       throw processError;
     }
 
@@ -1644,11 +1644,11 @@ app.post('/webhooks/intakeForm', upload.none(), async (req, res) => {
     console.log('Parsing JotForm intake data...');
     let parseStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'jotformIntakeParser', 'parseJotFormIntakeWebhook', { hasRawRequest: !!rawRequest });
+      const step = await GHLEventTracker.startStep(traceId, 'jotformIntakeParser', 'parseJotFormIntakeWebhook', { hasRawRequest: !!rawRequest });
       parseStepId = step.stepId;
     }
     const parsedData = parseJotFormIntakeWebhook(rawRequest);
-    if (parseStepId) await completeStep(parseStepId, { parsedFields: Object.keys(parsedData) });
+    if (parseStepId) await GHLEventTracker.completeStep(parseStepId, { parsedFields: Object.keys(parsedData) });
 
     console.log('Parsed intake data:', {
       name: parsedData.name,
@@ -1685,7 +1685,7 @@ app.post('/webhooks/intakeForm', upload.none(), async (req, res) => {
     console.log('Mapping to GHL contact format...');
     let mapStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'intakeDataMapper', 'mapIntakeToGHL', parsedData);
+      const step = await GHLEventTracker.startStep(traceId, 'intakeDataMapper', 'mapIntakeToGHL', parsedData);
       mapStepId = step.stepId;
     }
     const ghlContactData = mapIntakeToGHL(parsedData);
@@ -1699,22 +1699,22 @@ app.post('/webhooks/intakeForm', upload.none(), async (req, res) => {
       id: 'BJKwhr1OUaStUYVo6poh', // Jotform Link field ID
       field_value: jotformLink
     });
-    if (mapStepId) await completeStep(mapStepId, ghlContactData);
+    if (mapStepId) await GHLEventTracker.completeStep(mapStepId, ghlContactData);
 
     console.log('Creating GHL contact with data:', JSON.stringify(ghlContactData, null, 2));
 
     // Step 3: Create or update contact in GHL
     let createContactStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'ghlService', 'createGHLContact', ghlContactData);
+      const step = await GHLEventTracker.startStep(traceId, 'ghlService', 'createGHLContact', ghlContactData);
       createContactStepId = step.stepId;
     }
     let ghlResponse;
     try {
       ghlResponse = await createGHLContact(ghlContactData, traceId, createContactStepId);
-      if (createContactStepId) await completeStep(createContactStepId, ghlResponse);
+      if (createContactStepId) await GHLEventTracker.completeStep(createContactStepId, ghlResponse);
     } catch (contactError) {
-      if (createContactStepId) await failStep(createContactStepId, contactError, traceId);
+      if (createContactStepId) await GHLEventTracker.failStep(createContactStepId, contactError, traceId);
       throw contactError;
     }
     const ghlContactId = ghlResponse.contact?.id || ghlResponse.id;
@@ -1722,7 +1722,7 @@ app.post('/webhooks/intakeForm', upload.none(), async (req, res) => {
 
     // Update trace with contact ID
     if (traceId && ghlContactId) {
-      await updateTraceContextIds(traceId, { contactId: ghlContactId });
+      await GHLEventTracker.updateTraceContextIds(traceId, { contactId: ghlContactId });
     }
 
     console.log(`GHL contact ${isDuplicate ? 'updated' : 'created'} successfully:`, ghlContactId);
@@ -1737,7 +1737,7 @@ app.post('/webhooks/intakeForm', upload.none(), async (req, res) => {
 
     let createOpportunityStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'ghlService', 'createGHLOpportunity', { ghlContactId, pipelineId, stageId, opportunityName });
+      const step = await GHLEventTracker.startStep(traceId, 'ghlService', 'createGHLOpportunity', { ghlContactId, pipelineId, stageId, opportunityName });
       createOpportunityStepId = step.stepId;
     }
     let opportunityResult = null;
@@ -1750,15 +1750,15 @@ app.post('/webhooks/intakeForm', upload.none(), async (req, res) => {
         traceId,
         createOpportunityStepId
       );
-      if (createOpportunityStepId) await completeStep(createOpportunityStepId, opportunityResult);
+      if (createOpportunityStepId) await GHLEventTracker.completeStep(createOpportunityStepId, opportunityResult);
       console.log('Opportunity created successfully:', opportunityResult);
 
       // Update trace with opportunity ID
       if (traceId && opportunityResult?.id) {
-        await updateTraceContextIds(traceId, { opportunityId: opportunityResult.id });
+        await GHLEventTracker.updateTraceContextIds(traceId, { opportunityId: opportunityResult.id });
       }
     } catch (opportunityError) {
-      if (createOpportunityStepId) await failStep(createOpportunityStepId, opportunityError, traceId);
+      if (createOpportunityStepId) await GHLEventTracker.failStep(createOpportunityStepId, opportunityError, traceId);
       console.error('Error creating opportunity:', opportunityError.message);
       opportunityResult = { success: false, error: opportunityError.message };
     }
@@ -1769,16 +1769,16 @@ app.post('/webhooks/intakeForm', upload.none(), async (req, res) => {
       console.log(`PDF creation requested (createPdf="${parsedData.createPdf}"), proceeding with PDF upload`);
       let pdfStepId = null;
       if (traceId) {
-        const step = await startStep(traceId, 'pdfService', 'handlePdfUpload', { shouldSavePdf: true });
+        const step = await GHLEventTracker.startStep(traceId, 'pdfService', 'handlePdfUpload', { shouldSavePdf: true });
         pdfStepId = step.stepId;
       }
       try {
         const formId = req.body.formID || '252965467838072';
         pdfUploadResult = await handlePdfUpload(submissionID, formId, ghlContactId, opportunityName, traceId, pdfStepId);
-        if (pdfStepId) await completeStep(pdfStepId, pdfUploadResult);
+        if (pdfStepId) await GHLEventTracker.completeStep(pdfStepId, pdfUploadResult);
         console.log('PDF upload completed:', pdfUploadResult);
       } catch (pdfError) {
-        if (pdfStepId) await failStep(pdfStepId, pdfError, traceId);
+        if (pdfStepId) await GHLEventTracker.failStep(pdfStepId, pdfError, traceId);
         console.error('Error uploading PDF:', pdfError.message);
         pdfUploadResult = { success: false, error: pdfError.message };
       }
@@ -1854,7 +1854,7 @@ app.post('/webhooks/ghl/invoice-created', async (req, res) => {
 
     // Update trace with context IDs
     if (traceId) {
-      await updateTraceContextIds(traceId, {
+      await GHLEventTracker.updateTraceContextIds(traceId, {
         invoiceId: webhookData.ghlInvoiceId,
         contactId: webhookData.contactId,
         opportunityId: webhookData.opportunityId
@@ -1881,18 +1881,18 @@ app.post('/webhooks/ghl/invoice-created', async (req, res) => {
       console.log('Fetching contact details from GHL...');
       let getContactStepId = null;
       if (traceId) {
-        const step = await startStep(traceId, 'ghlService', 'getContact', { contactId: webhookData.contactId });
+        const step = await GHLEventTracker.startStep(traceId, 'ghlService', 'getContact', { contactId: webhookData.contactId });
         getContactStepId = step.stepId;
       }
       try {
         const contactResponse = await ghlService.getContact(webhookData.contactId, traceId, getContactStepId);
-        if (getContactStepId) await completeStep(getContactStepId, contactResponse);
+        if (getContactStepId) await GHLEventTracker.completeStep(getContactStepId, contactResponse);
         if (contactResponse && contactResponse.contact) {
           webhookData.primaryContactName = `${contactResponse.contact.firstName || ''} ${contactResponse.contact.lastName || ''}`.trim();
           console.log('Contact name retrieved:', webhookData.primaryContactName);
         }
       } catch (error) {
-        if (getContactStepId) await failStep(getContactStepId, error, traceId);
+        if (getContactStepId) await GHLEventTracker.failStep(getContactStepId, error, traceId);
         console.warn('Could not fetch contact details:', error.message);
       }
     }
@@ -1901,7 +1901,7 @@ app.post('/webhooks/ghl/invoice-created', async (req, res) => {
     console.log('Saving invoice to Supabase...');
     let saveStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'invoiceService', 'saveInvoiceToSupabase', { ghlInvoiceId: webhookData.ghlInvoiceId });
+      const step = await GHLEventTracker.startStep(traceId, 'invoiceService', 'saveInvoiceToSupabase', { ghlInvoiceId: webhookData.ghlInvoiceId });
       saveStepId = step.stepId;
     }
 
@@ -1920,9 +1920,9 @@ app.post('/webhooks/ghl/invoice-created', async (req, res) => {
         invoiceDate: webhookData.invoiceDate,
         dueDate: webhookData.dueDate,
       }, traceId, saveStepId);
-      if (saveStepId) await completeStep(saveStepId, supabaseResult);
+      if (saveStepId) await GHLEventTracker.completeStep(saveStepId, supabaseResult);
     } catch (saveError) {
-      if (saveStepId) await failStep(saveStepId, saveError, traceId);
+      if (saveStepId) await GHLEventTracker.failStep(saveStepId, saveError, traceId);
       throw saveError;
     }
 
@@ -1941,7 +1941,7 @@ app.post('/webhooks/ghl/invoice-created', async (req, res) => {
     console.log('Creating invoice in Confido...');
     let confidoStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'confidoService', 'createInvoice', { ghlInvoiceId: webhookData.ghlInvoiceId, amountDue: webhookData.amountDue });
+      const step = await GHLEventTracker.startStep(traceId, 'confidoService', 'createInvoice', { ghlInvoiceId: webhookData.ghlInvoiceId, amountDue: webhookData.amountDue });
       confidoStepId = step.stepId;
     }
 
@@ -1961,9 +1961,9 @@ app.post('/webhooks/ghl/invoice-created', async (req, res) => {
         memo: `Invoice #${webhookData.invoiceNumber || 'N/A'} - ${webhookData.opportunityName || ''}`,
         lineItems: webhookData.lineItems,
       }, traceId, confidoStepId);
-      if (confidoStepId) await completeStep(confidoStepId, confidoResult);
+      if (confidoStepId) await GHLEventTracker.completeStep(confidoStepId, confidoResult);
     } catch (confidoError) {
-      if (confidoStepId) await failStep(confidoStepId, confidoError, traceId);
+      if (confidoStepId) await GHLEventTracker.failStep(confidoStepId, confidoError, traceId);
       throw confidoError;
     }
 
@@ -1991,7 +1991,7 @@ app.post('/webhooks/ghl/invoice-created', async (req, res) => {
     // Step 3: Update Supabase record with all Confido IDs
     let updateStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'invoiceService', 'saveInvoiceToSupabase', { action: 'update', ghlInvoiceId: webhookData.ghlInvoiceId });
+      const step = await GHLEventTracker.startStep(traceId, 'invoiceService', 'saveInvoiceToSupabase', { action: 'update', ghlInvoiceId: webhookData.ghlInvoiceId });
       updateStepId = step.stepId;
     }
 
@@ -2012,9 +2012,9 @@ app.post('/webhooks/ghl/invoice-created', async (req, res) => {
         invoiceDate: webhookData.invoiceDate,
         dueDate: webhookData.dueDate,
       }, traceId, updateStepId);
-      if (updateStepId) await completeStep(updateStepId, updateResult);
+      if (updateStepId) await GHLEventTracker.completeStep(updateStepId, updateResult);
     } catch (updateError) {
-      if (updateStepId) await failStep(updateStepId, updateError, traceId);
+      if (updateStepId) await GHLEventTracker.failStep(updateStepId, updateError, traceId);
       // Non-blocking - invoice already created
       console.error('Failed to update Supabase with Confido IDs:', updateError.message);
     }
@@ -2116,16 +2116,16 @@ app.post('/webhooks/confido/payment-received', async (req, res) => {
     console.log('Looking up invoice by Confido ID...');
     let lookupStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'invoiceService', 'getInvoiceByconfidoId', { confidoInvoiceId: paymentData.confidoInvoiceId });
+      const step = await GHLEventTracker.startStep(traceId, 'invoiceService', 'getInvoiceByconfidoId', { confidoInvoiceId: paymentData.confidoInvoiceId });
       lookupStepId = step.stepId;
     }
 
     let invoiceResult;
     try {
       invoiceResult = await invoiceService.getInvoiceByconfidoId(paymentData.confidoInvoiceId, traceId, lookupStepId);
-      if (lookupStepId) await completeStep(lookupStepId, invoiceResult);
+      if (lookupStepId) await GHLEventTracker.completeStep(lookupStepId, invoiceResult);
     } catch (lookupError) {
-      if (lookupStepId) await failStep(lookupStepId, lookupError, traceId);
+      if (lookupStepId) await GHLEventTracker.failStep(lookupStepId, lookupError, traceId);
       throw lookupError;
     }
 
@@ -2142,7 +2142,7 @@ app.post('/webhooks/confido/payment-received', async (req, res) => {
 
     // Update trace with context IDs
     if (traceId) {
-      await updateTraceContextIds(traceId, {
+      await GHLEventTracker.updateTraceContextIds(traceId, {
         invoiceId: invoice.ghl_invoice_id,
         contactId: invoice.ghl_contact_id,
         opportunityId: invoice.ghl_opportunity_id
@@ -2160,7 +2160,7 @@ app.post('/webhooks/confido/payment-received', async (req, res) => {
     console.log('Updating invoice payment status...');
     let updateStatusStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'invoiceService', 'updateInvoicePaymentStatus', { confidoInvoiceId: paymentData.confidoInvoiceId, amount: paymentData.amount });
+      const step = await GHLEventTracker.startStep(traceId, 'invoiceService', 'updateInvoicePaymentStatus', { confidoInvoiceId: paymentData.confidoInvoiceId, amount: paymentData.amount });
       updateStatusStepId = step.stepId;
     }
 
@@ -2175,9 +2175,9 @@ app.post('/webhooks/confido/payment-received', async (req, res) => {
         traceId,
         updateStatusStepId
       );
-      if (updateStatusStepId) await completeStep(updateStatusStepId, updateResult);
+      if (updateStatusStepId) await GHLEventTracker.completeStep(updateStatusStepId, updateResult);
     } catch (updateError) {
-      if (updateStatusStepId) await failStep(updateStatusStepId, updateError, traceId);
+      if (updateStatusStepId) await GHLEventTracker.failStep(updateStatusStepId, updateError, traceId);
       throw updateError;
     }
 
@@ -2196,7 +2196,7 @@ app.post('/webhooks/confido/payment-received', async (req, res) => {
     console.log('Saving payment transaction...');
     let savePaymentStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'invoiceService', 'savePaymentToSupabase', { confidoPaymentId: paymentData.confidoPaymentId, amount: paymentData.amount });
+      const step = await GHLEventTracker.startStep(traceId, 'invoiceService', 'savePaymentToSupabase', { confidoPaymentId: paymentData.confidoPaymentId, amount: paymentData.amount });
       savePaymentStepId = step.stepId;
     }
 
@@ -2214,9 +2214,9 @@ app.post('/webhooks/confido/payment-received', async (req, res) => {
         transactionDate: paymentData.transactionDate,
         rawWebhookData: req.body, // Store full payload for debugging
       }, traceId, savePaymentStepId);
-      if (savePaymentStepId) await completeStep(savePaymentStepId, paymentRecord);
+      if (savePaymentStepId) await GHLEventTracker.completeStep(savePaymentStepId, paymentRecord);
     } catch (saveError) {
-      if (savePaymentStepId) await failStep(savePaymentStepId, saveError, traceId);
+      if (savePaymentStepId) await GHLEventTracker.failStep(savePaymentStepId, saveError, traceId);
       throw saveError;
     }
 
@@ -2227,7 +2227,7 @@ app.post('/webhooks/confido/payment-received', async (req, res) => {
       console.log('Recording payment in GHL invoice...');
       let recordPaymentStepId = null;
       if (traceId) {
-        const step = await startStep(traceId, 'ghlService', 'recordInvoicePayment', { ghlInvoiceId: invoice.ghl_invoice_id, amount: paymentData.amount });
+        const step = await GHLEventTracker.startStep(traceId, 'ghlService', 'recordInvoicePayment', { ghlInvoiceId: invoice.ghl_invoice_id, amount: paymentData.amount });
         recordPaymentStepId = step.stepId;
       }
       try {
@@ -2237,11 +2237,11 @@ app.post('/webhooks/confido/payment-received', async (req, res) => {
           transactionId: paymentData.confidoPaymentId,
           note: `Payment processed via Confido Legal on ${new Date(paymentData.transactionDate).toLocaleDateString()}`
         }, traceId, recordPaymentStepId);
-        if (recordPaymentStepId) await completeStep(recordPaymentStepId, { success: true });
+        if (recordPaymentStepId) await GHLEventTracker.completeStep(recordPaymentStepId, { success: true });
 
         console.log('✅ Payment recorded in GHL invoice');
       } catch (ghlError) {
-        if (recordPaymentStepId) await failStep(recordPaymentStepId, ghlError, traceId);
+        if (recordPaymentStepId) await GHLEventTracker.failStep(recordPaymentStepId, ghlError, traceId);
         console.error('Failed to record payment in GHL invoice:', ghlError.message);
         // Don't fail the request - payment is already recorded in Supabase
       }
@@ -2249,7 +2249,7 @@ app.post('/webhooks/confido/payment-received', async (req, res) => {
       // Step 5: Update GHL custom object status to 'paid'
       let updateCustomObjStepId = null;
       if (traceId) {
-        const step = await startStep(traceId, 'ghlService', 'updateCustomObject', { objectKey: 'custom_objects.invoices', recordId: invoice.ghl_invoice_id, status: 'paid' });
+        const step = await GHLEventTracker.startStep(traceId, 'ghlService', 'updateCustomObject', { objectKey: 'custom_objects.invoices', recordId: invoice.ghl_invoice_id, status: 'paid' });
         updateCustomObjStepId = step.stepId;
       }
       try {
@@ -2264,10 +2264,10 @@ app.post('/webhooks/confido/payment-received', async (req, res) => {
           traceId,
           updateCustomObjStepId
         );
-        if (updateCustomObjStepId) await completeStep(updateCustomObjStepId, { success: true });
+        if (updateCustomObjStepId) await GHLEventTracker.completeStep(updateCustomObjStepId, { success: true });
         console.log('✅ GHL custom object status updated to paid');
       } catch (statusError) {
-        if (updateCustomObjStepId) await failStep(updateCustomObjStepId, statusError, traceId);
+        if (updateCustomObjStepId) await GHLEventTracker.failStep(updateCustomObjStepId, statusError, traceId);
         console.error('Failed to update GHL custom object status:', statusError.message);
         // Don't fail the request - payment is already recorded
       }
@@ -2278,7 +2278,7 @@ app.post('/webhooks/confido/payment-received', async (req, res) => {
       console.log('Creating notification task in GHL...');
       let createTaskStepId = null;
       if (traceId) {
-        const step = await startStep(traceId, 'ghlService', 'createTask', { contactId: invoice.ghl_contact_id, opportunityId: invoice.ghl_opportunity_id });
+        const step = await GHLEventTracker.startStep(traceId, 'ghlService', 'createTask', { contactId: invoice.ghl_contact_id, opportunityId: invoice.ghl_opportunity_id });
         createTaskStepId = step.stepId;
       }
       try {
@@ -2296,11 +2296,11 @@ app.post('/webhooks/confido/payment-received', async (req, res) => {
           traceId,
           createTaskStepId
         );
-        if (createTaskStepId) await completeStep(createTaskStepId, { success: true });
+        if (createTaskStepId) await GHLEventTracker.completeStep(createTaskStepId, { success: true });
 
         console.log('✅ Notification task created in GHL');
       } catch (taskError) {
-        if (createTaskStepId) await failStep(createTaskStepId, taskError, traceId);
+        if (createTaskStepId) await GHLEventTracker.failStep(createTaskStepId, taskError, traceId);
         console.error('Failed to create GHL task:', taskError.message);
         // Don't fail the request - payment is already recorded
       }
@@ -2309,7 +2309,7 @@ app.post('/webhooks/confido/payment-received', async (req, res) => {
       console.log('Moving opportunity to Engaged stage...');
       let moveStageStepId = null;
       if (traceId) {
-        const step = await startStep(traceId, 'ghlOpportunityService', 'updateOpportunityStage', { opportunityId: invoice.ghl_opportunity_id, targetStage: 'Engaged' });
+        const step = await GHLEventTracker.startStep(traceId, 'ghlOpportunityService', 'updateOpportunityStage', { opportunityId: invoice.ghl_opportunity_id, targetStage: 'Engaged' });
         moveStageStepId = step.stepId;
       }
       try {
@@ -2323,10 +2323,10 @@ app.post('/webhooks/confido/payment-received', async (req, res) => {
         console.log(`   Target Stage (Engaged): ${ENGAGED_STAGE_ID}`);
 
         await updateOpportunityStage(invoice.ghl_opportunity_id, currentPipelineId, ENGAGED_STAGE_ID, traceId, moveStageStepId);
-        if (moveStageStepId) await completeStep(moveStageStepId, { success: true, stageId: ENGAGED_STAGE_ID });
+        if (moveStageStepId) await GHLEventTracker.completeStep(moveStageStepId, { success: true, stageId: ENGAGED_STAGE_ID });
         console.log('✅ Opportunity moved to Engaged stage');
       } catch (stageError) {
-        if (moveStageStepId) await failStep(moveStageStepId, stageError, traceId);
+        if (moveStageStepId) await GHLEventTracker.failStep(moveStageStepId, stageError, traceId);
         console.error('Failed to move opportunity to Engaged stage:', stageError.message);
         // Don't fail the request - payment is already recorded
       }
@@ -2337,7 +2337,7 @@ app.post('/webhooks/confido/payment-received', async (req, res) => {
     if (invoice.ghl_contact_id) {
       let emailStepId = null;
       if (traceId) {
-        const step = await startStep(traceId, 'invoiceEmailService', 'sendPaidInvoiceEmail', { contactId: invoice.ghl_contact_id });
+        const step = await GHLEventTracker.startStep(traceId, 'invoiceEmailService', 'sendPaidInvoiceEmail', { contactId: invoice.ghl_contact_id });
         emailStepId = step.stepId;
       }
       try {
@@ -2367,15 +2367,15 @@ app.post('/webhooks/confido/payment-received', async (req, res) => {
           };
 
           await sendPaidInvoiceEmail(paidInvoiceData, contactEmail, traceId, emailStepId);
-          if (emailStepId) await completeStep(emailStepId, { success: true, emailSent: true });
+          if (emailStepId) await GHLEventTracker.completeStep(emailStepId, { success: true, emailSent: true });
           console.log('✅ Paid invoice email sent successfully');
           emailSent = true;
         } else {
-          if (emailStepId) await completeStep(emailStepId, { success: true, emailSent: false, reason: 'no email' });
+          if (emailStepId) await GHLEventTracker.completeStep(emailStepId, { success: true, emailSent: false, reason: 'no email' });
           console.warn('⚠️ No contact email found, skipping paid invoice email');
         }
       } catch (emailError) {
-        if (emailStepId) await failStep(emailStepId, emailError, traceId);
+        if (emailStepId) await GHLEventTracker.failStep(emailStepId, emailError, traceId);
         console.error('Failed to send paid invoice email (non-blocking):', emailError.message);
       }
     }
@@ -2481,7 +2481,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     let webhookStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'webhook_received', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'webhook_received', {
           endpoint: '/webhooks/ghl/custom-object-created',
           method: 'POST',
           contentType: req.headers['content-type'],
@@ -2496,7 +2496,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     // Update trace with invoice ID if available
     const invoiceRecordId = req.body.id || req.body.recordId;
     if (traceId && invoiceRecordId) {
-      await updateTraceContextIds(traceId, { invoiceId: invoiceRecordId });
+      await GHLEventTracker.updateTraceContextIds(traceId, { invoiceId: invoiceRecordId });
     }
 
     const eventType = req.body.type || 'RecordCreate';
@@ -2505,7 +2505,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     // Complete webhook received step
     if (webhookStepId) {
       try {
-        await completeStep(webhookStepId, {
+        await GHLEventTracker.completeStep(webhookStepId, {
           recordId: invoiceRecordId,
           eventType,
           objectKey,
@@ -2539,7 +2539,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     let selfUpdateStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'processing', 'check_self_update', {
+        const step = await GHLEventTracker.startStep(traceId, 'processing', 'check_self_update', {
           eventType,
           ...selfUpdateIndicators,
           isLikelySelfUpdate
@@ -2555,7 +2555,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       console.log('Self-update indicators:', selfUpdateIndicators);
       if (selfUpdateStepId) {
         try {
-          await completeStep(selfUpdateStepId, {
+          await GHLEventTracker.completeStep(selfUpdateStepId, {
             isLikelySelfUpdate: true,  // For workflow matching
             skipped: true,
             reason: 'Self-triggered by our integration update (detected our fields in properties)',
@@ -2577,7 +2577,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     // Not our update, continue processing
     if (selfUpdateStepId) {
       try {
-        await completeStep(selfUpdateStepId, {
+        await GHLEventTracker.completeStep(selfUpdateStepId, {
           isLikelySelfUpdate: false,  // For workflow matching
           skipped: false,
           reason: 'External update, processing webhook',
@@ -2593,7 +2593,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     let routeStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'route_event_type', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'route_event_type', {
           eventType,
           objectKey
         });
@@ -2608,7 +2608,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       console.log('📍 Routing to DELETE handler...');
       if (routeStepId) {
         try {
-          await completeStep(routeStepId, { routedTo: 'custom-object-deleted', action: 'forwarded' });
+          await GHLEventTracker.completeStep(routeStepId, { routedTo: 'custom-object-deleted', action: 'forwarded' });
         } catch (e) {
           console.error('Error completing route_event_type step:', e.message);
         }
@@ -2644,7 +2644,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       console.log('📍 Routing to UPDATE handler...');
       if (routeStepId) {
         try {
-          await completeStep(routeStepId, { routedTo: 'custom-object-updated', action: 'forwarded' });
+          await GHLEventTracker.completeStep(routeStepId, { routedTo: 'custom-object-updated', action: 'forwarded' });
         } catch (e) {
           console.error('Error completing route_event_type step:', e.message);
         }
@@ -2679,7 +2679,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     // Continue with RecordCreate handling
     if (routeStepId) {
       try {
-        await completeStep(routeStepId, { routedTo: 'RecordCreate', action: 'process_locally' });
+        await GHLEventTracker.completeStep(routeStepId, { routedTo: 'RecordCreate', action: 'process_locally' });
       } catch (e) {
         console.error('Error completing route_event_type step:', e.message);
       }
@@ -2704,7 +2704,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     let checkTypeStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'processing', 'check_object_type', {
+        const step = await GHLEventTracker.startStep(traceId, 'processing', 'check_object_type', {
           objectKey: objectData.objectKey,
           expectedKey: 'custom_objects.invoices'
         });
@@ -2719,7 +2719,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       console.log('ℹ️ Not an invoice object, skipping...');
       if (checkTypeStepId) {
         try {
-          await completeStep(checkTypeStepId, {
+          await GHLEventTracker.completeStep(checkTypeStepId, {
             isInvoice: false,
             objectKey: objectData.objectKey,
             action: 'skipped'
@@ -2738,7 +2738,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     // Is invoice object
     if (checkTypeStepId) {
       try {
-        await completeStep(checkTypeStepId, {
+        await GHLEventTracker.completeStep(checkTypeStepId, {
           isInvoice: true,
           recordId: objectData.recordId,
           action: 'process_invoice'
@@ -2755,7 +2755,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     let retryStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'ghl', 'waitForOpportunityAssociation', {
+        const step = await GHLEventTracker.startStep(traceId, 'ghl', 'waitForOpportunityAssociation', {
           recordId: objectData.recordId,
           maxAttempts: 6,
           delayMs: 10000
@@ -2802,7 +2802,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
         // Check if we have the opportunity association
         if (hasOpportunity) {
           console.log(`✅ Opportunity association found on attempt ${attemptCount}`);
-          if (retryStepId) await completeStep(retryStepId, { found: true, attempts: attemptCount });
+          if (retryStepId) await GHLEventTracker.completeStep(retryStepId, { found: true, attempts: attemptCount });
           break;
         }
 
@@ -2810,7 +2810,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
 
         if (attemptCount === maxAttempts) {
           console.log('❌ Max attempts reached - no opportunity association found');
-          if (retryStepId) await completeStep(retryStepId, { found: false, attempts: attemptCount, action: 'no_opportunity_association' });
+          if (retryStepId) await GHLEventTracker.completeStep(retryStepId, { found: false, attempts: attemptCount, action: 'no_opportunity_association' });
           return res.json({
             success: false,
             message: 'Invoice missing opportunity association after 6 attempts',
@@ -2822,7 +2822,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
         }
       }
     } catch (retryError) {
-      if (retryStepId) await failStep(retryStepId, retryError, traceId);
+      if (retryStepId) await GHLEventTracker.failStep(retryStepId, retryError, traceId);
       throw retryError;
     }
 
@@ -2830,7 +2830,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     let calcStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'supabase', 'calculateInvoiceTotal', {
+        const step = await GHLEventTracker.startStep(traceId, 'supabase', 'calculateInvoiceTotal', {
           serviceItems: invoiceRecord.properties.serviceproduct || []
         });
         calcStepId = step.stepId;
@@ -2846,7 +2846,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     try {
       calculationResult = await invoiceService.calculateInvoiceTotal(serviceItems, traceId, calcStepId);
       if (!calculationResult.success) {
-        if (calcStepId) await failStep(calcStepId, { message: calculationResult.error }, traceId);
+        if (calcStepId) await GHLEventTracker.failStep(calcStepId, { message: calculationResult.error }, traceId);
         console.error('Failed to calculate invoice total:', calculationResult.error);
         return res.status(500).json({
           success: false,
@@ -2855,13 +2855,13 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
           action: 'calculation_failed'
         });
       }
-      if (calcStepId) await completeStep(calcStepId, {
+      if (calcStepId) await GHLEventTracker.completeStep(calcStepId, {
         total: calculationResult.total,
         lineItemsCount: calculationResult.lineItems.length,
         missingItems: calculationResult.missingItems
       });
     } catch (calcError) {
-      if (calcStepId) await failStep(calcStepId, calcError, traceId);
+      if (calcStepId) await GHLEventTracker.failStep(calcStepId, calcError, traceId);
       throw calcError;
     }
 
@@ -2882,9 +2882,9 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
 
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'ghl', 'getOpportunity', { opportunityId });
+        const step = await GHLEventTracker.startStep(traceId, 'ghl', 'getOpportunity', { opportunityId });
         getOppStepId = step.stepId;
-        await updateTraceContextIds(traceId, { opportunityId });
+        await GHLEventTracker.updateTraceContextIds(traceId, { opportunityId });
       } catch (e) {
         console.error('Error starting getOpportunity step:', e.message);
       }
@@ -2896,14 +2896,14 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     try {
       const opportunityResponse = await ghlService.getOpportunity(opportunityId, traceId, getOppStepId);
       opportunity = opportunityResponse.opportunity;
-      if (getOppStepId) await completeStep(getOppStepId, {
+      if (getOppStepId) await GHLEventTracker.completeStep(getOppStepId, {
         opportunityName: opportunity.name,
         contactId: opportunity.contactId,
         contactEmail: opportunity.contact?.email
       });
       console.log('Opportunity Details:', JSON.stringify(opportunity, null, 2));
     } catch (oppError) {
-      if (getOppStepId) await failStep(getOppStepId, oppError, traceId);
+      if (getOppStepId) await GHLEventTracker.failStep(getOppStepId, oppError, traceId);
       throw oppError;
     }
 
@@ -2911,7 +2911,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     let confidoStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'confido', 'createInvoice', {
+        const step = await GHLEventTracker.startStep(traceId, 'confido', 'createInvoice', {
           ghlInvoiceId: objectData.recordId,
           opportunityId: opportunity.id,
           amountDue: total
@@ -2953,7 +2953,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
             console.log('✅ Found existing invoice in Supabase');
             console.log('Payment URL:', existingInvoice.data.payment_url);
 
-            if (confidoStepId) await completeStep(confidoStepId, {
+            if (confidoStepId) await GHLEventTracker.completeStep(confidoStepId, {
               isDuplicate: true,
               paymentUrl: existingInvoice.data.payment_url,
               action: 'duplicate_invoice'
@@ -2970,7 +2970,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
             });
           } else {
             console.error('⚠️ PaymentLink exists in Confido but not in Supabase');
-            if (confidoStepId) await failStep(confidoStepId, { message: 'Data inconsistency - PaymentLink exists in Confido but not in Supabase' }, traceId);
+            if (confidoStepId) await GHLEventTracker.failStep(confidoStepId, { message: 'Data inconsistency - PaymentLink exists in Confido but not in Supabase' }, traceId);
             return res.json({
               success: false,
               message: 'Data inconsistency - PaymentLink exists in Confido but not in Supabase',
@@ -2983,7 +2983,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
 
         // Other errors
         console.error('Failed to create invoice in Confido:', confidoResult.error);
-        if (confidoStepId) await failStep(confidoStepId, { message: confidoResult.error }, traceId);
+        if (confidoStepId) await GHLEventTracker.failStep(confidoStepId, { message: confidoResult.error }, traceId);
         return res.json({
           success: true,
           message: 'Invoice processed but Confido creation failed',
@@ -2994,13 +2994,13 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
         });
       }
 
-      if (confidoStepId) await completeStep(confidoStepId, {
+      if (confidoStepId) await GHLEventTracker.completeStep(confidoStepId, {
         confidoInvoiceId: confidoResult.confidoInvoiceId,
         paymentUrl: confidoResult.paymentUrl,
         status: confidoResult.status
       });
     } catch (confidoError) {
-      if (confidoStepId) await failStep(confidoStepId, confidoError, traceId);
+      if (confidoStepId) await GHLEventTracker.failStep(confidoStepId, confidoError, traceId);
       throw confidoError;
     }
 
@@ -3019,7 +3019,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     let saveStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'supabase', 'saveInvoiceToSupabase', {
+        const step = await GHLEventTracker.startStep(traceId, 'supabase', 'saveInvoiceToSupabase', {
           ghlInvoiceId: objectData.recordId,
           invoiceNumber,
           amountDue: total
@@ -3049,10 +3049,10 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
         invoiceDate: new Date().toISOString(),
         dueDate: invoiceRecord.properties.due_date || null
       }, traceId, saveStepId);
-      if (saveStepId) await completeStep(saveStepId, { success: true, invoiceNumber });
+      if (saveStepId) await GHLEventTracker.completeStep(saveStepId, { success: true, invoiceNumber });
       console.log('✅ Invoice saved to Supabase');
     } catch (saveError) {
-      if (saveStepId) await failStep(saveStepId, saveError, traceId);
+      if (saveStepId) await GHLEventTracker.failStep(saveStepId, saveError, traceId);
       throw saveError;
     }
 
@@ -3063,7 +3063,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     let updateGhlStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'ghl', 'updateCustomObject', {
+        const step = await GHLEventTracker.startStep(traceId, 'ghl', 'updateCustomObject', {
           recordId: objectData.recordId,
           fields: ['payment_link', 'invoice_number', 'subtotal', 'total']
         });
@@ -3095,14 +3095,14 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
           traceId,
           updateGhlStepId
         );
-        if (updateGhlStepId) await completeStep(updateGhlStepId, { success: true, updated: true });
+        if (updateGhlStepId) await GHLEventTracker.completeStep(updateGhlStepId, { success: true, updated: true });
         console.log('✅ GHL custom object updated with payment link, invoice number, subtotal, and total');
       } else {
-        if (updateGhlStepId) await completeStep(updateGhlStepId, { success: true, updated: false, reason: 'object_not_found' });
+        if (updateGhlStepId) await GHLEventTracker.completeStep(updateGhlStepId, { success: true, updated: false, reason: 'object_not_found' });
         console.warn('⚠️ Custom object no longer exists in GHL, skipping update');
       }
     } catch (updateError) {
-      if (updateGhlStepId) await failStep(updateGhlStepId, updateError, traceId);
+      if (updateGhlStepId) await GHLEventTracker.failStep(updateGhlStepId, updateError, traceId);
       console.error('Failed to update GHL custom object (non-blocking):', updateError.message);
       if (updateError.response?.data) {
         console.error('GHL Error Details:', JSON.stringify(updateError.response.data, null, 2));
@@ -3118,7 +3118,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     if (contactEmail) {
       if (traceId) {
         try {
-          const step = await startStep(traceId, 'email', 'sendInvoiceEmail', {
+          const step = await GHLEventTracker.startStep(traceId, 'email', 'sendInvoiceEmail', {
             contactEmail,
             invoiceNumber,
             amountDue: total
@@ -3151,11 +3151,11 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
         };
 
         await sendInvoiceEmail(invoiceEmailData, contactEmail, traceId, emailStepId);
-        if (emailStepId) await completeStep(emailStepId, { success: true, emailSent: true });
+        if (emailStepId) await GHLEventTracker.completeStep(emailStepId, { success: true, emailSent: true });
         console.log('✅ Invoice email sent successfully');
         emailSent = true;
       } catch (emailError) {
-        if (emailStepId) await failStep(emailStepId, emailError, traceId);
+        if (emailStepId) await GHLEventTracker.failStep(emailStepId, emailError, traceId);
         console.error('Failed to send invoice email (non-blocking):', emailError.message);
       }
     } else {
@@ -3211,7 +3211,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     let webhookStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'webhook_received', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'webhook_received', {
           endpoint: '/webhooks/ghl/custom-object-updated',
           method: 'POST',
           contentType: req.headers['content-type'],
@@ -3236,13 +3236,13 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
 
     // Update trace with invoice ID
     if (traceId && objectData.recordId) {
-      await updateTraceContextIds(traceId, { invoiceId: objectData.recordId });
+      await GHLEventTracker.updateTraceContextIds(traceId, { invoiceId: objectData.recordId });
     }
 
     // Complete webhook received step
     if (webhookStepId) {
       try {
-        await completeStep(webhookStepId, {
+        await GHLEventTracker.completeStep(webhookStepId, {
           recordId: objectData.recordId,
           objectKey: objectData.objectKey
         });
@@ -3278,7 +3278,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     let selfUpdateStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'processing', 'check_self_update', {
+        const step = await GHLEventTracker.startStep(traceId, 'processing', 'check_self_update', {
           ...updateSelfIndicators,
           isLikelyOurUpdate,
           isForwardedRequest
@@ -3295,7 +3295,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
       console.log('Self-update indicators:', updateSelfIndicators);
       if (selfUpdateStepId) {
         try {
-          await completeStep(selfUpdateStepId, {
+          await GHLEventTracker.completeStep(selfUpdateStepId, {
             isLikelyOurUpdate: true,  // For workflow matching
             skipped: true,
             reason: 'Self-triggered by our integration update (detected our fields in properties)',
@@ -3317,7 +3317,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     // Not our update (or forwarded request), continue processing
     if (selfUpdateStepId) {
       try {
-        await completeStep(selfUpdateStepId, {
+        await GHLEventTracker.completeStep(selfUpdateStepId, {
           isLikelyOurUpdate: false,  // For workflow matching
           skipped: false,
           reason: isForwardedRequest ? 'Forwarded request, processing' : 'External update, processing webhook',
@@ -3334,7 +3334,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     let checkTypeStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'processing', 'check_object_type', {
+        const step = await GHLEventTracker.startStep(traceId, 'processing', 'check_object_type', {
           objectKey: objectData.objectKey,
           expectedKey: 'custom_objects.invoices'
         });
@@ -3349,7 +3349,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
       console.log('ℹ️ Not an invoice object, skipping...');
       if (checkTypeStepId) {
         try {
-          await completeStep(checkTypeStepId, { isInvoice: false, action: 'skipped' });
+          await GHLEventTracker.completeStep(checkTypeStepId, { isInvoice: false, action: 'skipped' });
         } catch (e) {
           console.error('Error completing check_object_type step:', e.message);
         }
@@ -3364,7 +3364,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     // Is invoice object
     if (checkTypeStepId) {
       try {
-        await completeStep(checkTypeStepId, { isInvoice: true, action: 'process_update' });
+        await GHLEventTracker.completeStep(checkTypeStepId, { isInvoice: true, action: 'process_update' });
       } catch (e) {
         console.error('Error completing check_object_type step:', e.message);
       }
@@ -3377,7 +3377,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     let getRecordStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'ghl', 'getCustomObject', {
+        const step = await GHLEventTracker.startStep(traceId, 'ghl', 'getCustomObject', {
           objectKey: objectData.objectKey,
           recordId: objectData.recordId
         });
@@ -3391,13 +3391,13 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     try {
       const customObjectResponse = await ghlService.getCustomObject(objectData.objectKey, objectData.recordId);
       invoiceRecord = customObjectResponse.record;
-      if (getRecordStepId) await completeStep(getRecordStepId, {
+      if (getRecordStepId) await GHLEventTracker.completeStep(getRecordStepId, {
         hasPaymentLink: !!invoiceRecord.properties.payment_link,
         serviceItemsCount: (invoiceRecord.properties.serviceproduct || []).length
       });
       console.log('Updated Invoice Record:', JSON.stringify(invoiceRecord, null, 2));
     } catch (getError) {
-      if (getRecordStepId) await failStep(getRecordStepId, getError, traceId);
+      if (getRecordStepId) await GHLEventTracker.failStep(getRecordStepId, getError, traceId);
       throw getError;
     }
 
@@ -3424,7 +3424,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     // Step 2: Calculate invoice total
     let calcStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'invoiceService', 'calculateInvoiceTotal', {
+      const step = await GHLEventTracker.startStep(traceId, 'invoiceService', 'calculateInvoiceTotal', {
         serviceItemsCount: serviceItems.length
       });
       calcStepId = step.stepId;
@@ -3434,7 +3434,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     try {
       calculationResult = await invoiceService.calculateInvoiceTotal(serviceItems);
       if (!calculationResult.success) {
-        if (calcStepId) await failStep(calcStepId, { message: calculationResult.error }, traceId);
+        if (calcStepId) await GHLEventTracker.failStep(calcStepId, { message: calculationResult.error }, traceId);
         console.error('Failed to calculate invoice total:', calculationResult.error);
         return res.status(500).json({
           success: false,
@@ -3442,13 +3442,13 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
           error: calculationResult.error
         });
       }
-      if (calcStepId) await completeStep(calcStepId, {
+      if (calcStepId) await GHLEventTracker.completeStep(calcStepId, {
         total: calculationResult.total,
         lineItemsCount: calculationResult.lineItems.length,
         missingItems: calculationResult.missingItems
       });
     } catch (calcError) {
-      if (calcStepId) await failStep(calcStepId, calcError, traceId);
+      if (calcStepId) await GHLEventTracker.failStep(calcStepId, calcError, traceId);
       throw calcError;
     }
 
@@ -3458,7 +3458,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     // Step 3: Get relations to find opportunity
     let getRelationsStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'ghlService', 'getRelations', {
+      const step = await GHLEventTracker.startStep(traceId, 'ghlService', 'getRelations', {
         recordId: objectData.recordId
       });
       getRelationsStepId = step.stepId;
@@ -3474,7 +3474,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
         ? relationsResponse.relations.find(rel => rel.secondObjectKey === 'opportunity' || rel.firstObjectKey === 'opportunity')
         : null;
 
-      if (getRelationsStepId) await completeStep(getRelationsStepId, {
+      if (getRelationsStepId) await GHLEventTracker.completeStep(getRelationsStepId, {
         hasRelations,
         hasOpportunity: !!opportunityRelation
       });
@@ -3490,7 +3490,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
         });
       }
     } catch (relError) {
-      if (getRelationsStepId) await failStep(getRelationsStepId, relError, traceId);
+      if (getRelationsStepId) await GHLEventTracker.failStep(getRelationsStepId, relError, traceId);
       throw relError;
     }
 
@@ -3502,13 +3502,13 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
 
     // Update trace with opportunity ID
     if (traceId) {
-      await updateTraceContextIds(traceId, { opportunityId });
+      await GHLEventTracker.updateTraceContextIds(traceId, { opportunityId });
     }
 
     // Step 4: Get opportunity details
     let getOppStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'ghlService', 'getOpportunity', { opportunityId });
+      const step = await GHLEventTracker.startStep(traceId, 'ghlService', 'getOpportunity', { opportunityId });
       getOppStepId = step.stepId;
     }
 
@@ -3516,21 +3516,21 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     try {
       const opportunityResponse = await ghlService.getOpportunity(opportunityId);
       opportunity = opportunityResponse.opportunity;
-      if (getOppStepId) await completeStep(getOppStepId, {
+      if (getOppStepId) await GHLEventTracker.completeStep(getOppStepId, {
         opportunityName: opportunity.name,
         contactId: opportunity.contactId,
         contactEmail: opportunity.contact?.email
       });
       console.log('Opportunity Details:', JSON.stringify(opportunity, null, 2));
     } catch (oppError) {
-      if (getOppStepId) await failStep(getOppStepId, oppError, traceId);
+      if (getOppStepId) await GHLEventTracker.failStep(getOppStepId, oppError, traceId);
       throw oppError;
     }
 
     // Step 5: Get existing invoice from Supabase
     let getExistingStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'invoiceService', 'getInvoiceByGHLId', {
+      const step = await GHLEventTracker.startStep(traceId, 'invoiceService', 'getInvoiceByGHLId', {
         ghlInvoiceId: objectData.recordId
       });
       getExistingStepId = step.stepId;
@@ -3541,12 +3541,12 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     try {
       existingInvoice = await invoiceService.getInvoiceByGHLId(objectData.recordId);
       hasExistingRecord = existingInvoice.success && existingInvoice.data;
-      if (getExistingStepId) await completeStep(getExistingStepId, {
+      if (getExistingStepId) await GHLEventTracker.completeStep(getExistingStepId, {
         found: hasExistingRecord,
         paymentUrl: existingInvoice.data?.payment_url
       });
     } catch (getExError) {
-      if (getExistingStepId) await failStep(getExistingStepId, getExError, traceId);
+      if (getExistingStepId) await GHLEventTracker.failStep(getExistingStepId, getExError, traceId);
       throw getExError;
     }
 
@@ -3558,7 +3558,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
       // Step 6a: Create invoice in Confido
       let confidoStepId = null;
       if (traceId) {
-        const step = await startStep(traceId, 'confidoService', 'createInvoice', {
+        const step = await GHLEventTracker.startStep(traceId, 'confidoService', 'createInvoice', {
           ghlInvoiceId: objectData.recordId,
           opportunityId: opportunity.id,
           amountDue: total
@@ -3590,7 +3590,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
 
             if (hasExistingRecord && existingInvoice.data.payment_url) {
               console.log('✅ Found existing invoice in Supabase with payment URL');
-              if (confidoStepId) await completeStep(confidoStepId, {
+              if (confidoStepId) await GHLEventTracker.completeStep(confidoStepId, {
                 isDuplicate: true,
                 paymentUrl: existingInvoice.data.payment_url
               });
@@ -3605,7 +3605,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
           }
 
           console.error('Failed to create invoice in Confido:', confidoResult.error);
-          if (confidoStepId) await failStep(confidoStepId, { message: confidoResult.error }, traceId);
+          if (confidoStepId) await GHLEventTracker.failStep(confidoStepId, { message: confidoResult.error }, traceId);
           return res.json({
             success: false,
             message: 'Failed to create invoice in Confido',
@@ -3614,13 +3614,13 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
           });
         }
 
-        if (confidoStepId) await completeStep(confidoStepId, {
+        if (confidoStepId) await GHLEventTracker.completeStep(confidoStepId, {
           confidoInvoiceId: confidoResult.confidoInvoiceId,
           paymentUrl: confidoResult.paymentUrl,
           status: confidoResult.status
         });
       } catch (confidoError) {
-        if (confidoStepId) await failStep(confidoStepId, confidoError, traceId);
+        if (confidoStepId) await GHLEventTracker.failStep(confidoStepId, confidoError, traceId);
         throw confidoError;
       }
 
@@ -3638,7 +3638,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
       // Step 7a: Save to Supabase
       let saveStepId = null;
       if (traceId) {
-        const step = await startStep(traceId, 'invoiceService', 'saveInvoiceToSupabase', {
+        const step = await GHLEventTracker.startStep(traceId, 'invoiceService', 'saveInvoiceToSupabase', {
           ghlInvoiceId: objectData.recordId,
           invoiceNumber,
           amountDue: total
@@ -3665,17 +3665,17 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
           invoiceDate: new Date().toISOString(),
           dueDate: invoiceRecord.properties.due_date || null
         });
-        if (saveStepId) await completeStep(saveStepId, { success: true, invoiceNumber });
+        if (saveStepId) await GHLEventTracker.completeStep(saveStepId, { success: true, invoiceNumber });
         console.log('✅ Invoice saved to Supabase');
       } catch (saveError) {
-        if (saveStepId) await failStep(saveStepId, saveError, traceId);
+        if (saveStepId) await GHLEventTracker.failStep(saveStepId, saveError, traceId);
         throw saveError;
       }
 
       // Step 8a: Update GHL custom object
       let updateGhlStepId = null;
       if (traceId) {
-        const step = await startStep(traceId, 'ghlService', 'updateCustomObject', {
+        const step = await GHLEventTracker.startStep(traceId, 'ghlService', 'updateCustomObject', {
           recordId: objectData.recordId,
           fields: ['payment_link', 'invoice_number', 'subtotal', 'total', 'status']
         });
@@ -3697,10 +3697,10 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
             status: 'unpaid'
           }
         );
-        if (updateGhlStepId) await completeStep(updateGhlStepId, { success: true, updated: true });
+        if (updateGhlStepId) await GHLEventTracker.completeStep(updateGhlStepId, { success: true, updated: true });
         console.log('✅ GHL custom object updated with payment link, invoice number, subtotal, total, and status');
       } catch (updateError) {
-        if (updateGhlStepId) await failStep(updateGhlStepId, updateError, traceId);
+        if (updateGhlStepId) await GHLEventTracker.failStep(updateGhlStepId, updateError, traceId);
         console.error('Failed to update GHL custom object (non-blocking):', updateError.message);
       }
 
@@ -3711,7 +3711,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
 
       if (contactEmail) {
         if (traceId) {
-          const step = await startStep(traceId, 'email', 'sendInvoiceEmail', {
+          const step = await GHLEventTracker.startStep(traceId, 'email', 'sendInvoiceEmail', {
             contactEmail,
             invoiceNumber
           });
@@ -3740,11 +3740,11 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
           };
 
           await sendInvoiceEmail(invoiceEmailData, contactEmail);
-          if (emailStepId) await completeStep(emailStepId, { success: true, emailSent: true });
+          if (emailStepId) await GHLEventTracker.completeStep(emailStepId, { success: true, emailSent: true });
           console.log('✅ Invoice email sent successfully');
           emailSent = true;
         } catch (emailError) {
-          if (emailStepId) await failStep(emailStepId, emailError, traceId);
+          if (emailStepId) await GHLEventTracker.failStep(emailStepId, emailError, traceId);
           console.error('Failed to send invoice email (non-blocking):', emailError.message);
         }
       } else {
@@ -3798,7 +3798,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
       // Step 6b: Update Supabase with new values
       let updateSupabaseStepId = null;
       if (traceId) {
-        const step = await startStep(traceId, 'invoiceService', 'updateInvoiceInSupabase', {
+        const step = await GHLEventTracker.startStep(traceId, 'invoiceService', 'updateInvoiceInSupabase', {
           ghlInvoiceId: objectData.recordId,
           amountDue: total
         });
@@ -3812,17 +3812,17 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
           invoice_number: invoiceRecord.properties.invoice || objectData.recordId,
           due_date: invoiceRecord.properties.due_date || null
         });
-        if (updateSupabaseStepId) await completeStep(updateSupabaseStepId, { success: true, amountDue: total });
+        if (updateSupabaseStepId) await GHLEventTracker.completeStep(updateSupabaseStepId, { success: true, amountDue: total });
         console.log('✅ Invoice updated in Supabase');
       } catch (updateSupaError) {
-        if (updateSupabaseStepId) await failStep(updateSupabaseStepId, updateSupaError, traceId);
+        if (updateSupabaseStepId) await GHLEventTracker.failStep(updateSupabaseStepId, updateSupaError, traceId);
         throw updateSupaError;
       }
 
       // Step 7b: Update GHL custom object with new totals
       let updateGhlStepId = null;
       if (traceId) {
-        const step = await startStep(traceId, 'ghlService', 'updateCustomObject', {
+        const step = await GHLEventTracker.startStep(traceId, 'ghlService', 'updateCustomObject', {
           recordId: objectData.recordId,
           fields: ['subtotal', 'total']
         });
@@ -3840,10 +3840,10 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
             total: { value: total, currency: 'default' }
           }
         );
-        if (updateGhlStepId) await completeStep(updateGhlStepId, { success: true, subtotal, total });
+        if (updateGhlStepId) await GHLEventTracker.completeStep(updateGhlStepId, { success: true, subtotal, total });
         console.log('✅ GHL custom object updated with new totals');
       } catch (updateError) {
-        if (updateGhlStepId) await failStep(updateGhlStepId, updateError, traceId);
+        if (updateGhlStepId) await GHLEventTracker.failStep(updateGhlStepId, updateError, traceId);
         console.error('Failed to update GHL custom object (non-blocking):', updateError.message);
       }
 
@@ -3895,7 +3895,7 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
     let webhookStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'express', 'webhook_received', {
+        const step = await GHLEventTracker.startStep(traceId, 'express', 'webhook_received', {
           endpoint: '/webhooks/ghl/custom-object-deleted',
           method: 'POST',
           contentType: req.headers['content-type'],
@@ -3919,13 +3919,13 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
 
     // Update trace with invoice ID
     if (traceId && objectData.recordId) {
-      await updateTraceContextIds(traceId, { invoiceId: objectData.recordId });
+      await GHLEventTracker.updateTraceContextIds(traceId, { invoiceId: objectData.recordId });
     }
 
     // Complete webhook received step
     if (webhookStepId) {
       try {
-        await completeStep(webhookStepId, {
+        await GHLEventTracker.completeStep(webhookStepId, {
           recordId: objectData.recordId,
           objectKey: objectData.objectKey
         });
@@ -3940,7 +3940,7 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
     let checkTypeStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'processing', 'check_object_type', {
+        const step = await GHLEventTracker.startStep(traceId, 'processing', 'check_object_type', {
           objectKey: objectData.objectKey,
           expectedKey: 'custom_objects.invoices'
         });
@@ -3955,7 +3955,7 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
       console.log('ℹ️ Not an invoice object, skipping...');
       if (checkTypeStepId) {
         try {
-          await completeStep(checkTypeStepId, { isInvoice: false, action: 'skipped' });
+          await GHLEventTracker.completeStep(checkTypeStepId, { isInvoice: false, action: 'skipped' });
         } catch (e) {
           console.error('Error completing check_object_type step:', e.message);
         }
@@ -3970,7 +3970,7 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
     // Is invoice object
     if (checkTypeStepId) {
       try {
-        await completeStep(checkTypeStepId, { isInvoice: true, action: 'process_delete' });
+        await GHLEventTracker.completeStep(checkTypeStepId, { isInvoice: true, action: 'process_delete' });
       } catch (e) {
         console.error('Error completing check_object_type step:', e.message);
       }
@@ -3983,7 +3983,7 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
     let getInvoiceStepId = null;
     if (traceId) {
       try {
-        const step = await startStep(traceId, 'supabase', 'getInvoiceByGHLId', {
+        const step = await GHLEventTracker.startStep(traceId, 'supabase', 'getInvoiceByGHLId', {
           ghlInvoiceId: objectData.recordId
         });
         getInvoiceStepId = step.stepId;
@@ -3997,7 +3997,7 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
       existingInvoice = await invoiceService.getInvoiceByGHLId(objectData.recordId);
 
       if (!existingInvoice.success || !existingInvoice.data) {
-        if (getInvoiceStepId) await completeStep(getInvoiceStepId, { found: false, action: 'not_found' });
+        if (getInvoiceStepId) await GHLEventTracker.completeStep(getInvoiceStepId, { found: false, action: 'not_found' });
         console.log('ℹ️ Invoice not found in Supabase - already deleted or never created');
         console.log('Nothing to do, returning success');
         return res.json({
@@ -4008,13 +4008,13 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
         });
       }
 
-      if (getInvoiceStepId) await completeStep(getInvoiceStepId, {
+      if (getInvoiceStepId) await GHLEventTracker.completeStep(getInvoiceStepId, {
         found: true,
         confidoInvoiceId: existingInvoice.data.confido_invoice_id,
         status: existingInvoice.data.status
       });
     } catch (getError) {
-      if (getInvoiceStepId) await failStep(getInvoiceStepId, getError, traceId);
+      if (getInvoiceStepId) await GHLEventTracker.failStep(getInvoiceStepId, getError, traceId);
       throw getError;
     }
 
@@ -4025,7 +4025,7 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
     if (confidoInvoiceId) {
       let deleteConfidoStepId = null;
       if (traceId) {
-        const step = await startStep(traceId, 'confidoService', 'deletePaymentLink', {
+        const step = await GHLEventTracker.startStep(traceId, 'confidoService', 'deletePaymentLink', {
           confidoInvoiceId
         });
         deleteConfidoStepId = step.stepId;
@@ -4038,10 +4038,10 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
         confidoDeleteResult = await confidoService.deletePaymentLink(confidoInvoiceId);
 
         if (confidoDeleteResult.success) {
-          if (deleteConfidoStepId) await completeStep(deleteConfidoStepId, { success: true, deleted: true });
+          if (deleteConfidoStepId) await GHLEventTracker.completeStep(deleteConfidoStepId, { success: true, deleted: true });
           console.log('✅ PaymentLink deleted from Confido');
         } else {
-          if (deleteConfidoStepId) await completeStep(deleteConfidoStepId, {
+          if (deleteConfidoStepId) await GHLEventTracker.completeStep(deleteConfidoStepId, {
             success: false,
             error: confidoDeleteResult.error
           });
@@ -4049,7 +4049,7 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
           // Continue anyway - still mark as deleted in Supabase
         }
       } catch (deleteError) {
-        if (deleteConfidoStepId) await failStep(deleteConfidoStepId, deleteError, traceId);
+        if (deleteConfidoStepId) await GHLEventTracker.failStep(deleteConfidoStepId, deleteError, traceId);
         console.error('⚠️ Error deleting PaymentLink from Confido:', deleteError.message);
         // Continue anyway - still mark as deleted in Supabase
       }
@@ -4060,7 +4060,7 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
     // Step 3: Update status to deleted in Supabase
     let updateSupabaseStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'invoiceService', 'updateInvoiceInSupabase', {
+      const step = await GHLEventTracker.startStep(traceId, 'invoiceService', 'updateInvoiceInSupabase', {
         ghlInvoiceId: objectData.recordId,
         status: 'deleted'
       });
@@ -4071,10 +4071,10 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
       await invoiceService.updateInvoiceInSupabase(objectData.recordId, {
         status: 'deleted'
       });
-      if (updateSupabaseStepId) await completeStep(updateSupabaseStepId, { success: true, status: 'deleted' });
+      if (updateSupabaseStepId) await GHLEventTracker.completeStep(updateSupabaseStepId, { success: true, status: 'deleted' });
       console.log('✅ Invoice marked as deleted in Supabase');
     } catch (updateError) {
-      if (updateSupabaseStepId) await failStep(updateSupabaseStepId, updateError, traceId);
+      if (updateSupabaseStepId) await GHLEventTracker.failStep(updateSupabaseStepId, updateError, traceId);
       throw updateError;
     }
 
@@ -4401,13 +4401,13 @@ app.post('/cron/process-sms-reminders', async (req, res) => {
   // Step: Process scheduled SMS reminders
   let processStepId = null;
   if (traceId) {
-    const step = await startStep(traceId, 'appointmentSmsService', 'processScheduledReminders', {});
+    const step = await GHLEventTracker.startStep(traceId, 'appointmentSmsService', 'processScheduledReminders', {});
     processStepId = step.stepId;
   }
 
   try {
     const result = await processScheduledReminders(traceId, processStepId);
-    if (processStepId) await completeStep(processStepId, result);
+    if (processStepId) await GHLEventTracker.completeStep(processStepId, result);
 
     console.log('CRON Result:', JSON.stringify(result, null, 2));
 
@@ -4418,7 +4418,7 @@ app.post('/cron/process-sms-reminders', async (req, res) => {
     });
 
   } catch (error) {
-    if (processStepId) await failStep(processStepId, error, traceId);
+    if (processStepId) await GHLEventTracker.failStep(processStepId, error, traceId);
     console.error('❌ CRON Error:', error);
     res.status(500).json({
       success: false,
@@ -4455,19 +4455,19 @@ app.post('/webhooks/ghl/inbound-sms', async (req, res) => {
 
     // Update trace with contact ID
     if (traceId && smsData.contactId) {
-      await updateTraceContextIds(traceId, { contactId: smsData.contactId });
+      await GHLEventTracker.updateTraceContextIds(traceId, { contactId: smsData.contactId });
     }
 
     // Step: Process the inbound SMS
     let processStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'smsConfirmationService', 'processInboundSms', smsData);
+      const step = await GHLEventTracker.startStep(traceId, 'smsConfirmationService', 'processInboundSms', smsData);
       processStepId = step.stepId;
     }
 
     try {
       const result = await processInboundSms(smsData, traceId, processStepId);
-      if (processStepId) await completeStep(processStepId, result);
+      if (processStepId) await GHLEventTracker.completeStep(processStepId, result);
 
       res.json({
         success: true,
@@ -4478,7 +4478,7 @@ app.post('/webhooks/ghl/inbound-sms', async (req, res) => {
         reason: result.reason
       });
     } catch (processError) {
-      if (processStepId) await failStep(processStepId, processError, traceId);
+      if (processStepId) await GHLEventTracker.failStep(processStepId, processError, traceId);
       throw processError;
     }
 
@@ -4508,7 +4508,7 @@ app.post('/webhooks/ghl/call-transcript', async (req, res) => {
 
     // Update trace with contact ID
     if (traceId && contactId) {
-      await updateTraceContextIds(traceId, { contactId });
+      await GHLEventTracker.updateTraceContextIds(traceId, { contactId });
     }
 
     // Validate required fields
@@ -4533,13 +4533,13 @@ app.post('/webhooks/ghl/call-transcript', async (req, res) => {
 
     let processStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'callTranscriptService', 'processCallTranscript', { contactId, transcriptLength: transcript?.length || 0 });
+      const step = await GHLEventTracker.startStep(traceId, 'callTranscriptService', 'processCallTranscript', { contactId, transcriptLength: transcript?.length || 0 });
       processStepId = step.stepId;
     }
 
     try {
       const result = await processCallTranscript(contactId, transcript, traceId, processStepId);
-      if (processStepId) await completeStep(processStepId, result);
+      if (processStepId) await GHLEventTracker.completeStep(processStepId, result);
 
       console.log('Call transcript processed successfully');
       console.log('Summary:', result.summary);
@@ -4553,7 +4553,7 @@ app.post('/webhooks/ghl/call-transcript', async (req, res) => {
         summary: result.summary
       });
     } catch (processError) {
-      if (processStepId) await failStep(processStepId, processError, traceId);
+      if (processStepId) await GHLEventTracker.failStep(processStepId, processError, traceId);
       throw processError;
     }
 
@@ -4571,10 +4571,20 @@ app.post('/webhooks/ghl/call-transcript', async (req, res) => {
 app.use(tracingErrorMiddleware);
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Webhook endpoint: http://localhost:${PORT}/webhook/jotform`);
-  console.log(`Tracing enabled: ${process.env.CONVEX_URL ? 'yes' : 'no'}`);
+async function startServer() {
+  // Initialize the GHL Event Tracker before starting the server
+  await initializeGHLEventTracker();
+
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Webhook endpoint: http://localhost:${PORT}/webhook/jotform`);
+    console.log(`Tracing enabled: ${GHLEventTracker.isEnabled() ? 'yes' : 'no'}`);
+  });
+}
+
+startServer().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });
 
 module.exports = app;

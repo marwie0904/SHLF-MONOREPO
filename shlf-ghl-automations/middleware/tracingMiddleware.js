@@ -3,15 +3,11 @@
  *
  * Automatically creates traces for all incoming requests and
  * captures response data when the request completes.
+ *
+ * Uses the GHLEventTracker service for proper Convex integration.
  */
 
-const {
-  startTrace,
-  completeTrace,
-  failTrace,
-  isTracingEnabled,
-  getTraceContext,
-} = require('../utils/traceContext');
+const { GHLEventTracker } = require('../services/ghlEventTracker');
 
 /**
  * Paths to skip tracing (health checks, static assets, etc.)
@@ -40,7 +36,7 @@ function tracingMiddleware(req, res, next) {
   }
 
   // Skip if tracing is disabled
-  if (!isTracingEnabled()) {
+  if (!GHLEventTracker.isEnabled()) {
     req.traceId = null;
     req.traceContext = null;
     return next();
@@ -53,7 +49,7 @@ function tracingMiddleware(req, res, next) {
     console.log(`[TRACING] Internal forward to ${req.path} - continuing parent trace ${parentTraceId}`);
     req.traceId = parentTraceId;
     // Retrieve the existing trace context so steps can continue to be added
-    req.traceContext = parentTraceId ? getTraceContext(parentTraceId) : null;
+    req.traceContext = parentTraceId ? GHLEventTracker.getTraceContext(parentTraceId) : null;
     req.isForwardedRequest = true;
     // Don't set up response handlers - the parent request will complete the trace
     return next();
@@ -64,7 +60,7 @@ function tracingMiddleware(req, res, next) {
 
   // Start trace asynchronously
   console.log(`[TRACING] Starting trace for ${req.method} ${req.path}`);
-  startTrace({
+  GHLEventTracker.startTrace({
     endpoint: req.path,
     httpMethod: req.method,
     headers: req.headers,
@@ -82,7 +78,6 @@ function tracingMiddleware(req, res, next) {
       // Store original response methods
       const originalJson = res.json.bind(res);
       const originalSend = res.send.bind(res);
-      const originalEnd = res.end.bind(res);
 
       // Track if response has been captured
       let responseCaptured = false;
@@ -128,12 +123,12 @@ function tracingMiddleware(req, res, next) {
           };
 
           console.log(`[TRACING] Failing trace ${traceId}`);
-          failTrace(traceId, error, res.statusCode, responseBody).catch((err) => {
+          GHLEventTracker.failTrace(traceId, error, res.statusCode, responseBody).catch((err) => {
             console.error('[TRACING] Error failing trace:', err.message);
           });
         } else {
           console.log(`[TRACING] Completing trace ${traceId}`);
-          completeTrace(traceId, res.statusCode, responseBody).catch((err) => {
+          GHLEventTracker.completeTrace(traceId, res.statusCode, responseBody).catch((err) => {
             console.error('[TRACING] Error completing trace:', err.message);
           });
         }
@@ -141,7 +136,7 @@ function tracingMiddleware(req, res, next) {
 
       // Handle request errors
       res.on('error', (error) => {
-        failTrace(traceId, error, 500, { error: error.message }).catch((err) => {
+        GHLEventTracker.failTrace(traceId, error, 500, { error: error.message }).catch((err) => {
           console.error('Error failing trace on response error:', err.message);
         });
       });
@@ -163,7 +158,7 @@ function tracingMiddleware(req, res, next) {
 function tracingErrorMiddleware(err, req, res, next) {
   // If we have a trace, fail it with the error
   if (req.traceId) {
-    failTrace(req.traceId, err, 500, { error: err.message }).catch((traceErr) => {
+    GHLEventTracker.failTrace(req.traceId, err, 500, { error: err.message }).catch((traceErr) => {
       console.error('Error failing trace in error middleware:', traceErr.message);
     });
   }
