@@ -2389,7 +2389,59 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       }
     }
 
-    // ===== STEP 2: Route Event Type =====
+    // ===== STEP 2: Check if Self-Update (Skip our own updates) - BEFORE ROUTING =====
+    const lastUpdatedBy = req.body.lastUpdatedBy || {};
+    const isOurUpdate = lastUpdatedBy.source === 'INTEGRATION';
+
+    let selfUpdateStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'processing', 'check_self_update', {
+          lastUpdatedBySource: lastUpdatedBy.source || 'unknown',
+          lastUpdatedByChannel: lastUpdatedBy.channel || 'unknown',
+          isOurUpdate,
+          eventType
+        });
+        selfUpdateStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting check_self_update step:', e.message);
+      }
+    }
+
+    if (isOurUpdate) {
+      console.log('⏭️ Skipping webhook triggered by our own integration update');
+      if (selfUpdateStepId) {
+        try {
+          await completeStep(selfUpdateStepId, {
+            skipped: true,
+            reason: 'Self-triggered by our integration update',
+            action: 'self_update_skipped'
+          });
+        } catch (e) {
+          console.error('Error completing check_self_update step:', e.message);
+        }
+      }
+      return res.json({
+        success: true,
+        message: 'Skipped webhook triggered by our own update',
+        action: 'self_update_skipped'
+      });
+    }
+
+    // Not our update, continue processing
+    if (selfUpdateStepId) {
+      try {
+        await completeStep(selfUpdateStepId, {
+          skipped: false,
+          reason: 'External update, processing webhook',
+          action: 'process_external_update'
+        });
+      } catch (e) {
+        console.error('Error completing check_self_update step:', e.message);
+      }
+    }
+
+    // ===== STEP 3: Route Event Type =====
     let routeStepId = null;
     if (traceId) {
       try {
@@ -2486,7 +2538,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
 
     console.log('Custom Object Data:', JSON.stringify(objectData, null, 2));
 
-    // ===== STEP 3: Check Object Type =====
+    // ===== STEP 4: Check Object Type =====
     let checkTypeStepId = null;
     if (traceId) {
       try {
@@ -2537,7 +2589,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     console.log('✅ Invoice custom object detected');
     console.log('Invoice Record ID:', objectData.recordId);
 
-    // ===== STEP 4: Wait for Opportunity Association =====
+    // ===== STEP 5: Wait for Opportunity Association =====
     let retryStepId = null;
     if (traceId) {
       try {
@@ -2612,7 +2664,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       throw retryError;
     }
 
-    // ===== STEP 5: Calculate Invoice Total =====
+    // ===== STEP 6: Calculate Invoice Total =====
     let calcStepId = null;
     if (traceId) {
       try {
@@ -2657,7 +2709,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       console.warn('Missing service items:', missingItems.join(', '));
     }
 
-    // ===== STEP 6: Get Opportunity Details =====
+    // ===== STEP 7: Get Opportunity Details =====
     let getOppStepId = null;
     const opportunityRelation = relationsResponse.relations.find(
       rel => rel.secondObjectKey === 'opportunity' || rel.firstObjectKey === 'opportunity'
@@ -2693,7 +2745,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       throw oppError;
     }
 
-    // ===== STEP 7: Create Invoice in Confido =====
+    // ===== STEP 8: Create Invoice in Confido =====
     let confidoStepId = null;
     if (traceId) {
       try {
@@ -2801,7 +2853,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     const invoiceNumber = `INV-${dateStr}-${randomStr}`;
     console.log('Generated Invoice Number:', invoiceNumber);
 
-    // ===== STEP 8: Save to Supabase =====
+    // ===== STEP 9: Save to Supabase =====
     let saveStepId = null;
     if (traceId) {
       try {
@@ -2845,7 +2897,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     // Calculate subtotal (same as total for now)
     const subtotal = total;
 
-    // ===== STEP 9: Update GHL Custom Object =====
+    // ===== STEP 10: Update GHL Custom Object =====
     let updateGhlStepId = null;
     if (traceId) {
       try {
@@ -2896,7 +2948,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       console.error('This is OK - invoice still created in Confido and Supabase');
     }
 
-    // ===== STEP 10: Send Invoice Email =====
+    // ===== STEP 11: Send Invoice Email =====
     let emailStepId = null;
     let emailSent = false;
     const contactEmail = opportunity.contact?.email;
@@ -3036,7 +3088,58 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
 
     console.log('Custom Object Data:', JSON.stringify(objectData, null, 2));
 
-    // ===== STEP 2: Check Object Type =====
+    // ===== STEP 2: Check if Self-Update (Skip our own updates) =====
+    const lastUpdatedBy = req.body.lastUpdatedBy || {};
+    const isOurUpdate = lastUpdatedBy.source === 'INTEGRATION';
+
+    let selfUpdateStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'processing', 'check_self_update', {
+          lastUpdatedBySource: lastUpdatedBy.source || 'unknown',
+          lastUpdatedByChannel: lastUpdatedBy.channel || 'unknown',
+          isOurUpdate
+        });
+        selfUpdateStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting check_self_update step:', e.message);
+      }
+    }
+
+    if (isOurUpdate) {
+      console.log('⏭️ Skipping webhook triggered by our own integration update');
+      if (selfUpdateStepId) {
+        try {
+          await completeStep(selfUpdateStepId, {
+            skipped: true,
+            reason: 'Self-triggered by our integration update',
+            action: 'self_update_skipped'
+          });
+        } catch (e) {
+          console.error('Error completing check_self_update step:', e.message);
+        }
+      }
+      return res.json({
+        success: true,
+        message: 'Skipped webhook triggered by our own update',
+        action: 'self_update_skipped'
+      });
+    }
+
+    // Not our update, continue processing
+    if (selfUpdateStepId) {
+      try {
+        await completeStep(selfUpdateStepId, {
+          skipped: false,
+          reason: 'External update, processing webhook',
+          action: 'process_external_update'
+        });
+      } catch (e) {
+        console.error('Error completing check_self_update step:', e.message);
+      }
+    }
+
+    // ===== STEP 4: Check Object Type =====
     let checkTypeStepId = null;
     if (traceId) {
       try {
@@ -3079,7 +3182,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     console.log('✅ Invoice update detected');
     console.log('Invoice Record ID:', objectData.recordId);
 
-    // ===== STEP 3: Get Custom Object Details =====
+    // ===== STEP 5: Get Custom Object Details =====
     let getRecordStepId = null;
     if (traceId) {
       try {

@@ -940,9 +940,9 @@ export const appointmentCreatedWorkflow = {
 // ============================================================================
 export const customObjectCreatedWorkflow = {
   id: 'custom-object-created',
-  name: 'Invoice Created (Custom Object)',
+  name: 'Invoice Created',
   trigger: '/webhooks/ghl/custom-object-created',
-  triggerName: 'custom-object-created',
+  triggerName: 'invoice-created',
   root: {
     id: 'webhook',
     name: 'Webhook Received',
@@ -950,68 +950,68 @@ export const customObjectCreatedWorkflow = {
     type: 'step',
     matchStep: 'express:webhook_received',
     children: [{
-      id: 'route_event',
-      name: 'Route Event Type',
+      id: 'check_self_update',
+      name: 'Check Self-Update',
       layer: 'processing',
       type: 'step',
-      matchStep: 'express:route_event_type',
+      matchStep: 'processing:check_self_update',
       children: [{
-        id: 'check_object_type',
-        name: 'Check Object Type',
-        layer: 'processing',
-        type: 'step',
-        matchStep: 'processing:check_object_type',
-        children: [{
-          id: 'is_invoice_decision',
-          name: 'Is Invoice Object?',
-          layer: 'decision',
-          type: 'decision',
-          condition: 'Check if custom object is an invoice',
-          matchStepOutput: { stepName: 'processing:check_object_type', outputField: 'isInvoice' },
-          children: [
-            {
-              label: 'No',
-              value: false,
-              matchValue: false,
-              node: {
-                id: 'not_invoice_skipped',
-                name: 'Not Invoice - Skipped',
-                layer: 'outcome',
-                type: 'outcome',
-                status: 'success',
-                matchAction: 'not_invoice_skipped',
-                children: []
-              }
-            },
-            {
-              label: 'Yes',
-              value: true,
-              matchValue: true,
-              node: {
-                id: 'wait_opportunity',
-                name: 'Wait for Opportunity Association',
-                layer: 'external',
+        id: 'is_self_update_decision',
+        name: 'Is Our Update?',
+        layer: 'decision',
+        type: 'decision',
+        condition: 'Check if webhook was triggered by our own integration update',
+        matchStepOutput: { stepName: 'processing:check_self_update', outputField: 'isOurUpdate' },
+        children: [
+          {
+            label: 'Yes (Skip)',
+            value: true,
+            matchValue: true,
+            node: {
+              id: 'self_update_skipped',
+              name: 'Self-Update Skipped',
+              layer: 'outcome',
+              type: 'outcome',
+              status: 'success',
+              matchAction: 'self_update_skipped',
+              children: []
+            }
+          },
+          {
+            label: 'No (Process)',
+            value: false,
+            matchValue: false,
+            node: {
+              id: 'route_event',
+              name: 'Route Event Type',
+              layer: 'processing',
+              type: 'step',
+              matchStep: 'express:route_event_type',
+              children: [{
+                id: 'check_object_type',
+                name: 'Check Object Type',
+                layer: 'processing',
                 type: 'step',
-                matchStep: 'ghl:waitForOpportunityAssociation',
+                matchStep: 'processing:check_object_type',
                 children: [{
-                  id: 'opportunity_found_decision',
-                  name: 'Opportunity Found?',
+                  id: 'is_invoice_decision',
+                  name: 'Is Invoice Object?',
                   layer: 'decision',
                   type: 'decision',
-                  condition: 'Check if opportunity association exists',
-                  matchStepOutput: { stepName: 'ghl:waitForOpportunityAssociation', outputField: 'found' },
+                  condition: 'Check if custom object is an invoice',
+                  matchStepOutput: { stepName: 'processing:check_object_type', outputField: 'isInvoice' },
                   children: [
                     {
                       label: 'No',
                       value: false,
                       matchValue: false,
                       node: {
-                        id: 'no_opportunity',
-                        name: 'No Opportunity Association',
+                        id: 'not_invoice_skipped',
+                        name: 'Not Invoice - Skipped',
                         layer: 'outcome',
                         type: 'outcome',
-                        status: 'error',
-                        matchAction: 'no_opportunity_association',
+                        status: 'success',
+                        matchAction: 'not_invoice_skipped',
                         children: []
                       }
                     },
@@ -1020,139 +1020,175 @@ export const customObjectCreatedWorkflow = {
                       value: true,
                       matchValue: true,
                       node: {
-                        id: 'calculate_total',
-                        name: 'Calculate Invoice Total',
-                        layer: 'processing',
+                        id: 'wait_opportunity',
+                        name: 'Wait for Opportunity Association',
+                        layer: 'external',
                         type: 'step',
-                        matchStep: 'supabase:calculateInvoiceTotal',
+                        matchStep: 'ghl:waitForOpportunityAssociation',
                         children: [{
-                          id: 'get_opportunity',
-                          name: 'Get Opportunity Details',
-                          layer: 'external',
-                          type: 'step',
-                          matchStep: 'ghl:getOpportunity',
-                          children: [{
-                            id: 'create_confido',
-                            name: 'Create Invoice in Confido',
-                            layer: 'external',
-                            type: 'step',
-                            matchStep: 'confido:createInvoice',
-                            children: [{
-                              id: 'confido_result_decision',
-                              name: 'Confido Creation Result',
-                              layer: 'decision',
-                              type: 'decision',
-                              condition: 'Check Confido invoice creation result',
-                              matchTraceStatus: true,
-                              children: [
-                                {
-                                  label: 'Duplicate',
-                                  value: 'duplicate',
-                                  matchValue: 'duplicate_invoice',
-                                  matchTraceAction: 'duplicate_invoice',
-                                  node: {
-                                    id: 'duplicate_invoice',
-                                    name: 'Duplicate Invoice',
-                                    layer: 'outcome',
-                                    type: 'outcome',
-                                    status: 'success',
-                                    matchAction: 'duplicate_invoice',
-                                    children: []
-                                  }
-                                },
-                                {
-                                  label: 'Failed',
-                                  value: 'failed',
-                                  matchValue: 'confido_failed',
-                                  matchTraceAction: 'confido_failed',
-                                  node: {
-                                    id: 'confido_failed',
-                                    name: 'Confido Creation Failed',
-                                    layer: 'outcome',
-                                    type: 'outcome',
-                                    status: 'error',
-                                    matchAction: 'confido_failed',
-                                    children: []
-                                  }
-                                },
-                                {
-                                  label: 'Success',
-                                  value: 'success',
-                                  matchValue: true,
-                                  node: {
-                                    id: 'save_supabase',
-                                    name: 'Save to Supabase',
-                                    layer: 'processing',
+                          id: 'opportunity_found_decision',
+                          name: 'Opportunity Found?',
+                          layer: 'decision',
+                          type: 'decision',
+                          condition: 'Check if opportunity association exists',
+                          matchStepOutput: { stepName: 'ghl:waitForOpportunityAssociation', outputField: 'found' },
+                          children: [
+                            {
+                              label: 'No',
+                              value: false,
+                              matchValue: false,
+                              node: {
+                                id: 'no_opportunity',
+                                name: 'No Opportunity Association',
+                                layer: 'outcome',
+                                type: 'outcome',
+                                status: 'error',
+                                matchAction: 'no_opportunity_association',
+                                children: []
+                              }
+                            },
+                            {
+                              label: 'Yes',
+                              value: true,
+                              matchValue: true,
+                              node: {
+                                id: 'calculate_total',
+                                name: 'Calculate Invoice Total',
+                                layer: 'processing',
+                                type: 'step',
+                                matchStep: 'supabase:calculateInvoiceTotal',
+                                children: [{
+                                  id: 'get_opportunity',
+                                  name: 'Get Opportunity Details',
+                                  layer: 'external',
+                                  type: 'step',
+                                  matchStep: 'ghl:getOpportunity',
+                                  children: [{
+                                    id: 'create_confido',
+                                    name: 'Create Invoice in Confido',
+                                    layer: 'external',
                                     type: 'step',
-                                    matchStep: 'supabase:saveInvoiceToSupabase',
+                                    matchStep: 'confido:createInvoice',
                                     children: [{
-                                      id: 'update_ghl',
-                                      name: 'Update GHL Custom Object',
-                                      layer: 'external',
-                                      type: 'step',
-                                      matchStep: 'ghl:updateCustomObject',
-                                      children: [{
-                                        id: 'send_email',
-                                        name: 'Send Invoice Email',
-                                        layer: 'external',
-                                        type: 'step',
-                                        matchStep: 'email:sendInvoiceEmail',
-                                        children: [{
-                                          id: 'final_outcome',
-                                          name: 'Invoice Result',
-                                          layer: 'decision',
-                                          type: 'decision',
-                                          condition: 'Final invoice outcome',
-                                          matchTraceStatus: true,
-                                          children: [
-                                            {
-                                              label: 'With Email',
-                                              value: 'with_email',
-                                              matchValue: 'invoice_created_with_email',
-                                              matchTraceAction: 'invoice_created_with_email',
-                                              node: {
-                                                id: 'created_with_email',
-                                                name: 'Invoice Created + Email Sent',
-                                                layer: 'outcome',
-                                                type: 'outcome',
-                                                status: 'success',
-                                                matchAction: 'invoice_created_with_email',
-                                                children: []
-                                              }
-                                            },
-                                            {
-                                              label: 'No Email',
-                                              value: 'no_email',
-                                              matchValue: 'invoice_created',
-                                              matchTraceAction: 'invoice_created',
-                                              node: {
-                                                id: 'created_no_email',
-                                                name: 'Invoice Created',
-                                                layer: 'outcome',
-                                                type: 'outcome',
-                                                status: 'success',
-                                                matchAction: 'invoice_created',
-                                                children: []
-                                              }
-                                            }
-                                          ]
-                                        }]
-                                      }]
+                                      id: 'confido_result_decision',
+                                      name: 'Confido Creation Result',
+                                      layer: 'decision',
+                                      type: 'decision',
+                                      condition: 'Check Confido invoice creation result',
+                                      matchTraceStatus: true,
+                                      children: [
+                                        {
+                                          label: 'Duplicate',
+                                          value: 'duplicate',
+                                          matchValue: 'duplicate_invoice',
+                                          matchTraceAction: 'duplicate_invoice',
+                                          node: {
+                                            id: 'duplicate_invoice',
+                                            name: 'Duplicate Invoice',
+                                            layer: 'outcome',
+                                            type: 'outcome',
+                                            status: 'success',
+                                            matchAction: 'duplicate_invoice',
+                                            children: []
+                                          }
+                                        },
+                                        {
+                                          label: 'Failed',
+                                          value: 'failed',
+                                          matchValue: 'confido_failed',
+                                          matchTraceAction: 'confido_failed',
+                                          node: {
+                                            id: 'confido_failed',
+                                            name: 'Confido Creation Failed',
+                                            layer: 'outcome',
+                                            type: 'outcome',
+                                            status: 'error',
+                                            matchAction: 'confido_failed',
+                                            children: []
+                                          }
+                                        },
+                                        {
+                                          label: 'Success',
+                                          value: 'success',
+                                          matchValue: true,
+                                          node: {
+                                            id: 'save_supabase',
+                                            name: 'Save to Supabase',
+                                            layer: 'processing',
+                                            type: 'step',
+                                            matchStep: 'supabase:saveInvoiceToSupabase',
+                                            children: [{
+                                              id: 'update_ghl',
+                                              name: 'Update GHL Custom Object',
+                                              layer: 'external',
+                                              type: 'step',
+                                              matchStep: 'ghl:updateCustomObject',
+                                              children: [{
+                                                id: 'send_email',
+                                                name: 'Send Invoice Email',
+                                                layer: 'external',
+                                                type: 'step',
+                                                matchStep: 'email:sendInvoiceEmail',
+                                                children: [{
+                                                  id: 'final_outcome',
+                                                  name: 'Invoice Result',
+                                                  layer: 'decision',
+                                                  type: 'decision',
+                                                  condition: 'Final invoice outcome',
+                                                  matchTraceStatus: true,
+                                                  children: [
+                                                    {
+                                                      label: 'With Email',
+                                                      value: 'with_email',
+                                                      matchValue: 'invoice_created_with_email',
+                                                      matchTraceAction: 'invoice_created_with_email',
+                                                      node: {
+                                                        id: 'created_with_email',
+                                                        name: 'Invoice Created + Email Sent',
+                                                        layer: 'outcome',
+                                                        type: 'outcome',
+                                                        status: 'success',
+                                                        matchAction: 'invoice_created_with_email',
+                                                        children: []
+                                                      }
+                                                    },
+                                                    {
+                                                      label: 'No Email',
+                                                      value: 'no_email',
+                                                      matchValue: 'invoice_created',
+                                                      matchTraceAction: 'invoice_created',
+                                                      node: {
+                                                        id: 'created_no_email',
+                                                        name: 'Invoice Created',
+                                                        layer: 'outcome',
+                                                        type: 'outcome',
+                                                        status: 'success',
+                                                        matchAction: 'invoice_created',
+                                                        children: []
+                                                      }
+                                                    }
+                                                  ]
+                                                }]
+                                              }]
+                                            }]
+                                          }
+                                        }
+                                      ]
                                     }]
-                                  }
-                                }
-                              ]
-                            }]
-                          }]
+                                  }]
+                                }]
+                              }
+                            }
+                          ]
                         }]
                       }
                     }
                   ]
                 }]
-              }
+              }]
             }
-          ]
-        }]
+          }
+        ]
       }]
     }]
   }
@@ -1163,9 +1199,9 @@ export const customObjectCreatedWorkflow = {
 // ============================================================================
 export const customObjectUpdatedWorkflow = {
   id: 'custom-object-updated',
-  name: 'Invoice Updated (Custom Object)',
+  name: 'Invoice Updated',
   trigger: '/webhooks/ghl/custom-object-updated',
-  triggerName: 'custom-object-updated',
+  triggerName: 'invoice-updated',
   root: {
     id: 'webhook',
     name: 'Webhook Received',
@@ -1173,94 +1209,130 @@ export const customObjectUpdatedWorkflow = {
     type: 'step',
     matchStep: 'express:webhook_received',
     children: [{
-      id: 'check_object_type',
-      name: 'Check Object Type',
+      id: 'check_self_update',
+      name: 'Check Self-Update',
       layer: 'processing',
       type: 'step',
-      matchStep: 'processing:check_object_type',
+      matchStep: 'processing:check_self_update',
       children: [{
-        id: 'is_invoice_decision',
-        name: 'Is Invoice Object?',
+        id: 'is_self_update_decision',
+        name: 'Is Our Update?',
         layer: 'decision',
         type: 'decision',
-        condition: 'Check if custom object is an invoice',
-        matchStepOutput: { stepName: 'processing:check_object_type', outputField: 'isInvoice' },
+        condition: 'Check if webhook was triggered by our own integration update',
+        matchStepOutput: { stepName: 'processing:check_self_update', outputField: 'isOurUpdate' },
         children: [
           {
-            label: 'No',
-            value: false,
-            matchValue: false,
+            label: 'Yes (Skip)',
+            value: true,
+            matchValue: true,
             node: {
-              id: 'not_invoice_skipped',
-              name: 'Not Invoice - Skipped',
+              id: 'self_update_skipped',
+              name: 'Self-Update Skipped',
               layer: 'outcome',
               type: 'outcome',
               status: 'success',
-              matchAction: 'not_invoice_skipped',
+              matchAction: 'self_update_skipped',
               children: []
             }
           },
           {
-            label: 'Yes',
-            value: true,
-            matchValue: true,
+            label: 'No (Process)',
+            value: false,
+            matchValue: false,
             node: {
-              id: 'get_custom_object',
-              name: 'Get Custom Object Details',
-              layer: 'external',
+              id: 'check_object_type',
+              name: 'Check Object Type',
+              layer: 'processing',
               type: 'step',
-              matchStep: 'ghl:getCustomObject',
+              matchStep: 'processing:check_object_type',
               children: [{
-                id: 'update_result',
-                name: 'Update Result',
+                id: 'is_invoice_decision',
+                name: 'Is Invoice Object?',
                 layer: 'decision',
                 type: 'decision',
-                condition: 'Final update outcome',
-                matchTraceStatus: true,
+                condition: 'Check if custom object is an invoice',
+                matchStepOutput: { stepName: 'processing:check_object_type', outputField: 'isInvoice' },
                 children: [
                   {
-                    label: 'Waiting',
-                    value: 'waiting',
-                    matchValue: 'waiting_for_service_items',
-                    matchTraceAction: 'waiting_for_service_items',
+                    label: 'No',
+                    value: false,
+                    matchValue: false,
                     node: {
-                      id: 'waiting_service_items',
-                      name: 'Waiting for Service Items',
+                      id: 'not_invoice_skipped',
+                      name: 'Not Invoice - Skipped',
                       layer: 'outcome',
                       type: 'outcome',
                       status: 'success',
-                      matchAction: 'waiting_for_service_items',
+                      matchAction: 'not_invoice_skipped',
                       children: []
                     }
                   },
                   {
-                    label: 'No Opportunity',
-                    value: 'no_opp',
-                    matchValue: 'waiting_for_opportunity_association',
-                    matchTraceAction: 'waiting_for_opportunity_association',
+                    label: 'Yes',
+                    value: true,
+                    matchValue: true,
                     node: {
-                      id: 'waiting_opportunity',
-                      name: 'Waiting for Opportunity',
-                      layer: 'outcome',
-                      type: 'outcome',
-                      status: 'success',
-                      matchAction: 'waiting_for_opportunity_association',
-                      children: []
-                    }
-                  },
-                  {
-                    label: 'Updated',
-                    value: 'updated',
-                    matchValue: 'invoice_updated',
-                    matchTraceAction: 'invoice_updated',
-                    node: {
-                      id: 'invoice_updated',
-                      name: 'Invoice Updated',
-                      layer: 'outcome',
-                      type: 'outcome',
-                      status: 'success',
-                      matchAction: 'invoice_updated',
-                      children: []
+                      id: 'get_custom_object',
+                      name: 'Get Custom Object Details',
+                      layer: 'external',
+                      type: 'step',
+                      matchStep: 'ghl:getCustomObject',
+                      children: [{
+                        id: 'update_result',
+                        name: 'Update Result',
+                        layer: 'decision',
+                        type: 'decision',
+                        condition: 'Final update outcome',
+                        matchTraceStatus: true,
+                        children: [
+                          {
+                            label: 'Waiting',
+                            value: 'waiting',
+                            matchValue: 'waiting_for_service_items',
+                            matchTraceAction: 'waiting_for_service_items',
+                            node: {
+                              id: 'waiting_service_items',
+                              name: 'Waiting for Service Items',
+                              layer: 'outcome',
+                              type: 'outcome',
+                              status: 'success',
+                              matchAction: 'waiting_for_service_items',
+                              children: []
+                            }
+                          },
+                          {
+                            label: 'No Opportunity',
+                            value: 'no_opp',
+                            matchValue: 'waiting_for_opportunity_association',
+                            matchTraceAction: 'waiting_for_opportunity_association',
+                            node: {
+                              id: 'waiting_opportunity',
+                              name: 'Waiting for Opportunity',
+                              layer: 'outcome',
+                              type: 'outcome',
+                              status: 'success',
+                              matchAction: 'waiting_for_opportunity_association',
+                              children: []
+                            }
+                          },
+                          {
+                            label: 'Updated',
+                            value: 'updated',
+                            matchValue: 'invoice_updated',
+                            matchTraceAction: 'invoice_updated',
+                            node: {
+                              id: 'invoice_updated',
+                              name: 'Invoice Updated',
+                              layer: 'outcome',
+                              type: 'outcome',
+                              status: 'success',
+                              matchAction: 'invoice_updated',
+                              children: []
+                            }
+                          }
+                        ]
+                      }]
                     }
                   }
                 ]
@@ -1278,9 +1350,9 @@ export const customObjectUpdatedWorkflow = {
 // ============================================================================
 export const customObjectDeletedWorkflow = {
   id: 'custom-object-deleted',
-  name: 'Invoice Deleted (Custom Object)',
+  name: 'Invoice Deleted',
   trigger: '/webhooks/ghl/custom-object-deleted',
-  triggerName: 'custom-object-deleted',
+  triggerName: 'invoice-deleted',
   root: {
     id: 'webhook',
     name: 'Webhook Received',
@@ -1396,6 +1468,10 @@ export const ghlWorkflowTemplates = {
   'custom-object-created': customObjectCreatedWorkflow,
   'custom-object-updated': customObjectUpdatedWorkflow,
   'custom-object-deleted': customObjectDeletedWorkflow,
+  // Aliases for better naming
+  'invoice-created': customObjectCreatedWorkflow,
+  'invoice-updated': customObjectUpdatedWorkflow,
+  'invoice-deleted': customObjectDeletedWorkflow,
 };
 
 /**
