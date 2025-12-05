@@ -47,13 +47,23 @@ function getStatusColor(status) {
 /**
  * Get display trigger name for GHL traces
  * Maps generic custom-object endpoints to specific invoice triggers when applicable
+ * @param {object} trace - The trace object
+ * @param {array} steps - Optional array of steps to check for objectKey in first step's output
  */
-function getGHLTriggerDisplayName(trace) {
+function getGHLTriggerDisplayName(trace, steps = []) {
   const endpoint = trace?.endpoint || ''
   const endpointName = endpoint.split('/').pop() || endpoint
 
-  // Check if this is an invoice-related trace by looking at objectKey in requestBody
-  const objectKey = trace?.requestBody?.objectKey || trace?.requestBody?.schemaKey || ''
+  // Check if this is an invoice-related trace by looking at objectKey
+  // First check trace's requestBody, then fall back to first step's output
+  let objectKey = trace?.requestBody?.objectKey || trace?.requestBody?.schemaKey || ''
+
+  // If no objectKey in requestBody, check the first step's output (webhook_received step)
+  if (!objectKey && steps?.length > 0) {
+    const firstStep = steps[0]
+    objectKey = firstStep?.output?.objectKey || ''
+  }
+
   const isInvoice = objectKey === 'custom_objects.invoices'
 
   // Map custom-object endpoints to invoice-specific names when applicable
@@ -172,6 +182,16 @@ function getEffectiveTraceStatus(trace, steps, system) {
 
   if (trace.errorMessage) {
     return 'error'
+  }
+
+  // If trace status is still "started" but all steps completed successfully,
+  // infer that the trace should be "completed"
+  if (traceStatus === 'started' && steps.length > 0) {
+    const allStepsCompleted = steps.every(step => {
+      const effectiveStatus = getEffectiveStepStatus(step, system)
+      return effectiveStatus === 'completed' || effectiveStatus === 'success'
+    })
+    if (allStepsCompleted) return 'completed'
   }
 
   return traceStatus
@@ -1026,7 +1046,7 @@ export default function TraceDetailPage() {
           ← Back to Traces
         </button>
         <div className="trace-detail-title">
-          <h1>{system === 'clio' ? trace.triggerName : getGHLTriggerDisplayName(trace)}</h1>
+          <h1>{system === 'clio' ? trace.triggerName : getGHLTriggerDisplayName(trace, steps)}</h1>
           <span className={`status-badge ${effectiveTraceStatus}`}>{effectiveTraceStatus}</span>
           <span className="trace-id">ID: {trace.traceId}</span>
         </div>

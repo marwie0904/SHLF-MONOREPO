@@ -1529,22 +1529,45 @@ export function matchGHLTraceToWorkflow(workflow, trace, steps) {
   // First check if responseBody has an explicit action field
   if (responseBody.action) {
     resultAction = responseBody.action;
-  } else if (traceStatus === 'completed' && responseBody.success) {
-    if (responseBody.tasksCreated > 0) {
-      resultAction = 'tasks_created';
-    } else if (responseBody.tasksCreated === 0) {
-      resultAction = 'no_tasks';
-    } else if (responseBody.stageUpdated) {
-      resultAction = 'stage_updated';
-    } else if (responseBody.taskId) {
-      resultAction = 'task_synced';
-    } else {
-      resultAction = 'success';
+  }
+  // If trace doesn't have responseBody (trace stuck at 'started'), check the last step's output
+  else if (!responseBody.action && steps?.length > 0) {
+    // Look for action in any step's output (reverse order to get the latest)
+    for (let i = steps.length - 1; i >= 0; i--) {
+      const stepOutput = steps[i]?.output;
+      if (stepOutput?.action) {
+        resultAction = stepOutput.action;
+        console.log(`[GHL WorkflowMatch] Found action in step ${steps[i].functionName}:`, resultAction);
+        break;
+      }
+      // Also check for specific action indicators in output
+      if (stepOutput?.emailSent !== undefined) {
+        resultAction = stepOutput.emailSent ? 'invoice_created_with_email' : 'invoice_created';
+        console.log(`[GHL WorkflowMatch] Derived action from emailSent:`, resultAction);
+        break;
+      }
     }
-  } else if (traceStatus === 'failed' || responseBody.success === false) {
-    resultAction = 'error';
-  } else if (traceStatus === 'partial') {
-    resultAction = 'partial';
+  }
+
+  // Fall back to status-based detection
+  if (!resultAction) {
+    if (traceStatus === 'completed' && responseBody.success) {
+      if (responseBody.tasksCreated > 0) {
+        resultAction = 'tasks_created';
+      } else if (responseBody.tasksCreated === 0) {
+        resultAction = 'no_tasks';
+      } else if (responseBody.stageUpdated) {
+        resultAction = 'stage_updated';
+      } else if (responseBody.taskId) {
+        resultAction = 'task_synced';
+      } else {
+        resultAction = 'success';
+      }
+    } else if (traceStatus === 'failed' || responseBody.success === false) {
+      resultAction = 'error';
+    } else if (traceStatus === 'partial') {
+      resultAction = 'partial';
+    }
   }
 
   console.log('[GHL WorkflowMatch] Derived resultAction:', resultAction, 'Status:', traceStatus, 'ResponseBody:', responseBody);
