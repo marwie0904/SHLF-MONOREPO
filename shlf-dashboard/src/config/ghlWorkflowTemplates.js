@@ -1110,7 +1110,9 @@ export const customObjectCreatedWorkflow = {
                                         {
                                           label: 'Success',
                                           value: 'success',
-                                          matchValue: true,
+                                          // Success branch is active when resultAction contains 'invoice_created'
+                                          matchTraceAction: 'invoice_created',
+                                          matchTraceActionPartial: true,
                                           node: {
                                             id: 'save_supabase',
                                             name: 'Save to Supabase',
@@ -1672,8 +1674,18 @@ export function matchGHLTraceToWorkflow(workflow, trace, steps) {
         }
 
         // Also check for matchTraceAction on the branch (alternative matching)
-        if (branch.matchTraceAction && resultAction === branch.matchTraceAction) {
-          isBranchActive = branchActive;
+        if (branch.matchTraceAction) {
+          if (branch.matchTraceActionPartial) {
+            // Partial match - resultAction contains the matchTraceAction
+            if (resultAction.includes(branch.matchTraceAction)) {
+              isBranchActive = branchActive;
+            }
+          } else {
+            // Exact match
+            if (resultAction === branch.matchTraceAction) {
+              isBranchActive = branchActive;
+            }
+          }
         }
 
         markedBranch.node = markNode(branch.node, depth + 1, isBranchActive);

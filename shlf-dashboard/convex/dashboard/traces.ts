@@ -42,7 +42,7 @@ export const listTraces = query({
       contactId: t.contactId,
       opportunityId: t.opportunityId,
       status: t.status,
-      resultAction: t.responseStatus?.toString(),
+      resultAction: t.responseBody?.action || t.responseStatus?.toString(),
       dateStarted: t.startTime,
       dateFinished: t.endTime,
       durationMs: t.durationMs,
@@ -50,6 +50,9 @@ export const listTraces = query({
       errorMessage: t.error?.message,
       stepCount: t.stepCount,
       detailCount: t.detailCount,
+      // Include requestBody for objectKey detection
+      requestBody: t.requestBody,
+      responseBody: t.responseBody,
       system: "ghl" as const,
     });
 

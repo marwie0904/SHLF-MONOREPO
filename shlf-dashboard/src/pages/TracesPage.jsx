@@ -48,6 +48,28 @@ function getEffectiveStatus(trace) {
   return status
 }
 
+/**
+ * Get display trigger name for GHL traces
+ * Maps generic custom-object endpoints to specific invoice triggers when applicable
+ */
+function getGHLTriggerDisplayName(trace) {
+  const endpoint = trace?.endpoint || ''
+  const endpointName = endpoint.split('/').pop() || endpoint
+
+  // Check if this is an invoice-related trace by looking at objectKey in requestBody
+  const objectKey = trace?.requestBody?.objectKey || trace?.requestBody?.schemaKey || ''
+  const isInvoice = objectKey === 'custom_objects.invoices'
+
+  // Map custom-object endpoints to invoice-specific names when applicable
+  if (isInvoice) {
+    if (endpointName === 'custom-object-created') return 'invoice-created'
+    if (endpointName === 'custom-object-updated') return 'invoice-updated'
+    if (endpointName === 'custom-object-deleted') return 'invoice-deleted'
+  }
+
+  return endpointName
+}
+
 // Get skip reason from resultAction
 function getSkipReason(resultAction) {
   if (!resultAction) return null
@@ -232,7 +254,7 @@ export default function TracesPage() {
                     <div className="trigger-cell">
                       <span className="trigger-name">
                         {isGhl
-                          ? (trace.endpoint?.split('/').pop() || trace.triggerName || '-')
+                          ? getGHLTriggerDisplayName(trace)
                           : trace.triggerName}
                       </span>
                       <span className="trigger-time">

@@ -44,6 +44,28 @@ function getStatusColor(status) {
   return colors[status] || 'var(--text-muted)'
 }
 
+/**
+ * Get display trigger name for GHL traces
+ * Maps generic custom-object endpoints to specific invoice triggers when applicable
+ */
+function getGHLTriggerDisplayName(trace) {
+  const endpoint = trace?.endpoint || ''
+  const endpointName = endpoint.split('/').pop() || endpoint
+
+  // Check if this is an invoice-related trace by looking at objectKey in requestBody
+  const objectKey = trace?.requestBody?.objectKey || trace?.requestBody?.schemaKey || ''
+  const isInvoice = objectKey === 'custom_objects.invoices'
+
+  // Map custom-object endpoints to invoice-specific names when applicable
+  if (isInvoice) {
+    if (endpointName === 'custom-object-created') return 'invoice-created'
+    if (endpointName === 'custom-object-updated') return 'invoice-updated'
+    if (endpointName === 'custom-object-deleted') return 'invoice-deleted'
+  }
+
+  return endpointName
+}
+
 // Determine effective status from step metadata and other fields
 function getEffectiveStepStatus(step, system) {
   const status = step.status
@@ -1004,7 +1026,7 @@ export default function TraceDetailPage() {
           ← Back to Traces
         </button>
         <div className="trace-detail-title">
-          <h1>{system === 'clio' ? trace.triggerName : (trace.endpoint?.split('/').pop() || trace.endpoint)}</h1>
+          <h1>{system === 'clio' ? trace.triggerName : getGHLTriggerDisplayName(trace)}</h1>
           <span className={`status-badge ${effectiveTraceStatus}`}>{effectiveTraceStatus}</span>
           <span className="trace-id">ID: {trace.traceId}</span>
         </div>

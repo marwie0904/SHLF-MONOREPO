@@ -1,6 +1,28 @@
 import { useState, useMemo } from 'react'
 import { getWorkflowTemplate, matchTraceToWorkflow } from '../config/workflowTemplates'
-import { getGHLWorkflowTemplate, matchGHLTraceToWorkflow } from '../config/ghlWorkflowTemplates'
+import { getGHLWorkflowTemplate, matchGHLTraceToWorkflow, ghlWorkflowTemplates } from '../config/ghlWorkflowTemplates'
+
+/**
+ * Get the appropriate workflow trigger name for GHL traces
+ * Maps generic custom-object endpoints to specific invoice triggers when applicable
+ */
+function getGHLWorkflowTrigger(trace) {
+  const endpoint = trace?.endpoint || ''
+  const endpointName = endpoint.split('/').pop() || endpoint
+
+  // Check if this is an invoice-related trace by looking at objectKey in requestBody
+  const objectKey = trace?.requestBody?.objectKey || trace?.requestBody?.schemaKey || ''
+  const isInvoice = objectKey === 'custom_objects.invoices'
+
+  // Map custom-object endpoints to invoice-specific triggers when applicable
+  if (isInvoice) {
+    if (endpointName === 'custom-object-created') return 'invoice-created'
+    if (endpointName === 'custom-object-updated') return 'invoice-updated'
+    if (endpointName === 'custom-object-deleted') return 'invoice-deleted'
+  }
+
+  return endpointName
+}
 
 /**
  * Get icon for node type/layer
@@ -211,8 +233,9 @@ export default function WorkflowVisualization({ trace, steps, system = 'clio', s
   // Get workflow template and match with trace data
   const matchedWorkflow = useMemo(() => {
     if (system === 'ghl') {
-      // GHL uses endpoint to identify workflow
-      const template = getGHLWorkflowTemplate(trace?.endpoint)
+      // GHL uses endpoint to identify workflow, but map to invoice-specific triggers
+      const triggerName = getGHLWorkflowTrigger(trace)
+      const template = ghlWorkflowTemplates[triggerName] || getGHLWorkflowTemplate(trace?.endpoint)
       if (!template) return null
       return matchGHLTraceToWorkflow(template, trace, steps)
     } else {
@@ -225,7 +248,7 @@ export default function WorkflowVisualization({ trace, steps, system = 'clio', s
 
   if (!matchedWorkflow) {
     const identifier = system === 'ghl'
-      ? trace?.endpoint?.split('/').pop()
+      ? getGHLWorkflowTrigger(trace)
       : trace?.triggerName
     return (
       <div className="wf-visualization empty">
