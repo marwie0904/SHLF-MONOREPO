@@ -18,6 +18,28 @@ const { processInboundSms } = require('./services/smsConfirmationService');
 const { tracingMiddleware, tracingErrorMiddleware } = require('./middleware/tracingMiddleware');
 const { startStep, completeStep, failStep, updateTraceContextIds } = require('./utils/traceContext');
 
+// In-memory cache for recently processed invoices to prevent duplicate processing
+// When we process an invoice, we add it here. If we see it again within TTL, we skip it.
+const recentlyProcessedInvoices = new Map();
+const INVOICE_CACHE_TTL_MS = 60000; // 60 seconds
+
+function markInvoiceAsProcessed(invoiceId) {
+  recentlyProcessedInvoices.set(invoiceId, Date.now());
+  // Clean up old entries
+  const now = Date.now();
+  for (const [id, timestamp] of recentlyProcessedInvoices) {
+    if (now - timestamp > INVOICE_CACHE_TTL_MS) {
+      recentlyProcessedInvoices.delete(id);
+    }
+  }
+}
+
+function wasRecentlyProcessed(invoiceId) {
+  const timestamp = recentlyProcessedInvoices.get(invoiceId);
+  if (!timestamp) return false;
+  return (Date.now() - timestamp) < INVOICE_CACHE_TTL_MS;
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -2496,19 +2518,22 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
 
     // ===== STEP 2: Check if Self-Update (Skip our own updates) - BEFORE ROUTING =====
     // NOTE: GHL webhook does NOT include lastUpdatedBy field - it's only available via API fetch
-    // Instead, we detect self-updates by checking if payment_link, invoice_number, or confido_id
-    // are already present in the webhook properties (fields we add during processing)
+    // Detection methods:
+    // 1. Check if payment_link, invoice_number, or confido_id are in webhook properties
+    // 2. Check if this invoice was recently processed (within 60 seconds)
     const webhookProperties = req.body.properties || {};
     const selfUpdateIndicators = {
       hasPaymentLink: !!webhookProperties.payment_link,
       hasInvoiceNumber: !!webhookProperties.invoice_number,
-      hasConfidoId: !!webhookProperties.confido_id
+      hasConfidoId: !!webhookProperties.confido_id,
+      wasRecentlyProcessed: wasRecentlyProcessed(invoiceRecordId)
     };
-    // For RecordUpdate, if these fields exist, it's likely our own update triggering the webhook
+    // For RecordUpdate, skip if we detect our fields OR if this invoice was just processed
     const isLikelySelfUpdate = eventType === 'RecordUpdate' && (
       selfUpdateIndicators.hasPaymentLink ||
       selfUpdateIndicators.hasInvoiceNumber ||
-      selfUpdateIndicators.hasConfidoId
+      selfUpdateIndicators.hasConfidoId ||
+      selfUpdateIndicators.wasRecentlyProcessed
     );
 
     let selfUpdateStepId = null;
@@ -3137,6 +3162,9 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       console.warn('⚠️ No contact email found, skipping invoice email');
     }
 
+    // Mark this invoice as processed to prevent duplicate processing from GHL webhook cascade
+    markInvoiceAsProcessed(objectData.recordId);
+
     // Determine final action for tracking
     const finalAction = emailSent ? 'invoice_created_with_email' : 'invoice_created';
 
@@ -3227,19 +3255,22 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
 
     // ===== STEP 2: Check if Self-Update (Skip our own updates) =====
     // NOTE: GHL webhook does NOT include lastUpdatedBy field - it's only available via API fetch
-    // Instead, we detect self-updates by checking if payment_link, invoice_number, or confido_id
-    // are already present in the webhook properties (fields we add during processing)
+    // Detection methods:
+    // 1. Check if payment_link, invoice_number, or confido_id are in webhook properties
+    // 2. Check if this invoice was recently processed (within 60 seconds)
     const updateProperties = req.body.properties || {};
     const updateSelfIndicators = {
       hasPaymentLink: !!updateProperties.payment_link,
       hasInvoiceNumber: !!updateProperties.invoice_number,
-      hasConfidoId: !!updateProperties.confido_id
+      hasConfidoId: !!updateProperties.confido_id,
+      wasRecentlyProcessed: wasRecentlyProcessed(objectData.recordId)
     };
-    // If these fields exist in the webhook, it's likely our own update triggering this webhook
+    // If these fields exist in the webhook OR recently processed, skip
     const isLikelyOurUpdate = (
       updateSelfIndicators.hasPaymentLink ||
       updateSelfIndicators.hasInvoiceNumber ||
-      updateSelfIndicators.hasConfidoId
+      updateSelfIndicators.hasConfidoId ||
+      updateSelfIndicators.wasRecentlyProcessed
     );
     // Also check if this is a forwarded request (which means it already went through self-update check)
     const isForwardedRequest = req.isForwardedRequest === true;
@@ -3822,6 +3853,9 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
         console.warn('⚠️ Invoice amount changed - Confido PaymentLink may need manual adjustment');
         console.warn(`Old: $${existingInvoice.data.amount_due}, New: $${total}`);
       }
+
+      // Mark this invoice as processed to prevent duplicate processing
+      markInvoiceAsProcessed(objectData.recordId);
 
       return res.json({
         success: true,
