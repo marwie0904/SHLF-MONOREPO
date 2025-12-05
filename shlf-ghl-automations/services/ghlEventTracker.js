@@ -142,11 +142,14 @@ function sanitize(data, maxDepth = 5) {
   }
 
   const sanitized = {};
+  // Be more specific with sensitive keys to avoid redacting fields like "objectKey"
   const sensitiveKeys = [
-    'password', 'token', 'secret', 'authorization', 'key',
+    'password', 'token', 'secret', 'authorization',
     'api_key', 'apikey', 'access_token', 'refresh_token',
-    'bearer', 'credential', 'signature'
+    'bearer', 'credential', 'signature', 'private_key', 'secret_key'
   ];
+  // Exact matches for short sensitive field names
+  const exactSensitiveKeys = ['key', 'auth'];
 
   for (const [key, value] of Object.entries(data)) {
     // Sanitize non-ASCII characters in keys for Convex compatibility
@@ -160,7 +163,9 @@ function sanitize(data, maxDepth = 5) {
       .replace(/[^\x00-\x7F]/g, '');
 
     const lowerKey = key.toLowerCase();
-    if (sensitiveKeys.some(k => lowerKey.includes(k))) {
+    const isSensitive = sensitiveKeys.some(k => lowerKey.includes(k)) ||
+                        exactSensitiveKeys.includes(lowerKey);
+    if (isSensitive) {
       sanitized[sanitizedKey] = '[REDACTED]';
     } else {
       sanitized[sanitizedKey] = sanitize(value, maxDepth - 1);
