@@ -960,8 +960,8 @@ export const customObjectCreatedWorkflow = {
         name: 'Is Our Update?',
         layer: 'decision',
         type: 'decision',
-        condition: 'Check if webhook was triggered by our own integration update',
-        matchStepOutput: { stepName: 'processing:check_self_update', outputField: 'isOurUpdate' },
+        condition: 'Check if webhook contains fields we add (payment_link, invoice_number, confido_id)',
+        matchStepOutput: { stepName: 'processing:check_self_update', outputField: 'isLikelySelfUpdate' },
         children: [
           {
             label: 'Yes (Skip)',
@@ -1219,8 +1219,8 @@ export const customObjectUpdatedWorkflow = {
         name: 'Is Our Update?',
         layer: 'decision',
         type: 'decision',
-        condition: 'Check if webhook was triggered by our own integration update',
-        matchStepOutput: { stepName: 'processing:check_self_update', outputField: 'isOurUpdate' },
+        condition: 'Check if webhook contains fields we add (payment_link, invoice_number, confido_id)',
+        matchStepOutput: { stepName: 'processing:check_self_update', outputField: 'isLikelyOurUpdate' },
         children: [
           {
             label: 'Yes (Skip)',

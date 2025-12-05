@@ -1224,50 +1224,155 @@ app.post('/workshop', upload.none(), async (req, res) => {
   try {
     console.log('=== WORKSHOP CREATION WEBHOOK RECEIVED ===');
     console.log('Timestamp:', new Date().toISOString());
-    console.log('Content-Type:', req.headers['content-type']);
-    console.log('Request body keys:', Object.keys(req.body || {}));
-    console.log('rawRequest field exists:', !!req.body.rawRequest);
+    console.log('Full Request Body:', JSON.stringify(req.body, null, 2));
+
+    // ===== STEP 1: Webhook Received =====
+    let webhookStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'express', 'webhook_received', {
+          endpoint: '/workshop',
+          method: 'POST',
+          contentType: req.headers['content-type'],
+          timestamp: new Date().toISOString(),
+          bodyKeys: Object.keys(req.body || {}),
+          hasRawRequest: !!req.body.rawRequest
+        });
+        webhookStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting webhook_received step:', e.message);
+      }
+    }
 
     // Get raw data from Jotform webhook
     const rawData = req.body.rawRequest;
 
+    // Complete webhook received step with initial data
+    if (webhookStepId) {
+      try {
+        await completeStep(webhookStepId, {
+          hasRawData: !!rawData,
+          rawDataLength: rawData ? rawData.length : 0,
+          action: rawData ? 'process_webhook' : 'missing_data'
+        });
+      } catch (e) {
+        console.error('Error completing webhook_received step:', e.message);
+      }
+    }
+
+    // ===== STEP 2: Validate Input =====
+    let validateStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'processing', 'validate_input', {
+          hasRawData: !!rawData,
+          rawDataType: typeof rawData
+        });
+        validateStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting validate_input step:', e.message);
+      }
+    }
+
     if (!rawData) {
+      if (validateStepId) {
+        try {
+          await completeStep(validateStepId, {
+            valid: false,
+            reason: 'Missing rawRequest data',
+            action: 'rejected'
+          });
+        } catch (e) {
+          console.error('Error completing validate_input step:', e.message);
+        }
+      }
       return res.status(400).json({
         success: false,
-        message: 'Missing rawRequest data from Jotform webhook'
+        message: 'Missing rawRequest data from Jotform webhook',
+        action: 'validation_failed'
       });
     }
 
-    // Step: Process the workshop event creation
-    let processStepId = null;
+    // Validation passed
+    if (validateStepId) {
+      try {
+        await completeStep(validateStepId, {
+          valid: true,
+          rawDataLength: rawData.length,
+          action: 'validated'
+        });
+      } catch (e) {
+        console.error('Error completing validate_input step:', e.message);
+      }
+    }
+
+    // ===== STEP 3-6: Process Workshop Creation (delegated to main function) =====
+    // The main function handles: parseRawData, downloadFiles, createWorkshopGHL, saveWorkshopToSupabase
+    const result = await createWorkshopEvent(rawData, traceId);
+
+    // ===== STEP 7: Build Response =====
+    let responseStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'createWorkshopEvent', 'main', { hasRawData: !!rawData });
-      processStepId = step.stepId;
+      try {
+        const step = await startStep(traceId, 'processing', 'build_response', {
+          success: result.success,
+          ghlRecordId: result.ghlResponse?.id,
+          supabaseId: result.supabaseResponse?.id
+        });
+        responseStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting build_response step:', e.message);
+      }
     }
 
-    try {
-      const result = await createWorkshopEvent(rawData, traceId, processStepId);
-      if (processStepId) await completeStep(processStepId, result);
+    const response = {
+      success: true,
+      message: 'Workshop created successfully',
+      workshopName: result.workshopData?.workshopName,
+      workshopDate: result.workshopData?.workshopDate,
+      workshopTime: result.workshopData?.workshopTime,
+      workshopType: result.workshopData?.workshopType,
+      filesDownloaded: result.filesDownloaded,
+      ghlRecordId: result.ghlResponse?.id,
+      supabaseId: result.supabaseResponse?.id,
+      traceId: traceId,
+      action: 'workshop_created'
+    };
 
-      res.json({
-        success: true,
-        message: 'Workshop created successfully',
-        workshopName: result.workshopData.workshopName,
-        filesDownloaded: result.filesDownloaded,
-        ghlRecordId: result.ghlResponse?.id,
-        details: result
-      });
-    } catch (processError) {
-      if (processStepId) await failStep(processStepId, processError, traceId);
-      throw processError;
+    if (responseStepId) {
+      try {
+        await completeStep(responseStepId, response);
+      } catch (e) {
+        console.error('Error completing build_response step:', e.message);
+      }
     }
+
+    res.json(response);
 
   } catch (error) {
     console.error('Error processing workshop webhook:', error);
+
+    // ===== Error Step =====
+    let errorStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'error', 'handle_error', {
+          errorMessage: error.message,
+          errorStack: error.stack?.substring(0, 500)
+        });
+        errorStepId = step.stepId;
+        await failStep(errorStepId, error, traceId);
+      } catch (e) {
+        console.error('Error tracking error step:', e.message);
+      }
+    }
+
     res.status(500).json({
       success: false,
       message: 'Error creating workshop',
-      error: error.message
+      error: error.message,
+      traceId: traceId,
+      action: 'workshop_creation_failed'
     });
   }
 });
@@ -2390,17 +2495,29 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     }
 
     // ===== STEP 2: Check if Self-Update (Skip our own updates) - BEFORE ROUTING =====
-    const lastUpdatedBy = req.body.lastUpdatedBy || {};
-    const isOurUpdate = lastUpdatedBy.source === 'INTEGRATION';
+    // NOTE: GHL webhook does NOT include lastUpdatedBy field - it's only available via API fetch
+    // Instead, we detect self-updates by checking if payment_link, invoice_number, or confido_id
+    // are already present in the webhook properties (fields we add during processing)
+    const webhookProperties = req.body.properties || {};
+    const selfUpdateIndicators = {
+      hasPaymentLink: !!webhookProperties.payment_link,
+      hasInvoiceNumber: !!webhookProperties.invoice_number,
+      hasConfidoId: !!webhookProperties.confido_id
+    };
+    // For RecordUpdate, if these fields exist, it's likely our own update triggering the webhook
+    const isLikelySelfUpdate = eventType === 'RecordUpdate' && (
+      selfUpdateIndicators.hasPaymentLink ||
+      selfUpdateIndicators.hasInvoiceNumber ||
+      selfUpdateIndicators.hasConfidoId
+    );
 
     let selfUpdateStepId = null;
     if (traceId) {
       try {
         const step = await startStep(traceId, 'processing', 'check_self_update', {
-          lastUpdatedBySource: lastUpdatedBy.source || 'unknown',
-          lastUpdatedByChannel: lastUpdatedBy.channel || 'unknown',
-          isOurUpdate,
-          eventType
+          eventType,
+          ...selfUpdateIndicators,
+          isLikelySelfUpdate
         });
         selfUpdateStepId = step.stepId;
       } catch (e) {
@@ -2408,13 +2525,15 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       }
     }
 
-    if (isOurUpdate) {
-      console.log('⏭️ Skipping webhook triggered by our own integration update');
+    if (isLikelySelfUpdate) {
+      console.log('⏭️ Skipping webhook - detected fields we add (payment_link, invoice_number, confido_id)');
+      console.log('Self-update indicators:', selfUpdateIndicators);
       if (selfUpdateStepId) {
         try {
           await completeStep(selfUpdateStepId, {
             skipped: true,
-            reason: 'Self-triggered by our integration update',
+            reason: 'Self-triggered by our integration update (detected our fields in properties)',
+            indicators: selfUpdateIndicators,
             action: 'self_update_skipped'
           });
         } catch (e) {
@@ -2424,6 +2543,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       return res.json({
         success: true,
         message: 'Skipped webhook triggered by our own update',
+        indicators: selfUpdateIndicators,
         action: 'self_update_skipped'
       });
     }
@@ -2434,6 +2554,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
         await completeStep(selfUpdateStepId, {
           skipped: false,
           reason: 'External update, processing webhook',
+          indicators: selfUpdateIndicators,
           action: 'process_external_update'
         });
       } catch (e) {
@@ -2466,12 +2587,19 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
         }
       }
       // Forward to delete endpoint internally
+      // Use x-internal-forward header to prevent duplicate trace creation
       const axios = require('axios');
       try {
         const deleteResponse = await axios.post(
           'http://localhost:' + (process.env.PORT || 3000) + '/webhooks/ghl/custom-object-deleted',
           req.body,
-          { headers: { 'Content-Type': 'application/json' } }
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'x-internal-forward': 'true',
+              'x-parent-trace-id': traceId || ''
+            }
+          }
         );
         return res.json(deleteResponse.data);
       } catch (deleteError) {
@@ -2495,12 +2623,19 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
         }
       }
       // Forward to update endpoint internally
+      // Use x-internal-forward header to prevent duplicate trace creation
       const axios = require('axios');
       try {
         const updateResponse = await axios.post(
           'http://localhost:' + (process.env.PORT || 3000) + '/webhooks/ghl/custom-object-updated',
           req.body,
-          { headers: { 'Content-Type': 'application/json' } }
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'x-internal-forward': 'true',
+              'x-parent-trace-id': traceId || ''
+            }
+          }
         );
         return res.json(updateResponse.data);
       } catch (updateError) {
@@ -3089,16 +3224,31 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     console.log('Custom Object Data:', JSON.stringify(objectData, null, 2));
 
     // ===== STEP 2: Check if Self-Update (Skip our own updates) =====
-    const lastUpdatedBy = req.body.lastUpdatedBy || {};
-    const isOurUpdate = lastUpdatedBy.source === 'INTEGRATION';
+    // NOTE: GHL webhook does NOT include lastUpdatedBy field - it's only available via API fetch
+    // Instead, we detect self-updates by checking if payment_link, invoice_number, or confido_id
+    // are already present in the webhook properties (fields we add during processing)
+    const updateProperties = req.body.properties || {};
+    const updateSelfIndicators = {
+      hasPaymentLink: !!updateProperties.payment_link,
+      hasInvoiceNumber: !!updateProperties.invoice_number,
+      hasConfidoId: !!updateProperties.confido_id
+    };
+    // If these fields exist in the webhook, it's likely our own update triggering this webhook
+    const isLikelyOurUpdate = (
+      updateSelfIndicators.hasPaymentLink ||
+      updateSelfIndicators.hasInvoiceNumber ||
+      updateSelfIndicators.hasConfidoId
+    );
+    // Also check if this is a forwarded request (which means it already went through self-update check)
+    const isForwardedRequest = req.isForwardedRequest === true;
 
     let selfUpdateStepId = null;
     if (traceId) {
       try {
         const step = await startStep(traceId, 'processing', 'check_self_update', {
-          lastUpdatedBySource: lastUpdatedBy.source || 'unknown',
-          lastUpdatedByChannel: lastUpdatedBy.channel || 'unknown',
-          isOurUpdate
+          ...updateSelfIndicators,
+          isLikelyOurUpdate,
+          isForwardedRequest
         });
         selfUpdateStepId = step.stepId;
       } catch (e) {
@@ -3106,13 +3256,16 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
       }
     }
 
-    if (isOurUpdate) {
-      console.log('⏭️ Skipping webhook triggered by our own integration update');
+    // Skip if this is our own update (but not if it's a forwarded request - those already passed the check)
+    if (isLikelyOurUpdate && !isForwardedRequest) {
+      console.log('⏭️ Skipping webhook - detected fields we add (payment_link, invoice_number, confido_id)');
+      console.log('Self-update indicators:', updateSelfIndicators);
       if (selfUpdateStepId) {
         try {
           await completeStep(selfUpdateStepId, {
             skipped: true,
-            reason: 'Self-triggered by our integration update',
+            reason: 'Self-triggered by our integration update (detected our fields in properties)',
+            indicators: updateSelfIndicators,
             action: 'self_update_skipped'
           });
         } catch (e) {
@@ -3122,16 +3275,19 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
       return res.json({
         success: true,
         message: 'Skipped webhook triggered by our own update',
+        indicators: updateSelfIndicators,
         action: 'self_update_skipped'
       });
     }
 
-    // Not our update, continue processing
+    // Not our update (or forwarded request), continue processing
     if (selfUpdateStepId) {
       try {
         await completeStep(selfUpdateStepId, {
           skipped: false,
-          reason: 'External update, processing webhook',
+          reason: isForwardedRequest ? 'Forwarded request, processing' : 'External update, processing webhook',
+          indicators: updateSelfIndicators,
+          isForwardedRequest,
           action: 'process_external_update'
         });
       } catch (e) {
@@ -3139,7 +3295,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
       }
     }
 
-    // ===== STEP 4: Check Object Type =====
+    // ===== STEP 3: Check Object Type =====
     let checkTypeStepId = null;
     if (traceId) {
       try {
@@ -3182,7 +3338,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     console.log('✅ Invoice update detected');
     console.log('Invoice Record ID:', objectData.recordId);
 
-    // ===== STEP 5: Get Custom Object Details =====
+    // ===== STEP 4: Get Custom Object Details =====
     let getRecordStepId = null;
     if (traceId) {
       try {

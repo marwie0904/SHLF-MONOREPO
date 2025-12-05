@@ -10,6 +10,7 @@ const {
   completeTrace,
   failTrace,
   isTracingEnabled,
+  getTraceContext,
 } = require('../utils/traceContext');
 
 /**
@@ -42,6 +43,19 @@ function tracingMiddleware(req, res, next) {
   if (!isTracingEnabled()) {
     req.traceId = null;
     req.traceContext = null;
+    return next();
+  }
+
+  // Handle internal forwarded requests (from axios routing within the server)
+  // These requests continue using the parent trace instead of creating a new one
+  if (req.headers['x-internal-forward'] === 'true') {
+    const parentTraceId = req.headers['x-parent-trace-id'] || null;
+    console.log(`[TRACING] Internal forward to ${req.path} - continuing parent trace ${parentTraceId}`);
+    req.traceId = parentTraceId;
+    // Retrieve the existing trace context so steps can continue to be added
+    req.traceContext = parentTraceId ? getTraceContext(parentTraceId) : null;
+    req.isForwardedRequest = true;
+    // Don't set up response handlers - the parent request will complete the trace
     return next();
   }
 
