@@ -45,6 +45,21 @@ function getEffectiveStatus(trace) {
     return 'error'
   }
 
+  // If trace status is "started" but has a successful resultAction, infer "completed"
+  // This handles cases where trace completion didn't fire properly
+  if (status === 'started' && resultAction) {
+    if (resultAction.includes('invoice_created') || resultAction.includes('invoice_updated') ||
+        resultAction.includes('tasks_created') || resultAction.includes('success') ||
+        resultAction === 'self_update_skipped' || resultAction === 'forwarded') {
+      return 'completed'
+    }
+  }
+
+  // If trace has stepCount > 0 and status is still "started", likely completed
+  if (status === 'started' && trace.stepCount > 0 && trace.durationMs) {
+    return 'completed'
+  }
+
   return status
 }
 
@@ -54,7 +69,21 @@ function getEffectiveStatus(trace) {
  */
 function getGHLTriggerDisplayName(trace) {
   const endpoint = trace?.endpoint || ''
-  const endpointName = endpoint.split('/').pop() || endpoint
+  let endpointName = endpoint.split('/').pop() || endpoint
+  const resultAction = trace?.resultAction?.toLowerCase() || ''
+  const responseAction = trace?.responseBody?.action?.toLowerCase() || ''
+
+  // Check if this trace was forwarded to a different endpoint
+  // The resultAction or responseBody.action contains the actual action taken
+  if (endpointName === 'custom-object-created') {
+    // Check if it was actually forwarded to update or delete handler
+    if (resultAction.includes('invoice_updated') || responseAction.includes('invoice_updated') ||
+        resultAction === 'forwarded' || resultAction.includes('update')) {
+      endpointName = 'custom-object-updated'
+    } else if (resultAction.includes('deleted') || responseAction.includes('deleted')) {
+      endpointName = 'custom-object-deleted'
+    }
+  }
 
   // Check if this is an invoice-related trace by looking at objectKey in requestBody
   const objectKey = trace?.requestBody?.objectKey || trace?.requestBody?.schemaKey || ''
