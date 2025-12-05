@@ -15,7 +15,12 @@ export const createDetail = mutation({
       v.literal("db_query"),
       v.literal("internal"),
       v.literal("webhook_out"),
-      v.literal("ai_call")
+      v.literal("ai_call"),
+      v.literal("decision"),
+      v.literal("calculation"),
+      v.literal("validation"),
+      v.literal("webhook"),
+      v.literal("operation")
     ),
     sequence: v.number(),
     // For API calls
@@ -129,7 +134,12 @@ export const createCompletedDetail = mutation({
       v.literal("db_query"),
       v.literal("internal"),
       v.literal("webhook_out"),
-      v.literal("ai_call")
+      v.literal("ai_call"),
+      v.literal("decision"),
+      v.literal("calculation"),
+      v.literal("validation"),
+      v.literal("webhook"),
+      v.literal("operation")
     ),
     sequence: v.number(),
     // For API calls
@@ -194,7 +204,12 @@ export const createFailedDetail = mutation({
       v.literal("db_query"),
       v.literal("internal"),
       v.literal("webhook_out"),
-      v.literal("ai_call")
+      v.literal("ai_call"),
+      v.literal("decision"),
+      v.literal("calculation"),
+      v.literal("validation"),
+      v.literal("webhook"),
+      v.literal("operation")
     ),
     sequence: v.number(),
     // For API calls
