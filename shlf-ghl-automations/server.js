@@ -2350,6 +2350,22 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     console.log('Timestamp:', new Date().toISOString());
     console.log('Full Request Body:', JSON.stringify(req.body, null, 2));
 
+    // ===== STEP 1: Webhook Received =====
+    let webhookStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'express', 'webhook_received', {
+          endpoint: '/webhooks/ghl/custom-object-created',
+          method: 'POST',
+          contentType: req.headers['content-type'],
+          timestamp: new Date().toISOString()
+        });
+        webhookStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting webhook_received step:', e.message);
+      }
+    }
+
     // Update trace with invoice ID if available
     const invoiceRecordId = req.body.id || req.body.recordId;
     if (traceId && invoiceRecordId) {
@@ -2357,10 +2373,46 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     }
 
     const eventType = req.body.type || 'RecordCreate';
+    const objectKey = req.body.objectKey || req.body.schemaKey;
+
+    // Complete webhook received step
+    if (webhookStepId) {
+      try {
+        await completeStep(webhookStepId, {
+          recordId: invoiceRecordId,
+          eventType,
+          objectKey,
+          hasProperties: !!req.body.properties
+        });
+      } catch (e) {
+        console.error('Error completing webhook_received step:', e.message);
+      }
+    }
+
+    // ===== STEP 2: Route Event Type =====
+    let routeStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'express', 'route_event_type', {
+          eventType,
+          objectKey
+        });
+        routeStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting route_event_type step:', e.message);
+      }
+    }
 
     // Route to appropriate handler based on event type
     if (eventType === 'RecordDelete') {
       console.log('📍 Routing to DELETE handler...');
+      if (routeStepId) {
+        try {
+          await completeStep(routeStepId, { routedTo: 'custom-object-deleted', action: 'forwarded' });
+        } catch (e) {
+          console.error('Error completing route_event_type step:', e.message);
+        }
+      }
       // Forward to delete endpoint internally
       const axios = require('axios');
       try {
@@ -2375,13 +2427,21 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
         return res.status(500).json({
           success: false,
           message: 'Error processing delete webhook',
-          error: deleteError.message
+          error: deleteError.message,
+          action: 'forward_error'
         });
       }
     }
 
     if (eventType === 'RecordUpdate') {
       console.log('📍 Routing to UPDATE handler...');
+      if (routeStepId) {
+        try {
+          await completeStep(routeStepId, { routedTo: 'custom-object-updated', action: 'forwarded' });
+        } catch (e) {
+          console.error('Error completing route_event_type step:', e.message);
+        }
+      }
       // Forward to update endpoint internally
       const axios = require('axios');
       try {
@@ -2396,12 +2456,20 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
         return res.status(500).json({
           success: false,
           message: 'Error processing update webhook',
-          error: updateError.message
+          error: updateError.message,
+          action: 'forward_error'
         });
       }
     }
 
     // Continue with RecordCreate handling
+    if (routeStepId) {
+      try {
+        await completeStep(routeStepId, { routedTo: 'RecordCreate', action: 'process_locally' });
+      } catch (e) {
+        console.error('Error completing route_event_type step:', e.message);
+      }
+    }
     console.log('📍 Processing as CREATE event...');
 
     const ghlService = require('./services/ghlService');
@@ -2418,27 +2486,70 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
 
     console.log('Custom Object Data:', JSON.stringify(objectData, null, 2));
 
+    // ===== STEP 3: Check Object Type =====
+    let checkTypeStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'processing', 'check_object_type', {
+          objectKey: objectData.objectKey,
+          expectedKey: 'custom_objects.invoices'
+        });
+        checkTypeStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting check_object_type step:', e.message);
+      }
+    }
+
     // Check if this is an invoice object
     if (objectData.objectKey !== 'custom_objects.invoices') {
       console.log('ℹ️ Not an invoice object, skipping...');
+      if (checkTypeStepId) {
+        try {
+          await completeStep(checkTypeStepId, {
+            isInvoice: false,
+            objectKey: objectData.objectKey,
+            action: 'skipped'
+          });
+        } catch (e) {
+          console.error('Error completing check_object_type step:', e.message);
+        }
+      }
       return res.json({
         success: true,
-        message: 'Custom object received but not processed (not invoice)'
+        message: 'Custom object received but not processed (not invoice)',
+        action: 'not_invoice_skipped'
       });
+    }
+
+    // Is invoice object
+    if (checkTypeStepId) {
+      try {
+        await completeStep(checkTypeStepId, {
+          isInvoice: true,
+          recordId: objectData.recordId,
+          action: 'process_invoice'
+        });
+      } catch (e) {
+        console.error('Error completing check_object_type step:', e.message);
+      }
     }
 
     console.log('✅ Invoice custom object detected');
     console.log('Invoice Record ID:', objectData.recordId);
 
-    // Step 1: Wait for opportunity association with retry logic
+    // ===== STEP 4: Wait for Opportunity Association =====
     let retryStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'custom-object-created', 'waitForOpportunityAssociation', {
-        recordId: objectData.recordId,
-        maxAttempts: 6,
-        delayMs: 10000
-      });
-      retryStepId = step.stepId;
+      try {
+        const step = await startStep(traceId, 'ghl', 'waitForOpportunityAssociation', {
+          recordId: objectData.recordId,
+          maxAttempts: 6,
+          delayMs: 10000
+        });
+        retryStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting waitForOpportunityAssociation step:', e.message);
+      }
     }
 
     let invoiceRecord = null;
@@ -2485,13 +2596,14 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
 
         if (attemptCount === maxAttempts) {
           console.log('❌ Max attempts reached - no opportunity association found');
-          if (retryStepId) await completeStep(retryStepId, { found: false, attempts: attemptCount });
+          if (retryStepId) await completeStep(retryStepId, { found: false, attempts: attemptCount, action: 'no_opportunity_association' });
           return res.json({
             success: false,
             message: 'Invoice missing opportunity association after 6 attempts',
             invoiceId: objectData.recordId,
             hasOpportunity: hasOpportunity,
-            attempts: attemptCount
+            attempts: attemptCount,
+            action: 'no_opportunity_association'
           });
         }
       }
@@ -2500,13 +2612,17 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       throw retryError;
     }
 
-    // Step 2: Calculate invoice total from service items
+    // ===== STEP 5: Calculate Invoice Total =====
     let calcStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'invoiceService', 'calculateInvoiceTotal', {
-        serviceItems: invoiceRecord.properties.serviceproduct || []
-      });
-      calcStepId = step.stepId;
+      try {
+        const step = await startStep(traceId, 'supabase', 'calculateInvoiceTotal', {
+          serviceItems: invoiceRecord.properties.serviceproduct || []
+        });
+        calcStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting calculateInvoiceTotal step:', e.message);
+      }
     }
 
     const serviceItems = invoiceRecord.properties.serviceproduct || [];
@@ -2514,14 +2630,15 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
 
     let calculationResult;
     try {
-      calculationResult = await invoiceService.calculateInvoiceTotal(serviceItems);
+      calculationResult = await invoiceService.calculateInvoiceTotal(serviceItems, traceId, calcStepId);
       if (!calculationResult.success) {
         if (calcStepId) await failStep(calcStepId, { message: calculationResult.error }, traceId);
         console.error('Failed to calculate invoice total:', calculationResult.error);
         return res.status(500).json({
           success: false,
           message: 'Failed to calculate invoice total',
-          error: calculationResult.error
+          error: calculationResult.error,
+          action: 'calculation_failed'
         });
       }
       if (calcStepId) await completeStep(calcStepId, {
@@ -2540,7 +2657,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       console.warn('Missing service items:', missingItems.join(', '));
     }
 
-    // Step 3: Get opportunity details
+    // ===== STEP 6: Get Opportunity Details =====
     let getOppStepId = null;
     const opportunityRelation = relationsResponse.relations.find(
       rel => rel.secondObjectKey === 'opportunity' || rel.firstObjectKey === 'opportunity'
@@ -2550,16 +2667,20 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       : opportunityRelation.firstRecordId;
 
     if (traceId) {
-      const step = await startStep(traceId, 'ghlService', 'getOpportunity', { opportunityId });
-      getOppStepId = step.stepId;
-      await updateTraceContextIds(traceId, { opportunityId });
+      try {
+        const step = await startStep(traceId, 'ghl', 'getOpportunity', { opportunityId });
+        getOppStepId = step.stepId;
+        await updateTraceContextIds(traceId, { opportunityId });
+      } catch (e) {
+        console.error('Error starting getOpportunity step:', e.message);
+      }
     }
 
     console.log('✅ Found opportunity:', opportunityId);
 
     let opportunity;
     try {
-      const opportunityResponse = await ghlService.getOpportunity(opportunityId);
+      const opportunityResponse = await ghlService.getOpportunity(opportunityId, traceId, getOppStepId);
       opportunity = opportunityResponse.opportunity;
       if (getOppStepId) await completeStep(getOppStepId, {
         opportunityName: opportunity.name,
@@ -2572,15 +2693,19 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       throw oppError;
     }
 
-    // Step 4: Create invoice in Confido
+    // ===== STEP 7: Create Invoice in Confido =====
     let confidoStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'confidoService', 'createInvoice', {
-        ghlInvoiceId: objectData.recordId,
-        opportunityId: opportunity.id,
-        amountDue: total
-      });
-      confidoStepId = step.stepId;
+      try {
+        const step = await startStep(traceId, 'confido', 'createInvoice', {
+          ghlInvoiceId: objectData.recordId,
+          opportunityId: opportunity.id,
+          amountDue: total
+        });
+        confidoStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting createInvoice step:', e.message);
+      }
     }
 
     console.log('Creating invoice in Confido...');
@@ -2599,7 +2724,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
         dueDate: invoiceRecord.properties.due_date || null,
         memo: `Invoice for ${lineItems.map(item => item.name).join(', ')}`,
         lineItems: lineItems
-      });
+      }, traceId, confidoStepId);
 
       if (!confidoResult.success) {
         // Check if this is a duplicate PaymentLink error
@@ -2608,7 +2733,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
           console.log('Checking Supabase for existing invoice record...');
 
           // Get existing invoice from Supabase
-          const existingInvoice = await invoiceService.getInvoiceByGHLId(objectData.recordId);
+          const existingInvoice = await invoiceService.getInvoiceByGHLId(objectData.recordId, traceId, confidoStepId);
 
           if (existingInvoice.success && existingInvoice.data) {
             console.log('✅ Found existing invoice in Supabase');
@@ -2616,7 +2741,8 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
 
             if (confidoStepId) await completeStep(confidoStepId, {
               isDuplicate: true,
-              paymentUrl: existingInvoice.data.payment_url
+              paymentUrl: existingInvoice.data.payment_url,
+              action: 'duplicate_invoice'
             });
 
             return res.json({
@@ -2625,7 +2751,8 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
               invoiceId: objectData.recordId,
               opportunityId: opportunity.id,
               paymentUrl: existingInvoice.data.payment_url,
-              isDuplicate: true
+              isDuplicate: true,
+              action: 'duplicate_invoice'
             });
           } else {
             console.error('⚠️ PaymentLink exists in Confido but not in Supabase');
@@ -2634,7 +2761,8 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
               success: false,
               message: 'Data inconsistency - PaymentLink exists in Confido but not in Supabase',
               invoiceId: objectData.recordId,
-              confidoError: confidoResult.error
+              confidoError: confidoResult.error,
+              action: 'data_inconsistency'
             });
           }
         }
@@ -2647,7 +2775,8 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
           message: 'Invoice processed but Confido creation failed',
           invoiceId: objectData.recordId,
           opportunityId: opportunity.id,
-          confidoError: confidoResult.error
+          confidoError: confidoResult.error,
+          action: 'confido_failed'
         });
       }
 
@@ -2672,15 +2801,19 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     const invoiceNumber = `INV-${dateStr}-${randomStr}`;
     console.log('Generated Invoice Number:', invoiceNumber);
 
-    // Step 5: Save to Supabase
+    // ===== STEP 8: Save to Supabase =====
     let saveStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'invoiceService', 'saveInvoiceToSupabase', {
-        ghlInvoiceId: objectData.recordId,
-        invoiceNumber,
-        amountDue: total
-      });
-      saveStepId = step.stepId;
+      try {
+        const step = await startStep(traceId, 'supabase', 'saveInvoiceToSupabase', {
+          ghlInvoiceId: objectData.recordId,
+          invoiceNumber,
+          amountDue: total
+        });
+        saveStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting saveInvoiceToSupabase step:', e.message);
+      }
     }
 
     console.log('Saving to Supabase...');
@@ -2701,7 +2834,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
         status: 'unpaid',
         invoiceDate: new Date().toISOString(),
         dueDate: invoiceRecord.properties.due_date || null
-      });
+      }, traceId, saveStepId);
       if (saveStepId) await completeStep(saveStepId, { success: true, invoiceNumber });
       console.log('✅ Invoice saved to Supabase');
     } catch (saveError) {
@@ -2712,14 +2845,18 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     // Calculate subtotal (same as total for now)
     const subtotal = total;
 
-    // Step 6: Update GHL custom object with payment link
+    // ===== STEP 9: Update GHL Custom Object =====
     let updateGhlStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'ghlService', 'updateCustomObject', {
-        recordId: objectData.recordId,
-        fields: ['payment_link', 'invoice_number', 'subtotal', 'total']
-      });
-      updateGhlStepId = step.stepId;
+      try {
+        const step = await startStep(traceId, 'ghl', 'updateCustomObject', {
+          recordId: objectData.recordId,
+          fields: ['payment_link', 'invoice_number', 'subtotal', 'total']
+        });
+        updateGhlStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting updateCustomObject step:', e.message);
+      }
     }
 
     try {
@@ -2727,7 +2864,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
 
       // First verify the object still exists
       console.log('Verifying custom object still exists...');
-      const verifyResponse = await ghlService.getCustomObject(objectData.objectKey, objectData.recordId);
+      const verifyResponse = await ghlService.getCustomObject(objectData.objectKey, objectData.recordId, traceId, updateGhlStepId);
 
       if (verifyResponse && verifyResponse.record) {
         console.log('✅ Custom object verified, proceeding with update');
@@ -2740,7 +2877,9 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
             invoice_number: invoiceNumber,
             subtotal: { value: subtotal, currency: 'default' },
             total: { value: total, currency: 'default' }
-          }
+          },
+          traceId,
+          updateGhlStepId
         );
         if (updateGhlStepId) await completeStep(updateGhlStepId, { success: true, updated: true });
         console.log('✅ GHL custom object updated with payment link, invoice number, subtotal, and total');
@@ -2757,18 +2896,23 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       console.error('This is OK - invoice still created in Confido and Supabase');
     }
 
-    // Step 7: Send invoice email to client
+    // ===== STEP 10: Send Invoice Email =====
     let emailStepId = null;
     let emailSent = false;
     const contactEmail = opportunity.contact?.email;
 
     if (contactEmail) {
       if (traceId) {
-        const step = await startStep(traceId, 'invoiceEmailService', 'sendInvoiceEmail', {
-          contactEmail,
-          invoiceNumber
-        });
-        emailStepId = step.stepId;
+        try {
+          const step = await startStep(traceId, 'email', 'sendInvoiceEmail', {
+            contactEmail,
+            invoiceNumber,
+            amountDue: total
+          });
+          emailStepId = step.stepId;
+        } catch (e) {
+          console.error('Error starting sendInvoiceEmail step:', e.message);
+        }
       }
 
       try {
@@ -2792,7 +2936,7 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
           paymentLink: confidoResult.paymentUrl
         };
 
-        await sendInvoiceEmail(invoiceEmailData, contactEmail);
+        await sendInvoiceEmail(invoiceEmailData, contactEmail, traceId, emailStepId);
         if (emailStepId) await completeStep(emailStepId, { success: true, emailSent: true });
         console.log('✅ Invoice email sent successfully');
         emailSent = true;
@@ -2804,9 +2948,13 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
       console.warn('⚠️ No contact email found, skipping invoice email');
     }
 
+    // Determine final action for tracking
+    const finalAction = emailSent ? 'invoice_created_with_email' : 'invoice_created';
+
     res.json({
       success: true,
       message: 'Custom invoice processed successfully',
+      action: finalAction,
       invoiceId: objectData.recordId,
       opportunityId: opportunity.id,
       total: total,
@@ -2825,7 +2973,8 @@ app.post('/webhooks/ghl/custom-object-created', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error processing custom object webhook',
-      error: error.message
+      error: error.message,
+      action: 'error'
     });
   }
 });
@@ -2840,6 +2989,22 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     console.log('=== GHL CUSTOM OBJECT UPDATED WEBHOOK RECEIVED ===');
     console.log('Timestamp:', new Date().toISOString());
     console.log('Full Request Body:', JSON.stringify(req.body, null, 2));
+
+    // ===== STEP 1: Webhook Received =====
+    let webhookStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'express', 'webhook_received', {
+          endpoint: '/webhooks/ghl/custom-object-updated',
+          method: 'POST',
+          contentType: req.headers['content-type'],
+          timestamp: new Date().toISOString()
+        });
+        webhookStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting webhook_received step:', e.message);
+      }
+    }
 
     const ghlService = require('./services/ghlService');
     const confidoService = require('./services/confidoService');
@@ -2857,28 +3022,75 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
       await updateTraceContextIds(traceId, { invoiceId: objectData.recordId });
     }
 
+    // Complete webhook received step
+    if (webhookStepId) {
+      try {
+        await completeStep(webhookStepId, {
+          recordId: objectData.recordId,
+          objectKey: objectData.objectKey
+        });
+      } catch (e) {
+        console.error('Error completing webhook_received step:', e.message);
+      }
+    }
+
     console.log('Custom Object Data:', JSON.stringify(objectData, null, 2));
+
+    // ===== STEP 2: Check Object Type =====
+    let checkTypeStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'processing', 'check_object_type', {
+          objectKey: objectData.objectKey,
+          expectedKey: 'custom_objects.invoices'
+        });
+        checkTypeStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting check_object_type step:', e.message);
+      }
+    }
 
     // Check if this is an invoice object
     if (objectData.objectKey !== 'custom_objects.invoices') {
       console.log('ℹ️ Not an invoice object, skipping...');
+      if (checkTypeStepId) {
+        try {
+          await completeStep(checkTypeStepId, { isInvoice: false, action: 'skipped' });
+        } catch (e) {
+          console.error('Error completing check_object_type step:', e.message);
+        }
+      }
       return res.json({
         success: true,
-        message: 'Custom object received but not processed (not invoice)'
+        message: 'Custom object received but not processed (not invoice)',
+        action: 'not_invoice_skipped'
       });
+    }
+
+    // Is invoice object
+    if (checkTypeStepId) {
+      try {
+        await completeStep(checkTypeStepId, { isInvoice: true, action: 'process_update' });
+      } catch (e) {
+        console.error('Error completing check_object_type step:', e.message);
+      }
     }
 
     console.log('✅ Invoice update detected');
     console.log('Invoice Record ID:', objectData.recordId);
 
-    // Step 1: Get updated custom object details from GHL
+    // ===== STEP 3: Get Custom Object Details =====
     let getRecordStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'ghlService', 'getCustomObject', {
-        objectKey: objectData.objectKey,
-        recordId: objectData.recordId
-      });
-      getRecordStepId = step.stepId;
+      try {
+        const step = await startStep(traceId, 'ghl', 'getCustomObject', {
+          objectKey: objectData.objectKey,
+          recordId: objectData.recordId
+        });
+        getRecordStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting getCustomObject step:', e.message);
+      }
     }
 
     let invoiceRecord;
@@ -2910,7 +3122,8 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
         success: true,
         message: 'Invoice update received, waiting for service items',
         invoiceId: objectData.recordId,
-        hasPaymentLink: !!existingPaymentLink
+        hasPaymentLink: !!existingPaymentLink,
+        action: 'waiting_for_service_items'
       });
     }
 
@@ -2978,7 +3191,8 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
           success: true,
           message: 'Invoice update received, waiting for opportunity association',
           invoiceId: objectData.recordId,
-          hasPaymentLink: !!existingPaymentLink
+          hasPaymentLink: !!existingPaymentLink,
+          action: 'waiting_for_opportunity_association'
         });
       }
     } catch (relError) {
@@ -3349,6 +3563,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
       return res.json({
         success: true,
         message: 'Invoice updated in Supabase',
+        action: 'invoice_updated',
         invoiceId: objectData.recordId,
         opportunityId: opportunity.id,
         total: total,
@@ -3363,7 +3578,8 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error processing custom object update webhook',
-      error: error.message
+      error: error.message,
+      action: 'error'
     });
   }
 });
@@ -3377,6 +3593,22 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
     console.log('=== GHL CUSTOM OBJECT DELETED WEBHOOK RECEIVED ===');
     console.log('Timestamp:', new Date().toISOString());
     console.log('Full Request Body:', JSON.stringify(req.body, null, 2));
+
+    // ===== STEP 1: Webhook Received =====
+    let webhookStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'express', 'webhook_received', {
+          endpoint: '/webhooks/ghl/custom-object-deleted',
+          method: 'POST',
+          contentType: req.headers['content-type'],
+          timestamp: new Date().toISOString()
+        });
+        webhookStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting webhook_received step:', e.message);
+      }
+    }
 
     const invoiceService = require('./services/invoiceService');
     const confidoService = require('./services/confidoService');
@@ -3393,27 +3625,74 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
       await updateTraceContextIds(traceId, { invoiceId: objectData.recordId });
     }
 
+    // Complete webhook received step
+    if (webhookStepId) {
+      try {
+        await completeStep(webhookStepId, {
+          recordId: objectData.recordId,
+          objectKey: objectData.objectKey
+        });
+      } catch (e) {
+        console.error('Error completing webhook_received step:', e.message);
+      }
+    }
+
     console.log('Custom Object Data:', JSON.stringify(objectData, null, 2));
+
+    // ===== STEP 2: Check Object Type =====
+    let checkTypeStepId = null;
+    if (traceId) {
+      try {
+        const step = await startStep(traceId, 'processing', 'check_object_type', {
+          objectKey: objectData.objectKey,
+          expectedKey: 'custom_objects.invoices'
+        });
+        checkTypeStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting check_object_type step:', e.message);
+      }
+    }
 
     // Check if this is an invoice object
     if (objectData.objectKey !== 'custom_objects.invoices') {
       console.log('ℹ️ Not an invoice object, skipping...');
+      if (checkTypeStepId) {
+        try {
+          await completeStep(checkTypeStepId, { isInvoice: false, action: 'skipped' });
+        } catch (e) {
+          console.error('Error completing check_object_type step:', e.message);
+        }
+      }
       return res.json({
         success: true,
-        message: 'Custom object received but not processed (not invoice)'
+        message: 'Custom object received but not processed (not invoice)',
+        action: 'not_invoice_skipped'
       });
+    }
+
+    // Is invoice object
+    if (checkTypeStepId) {
+      try {
+        await completeStep(checkTypeStepId, { isInvoice: true, action: 'process_delete' });
+      } catch (e) {
+        console.error('Error completing check_object_type step:', e.message);
+      }
     }
 
     console.log('✅ Invoice deletion detected');
     console.log('Invoice Record ID:', objectData.recordId);
 
-    // Step 1: Get existing invoice from Supabase
+    // ===== STEP 3: Get Existing Invoice =====
     let getInvoiceStepId = null;
     if (traceId) {
-      const step = await startStep(traceId, 'invoiceService', 'getInvoiceByGHLId', {
-        ghlInvoiceId: objectData.recordId
-      });
-      getInvoiceStepId = step.stepId;
+      try {
+        const step = await startStep(traceId, 'supabase', 'getInvoiceByGHLId', {
+          ghlInvoiceId: objectData.recordId
+        });
+        getInvoiceStepId = step.stepId;
+      } catch (e) {
+        console.error('Error starting getInvoiceByGHLId step:', e.message);
+      }
     }
 
     let existingInvoice;
@@ -3421,13 +3700,14 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
       existingInvoice = await invoiceService.getInvoiceByGHLId(objectData.recordId);
 
       if (!existingInvoice.success || !existingInvoice.data) {
-        if (getInvoiceStepId) await completeStep(getInvoiceStepId, { found: false });
+        if (getInvoiceStepId) await completeStep(getInvoiceStepId, { found: false, action: 'not_found' });
         console.log('ℹ️ Invoice not found in Supabase - already deleted or never created');
         console.log('Nothing to do, returning success');
         return res.json({
           success: true,
           message: 'Invoice not found (already deleted or never created) - no action needed',
-          invoiceId: objectData.recordId
+          invoiceId: objectData.recordId,
+          action: 'not_found_no_action'
         });
       }
 
@@ -3504,6 +3784,7 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
     res.json({
       success: true,
       message: 'Invoice deleted successfully',
+      action: 'invoice_deleted',
       invoiceId: objectData.recordId,
       confidoInvoiceId: confidoInvoiceId,
       confidoDeleted: confidoDeleteResult?.success || false,
@@ -3515,7 +3796,8 @@ app.post('/webhooks/ghl/custom-object-deleted', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error processing custom object delete webhook',
-      error: error.message
+      error: error.message,
+      action: 'error'
     });
   }
 });
