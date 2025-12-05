@@ -3711,7 +3711,7 @@ app.post('/webhooks/ghl/custom-object-updated', async (req, res) => {
 
       if (contactEmail) {
         if (traceId) {
-          const step = await startStep(traceId, 'invoiceEmailService', 'sendInvoiceEmail', {
+          const step = await startStep(traceId, 'email', 'sendInvoiceEmail', {
             contactEmail,
             invoiceNumber
           });
